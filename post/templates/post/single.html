@@ -13,10 +13,18 @@
 										<h2>{{post.title}}</h2>
 										<p>{{post.cat}}</p>
 									</div>
+									{%if p.author.avatar%}
 									<div class="meta">
 										<time class="published" datetime="{{post.time_create}}">{{post.time_update|time:"G:i"}}<br>{{post.time_update|date:"d F Y"}}</time>
-										<a href="#" class="author"><span class="name">{{post.author.last_name}}<br>{{post.author.first_name}}<br>{{post.author.patronymic}}</span><img src="{{post.author.avatar.url}}" alt="" /></a>
+										<a href="#" class="author"><span class="name">{{post.author.last_name}}<br>{{post.author.first_name}}<br>{{post.author.patronymic}}</span>
+											<img src="{{post.author.avatar.url}}" alt="" /></a>
 									</div>
+									{%else%}
+									<div class="meta">
+										<time class="published" datetime="{{post.time_create}}">{{post.time_update|time:"G:i"}}<br>{{post.time_update|date:"d F Y"}}</time>
+										<a href="#" class="author"><span class="name">{{post.author.last_name}}<br>{{post.author.first_name}}<br>{{post.author.patronymic}}</span>
+											<img src="{% static 'post/images/avatar7.png' %}" alt="" /></a>
+											{% endif %}
 								</header>
 								{% if post.photo %}
 								<span class="image featured"><img src="{{post.photo.url}}" alt="" /></span>
