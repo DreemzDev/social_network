@@ -1,0 +1,62 @@
+<!-- {% extends 'profiles/profiles.html' %}
+{% block add %}
+
+						
+                        <article class="post">
+								<section>
+
+									<form action="{% url 'addpost'user.username}" method="post" enctype="multipart/form-data">
+										{% csrf_token %}
+										<div class="row gtr-uniform">
+											<div class="col-6 col-12-xsmall">
+												{{form.title}}
+
+											</div>
+											<div class="col-6 col-12-xsmall">
+												{{form.cat}}
+
+											</div>
+
+
+											<div class="col-12">
+												{{form.content}}
+											</div>
+
+										</div>
+									
+								</section>
+
+                            
+                            <footer>
+                                <ul class="actions">
+
+									<button type="submit">Добавить</button> 
+                                </ul>
+                                <ul class="stats">
+									
+
+                                    <li>
+										
+										{{form.photo}}
+
+   										<label for="id_photo" class="input__file-button">
+										<a for="id_photo" class="icon solid fa-camera" ></a>
+     									<span class="input__file-button-text"></span>
+										 
+   										</label>
+
+									</li>
+                                    <li>
+										<label for="id_photo" class="input__file-button">
+
+										<a href="#" class="icon solid fa-file-word"></a></li></label>
+                                </ul>
+                            </footer>
+						
+                        </article>
+
+					    </form>
+
+					
+
+						{% endblock add %} -->

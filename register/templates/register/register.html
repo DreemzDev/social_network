@@ -1,0 +1,18 @@
+{% extends 'post/base.html' %}
+{% block content %}
+<article class="post">
+    <header>
+        <div class="title">
+            <h2><a href="">Регистрация</a></h2>
+            <p>Lorem ipsum dolor amet nullam consequat etiam feugiat</p>
+        </div>
+
+    </header>
+
+<form method="post">
+    {% csrf_token %}
+    {{form.as_p}}
+    <button type="submit">Регистрация</button>
+</form>
+</article>
+{% endblock content %}

@@ -1,0 +1,182 @@
+
+{% extends 'post/base.html' %}
+{% load static %}
+
+{% block profiles %}
+
+
+<article class="post">
+    <header>
+        <div class="title">
+            <h2><a href="#">Личный кабинет {{user.pk}}{{users.last_name}}</a></h2>
+
+        </div>
+
+    </header>
+
+    
+
+      
+   
+          <div class="row gutters-sm">
+            <div class="col-md-4 mb-3">
+              <div class="card_avatar">
+                <div class="card-body">
+                    
+                    {% if user.avatar %}
+                    <img src="{{user.avatar.url}}" alt="" class="rounded-circle" width="250">
+                    {%else%}
+                    <img src="{% static 'post/images/avatar7.png' %}" alt="" class="rounded-circle" width="250">
+                    {% endif%}
+                    <ul class="qqq">
+
+                        <li><a href="#" class="icon solid fa-camera">Изменить фото</a></li>
+
+                    </ul>            
+                        <div class="meta"> 
+                      <p class="text-secondary mb-1">Был в сети 15 мин назад</p>
+                      
+                    </div>
+
+
+
+
+                      <ul class="actions fit small">
+                        <li><a href="#" class="button icon solid fa-comment">Написать</a></li>
+                    </ul>
+                    
+                  
+                </div>
+              </div>
+
+            </div>
+            
+            <div class="card">
+              
+                
+                  <div class="row">
+
+                    <div class="table-wrapper">
+                        <table>
+
+                            <tbody>
+                                <tr>
+                                    <td><label>Должность</label></td>
+                                    <td>{{user.position}}</td>
+                                    
+                                </tr>
+                                <tr>
+                                    <td><label>Звание</label></td>
+                                    <td>{{user.rank}}</td>
+                                    
+                                </tr>
+                                <tr>
+                                    <td><label>Фамилия</label></td>
+                                    <td>{{user.last_name }}</td>
+                                    
+                                </tr>
+                                <tr>
+                                    <td><label>Имя</label></td>
+                                    <td>{{user.first_name}}</td>
+                                    
+                                </tr>
+                                <tr>
+                                    <td><label>Отчество</label></td>
+                                    <td>{{user.patronymic}}</td>
+                                    
+                                </tr>
+                                <tr>
+                                    <td><label>Дата рождения</label></td>
+                                    <td>{{user.birth_date}}</td>
+                                    
+                                </tr>
+                                <tr>
+                                    <td><label>Телефоны</label></td>
+                                    <td> 555-96-13</td>
+                                    
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+                        <div class="q">
+                            <ul class="qq">
+        
+                                <li><a href="{% url 'settingprofile' user.id %}" class="icon solid fa-desktop">Изменить информации</a></li>
+        
+                            </ul> </div>
+                    </div>
+                    
+  
+                  </div>
+
+
+                
+              </div>
+
+
+
+
+            
+          </div>
+
+</article>
+
+<article class="post">
+    <section>
+{{user.username}}
+        <form action="" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row gtr-uniform">
+                <div class="col-6 col-12-xsmall">
+                 
+                    {{form.title}}
+
+                </div>
+                <div class="col-6 col-12-xsmall">
+                    {{form.cat}}
+
+                </div>
+
+
+                <div class="col-12">
+                    {{form.content}}
+                </div>
+
+            </div>
+        
+    </section>
+
+
+<footer>
+    <ul class="actions">
+
+        <button type="submit">Добавить</button> 
+    </ul>
+    <ul class="stats">
+        
+
+        <li>
+            
+            {{form.photo}}
+
+               <label for="id_photo" class="input__file-button">
+            <a for="id_photo" class="icon solid fa-camera" ></a>
+             <span class="input__file-button-text"></span>
+             
+               </label>
+
+        </li>
+        <li>
+            <label for="id_photo" class="input__file-button">
+
+            <a href="#" class="icon solid fa-file-word"></a></li></label>
+    </ul>
+</footer>
+
+</article>
+
+</form>
+
+{% endblock profiles %}
+
