@@ -17,9 +17,13 @@
         </div>
         <div class="meta">
             <time class="published" datetime="{{p.time_create}}">{{p.time_update|time:"G:i"}}<br>{{p.time_update|date:"d F Y"}}</time>
-            {%if user.pk%}
+            {%if p.author.avatar%}
             <a href="{{p.author.get_absolute_url}}" class="author"><span class="name">{{p.author.last_name}}<br>{{p.author.first_name}}<br>{{p.author.patronymic}}</span><img
-                    src="{{p.author.avatar.url}}" alt="" /></a>{% endif %}
+                    src="{{p.author.avatar.url}}" alt="" /></a>
+                    {%else%}
+                    <a href="{{p.author.get_absolute_url}}" class="author"><span class="name">{{p.author.last_name}}<br>{{p.author.first_name}}<br>{{p.author.patronymic}}</span><img
+                        src="{% static 'post/images/avatar7.png' %}" alt="" /></a>
+                    {% endif %}
                     
         </div>
     </header>

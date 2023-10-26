@@ -27,11 +27,11 @@ class SettingProfileForm(forms.ModelForm):
         fields = ('position','rank','last_name', 'first_name','patronymic','birth_date','phone')
         widgets = {
             'position': forms.TextInput(attrs={'placeholder': "Введите свою должность"}),
-            'rank': forms.TextInput(attrs={'placeholder': "Введите своё звание"}),
+            'rank': forms.TextInput(attrs={'placeholder': "Введите свой ранг"}),
             'last_name': forms.TextInput(attrs={'placeholder': "Введите свою фамилию"}),
             'first_name': forms.TextInput(attrs={'placeholder': "Введите своё имя"}),
             'patronymic': forms.TextInput(attrs={'placeholder': "Введите своё отчество"}),
-            'birth_date': forms.SelectDateWidget(attrs={'placeholder': "Введите дату рождения"}),
+            'birth_date': forms.DateInput(attrs={'placeholder': "Введите дату рождения: xx.xx.xx"}),
             'phone': forms.TextInput(attrs={'placeholder': "Введите номер телефона"}),
 
         }
