@@ -1,0 +1,56 @@
+{% extends 'post/base.html' %}
+{% load static %}
+{% block content %}
+
+<article class="post">
+    <header>
+        <div class="title">
+            <h2><a href="single.html">Коллеги</a></h2>
+            
+        </div>
+
+    </header>
+<!--								<a href="single.html" class="image featured"><img src="images/pic01.jpg" alt="" /></a>-->
+                            <!-- Search -->
+<section>
+    <form class="search" method="get" action="#">
+        <input type="text" name="query" placeholder="Поиск" />
+    </form>
+</section>
+    <div class="table-wrapper">
+            <table>
+
+                <tbody>
+                    {% for p in sh_users %}
+                    <tr>
+                        <td>									
+                            
+                            <div class="freand"> 
+                                {% if p.avatar %}<a href="{{p.get_absolute_url}}"><img src="{{p.avatar.url}}" alt="" ></a>{%else%}
+                                <a href="{{p.get_absolute_url}}"><img src="{% static 'post/images/avatar7.png' %}" alt="" ></a>
+                                {%endif%}
+                       </div>
+                       
+                        </td>
+                        <td>
+                            <ul class="link_F">
+                                <li ><a href="#">{{p.last_name}}&nbsp;{{p.first_name}}</a>
+                                <li class="f">Категория
+                                <td class"message-button"><label class="message-button">
+            <a href="#" class="icon solid fa-envelope"></a></label></td>
+                            </ul>       
+                       </td>
+                        <td></td>
+                    </tr>
+                    {%endfor%}
+
+
+
+                </tbody>
+
+            </table>
+        </div>
+
+</article>
+
+{% endblock content %}

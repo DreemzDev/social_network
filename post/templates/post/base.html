@@ -76,13 +76,13 @@
                     </li>
                     
                     <li>
-                        <a href="{% url 'addprofile' user.id %}">
-                            <h3>Добавить пост</h3>
+                        <a href="{% url 'show_users' %}">
+                            <h3>Коллеги</h3>
                             <p>Описание</p>
                         </a>
                     </li>
-                    {%endif%}
-                    <li>{{user.username}}
+                    
+                    <li>
                         <a href="#">
                             <h3>Раздел 3</h3>
                             <p>Описание</p>
@@ -95,6 +95,7 @@
                         </a>
                     </li>
                 </ul>
+                {%endif%}
             </section>
 
             <!-- Actions -->

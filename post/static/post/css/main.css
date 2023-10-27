@@ -19,7 +19,8 @@ section, summary, time, mark, audio, video {
 	border: 0;
 	font-size: 100%;
 	font: inherit;
-	vertical-align: baseline;}
+	/* vertical-align: baseline; */
+}
 
 article, aside, details, figcaption, figure,
 footer, header, hgroup, menu, nav, section {
@@ -227,6 +228,83 @@ input, select, textarea {
 			color: inherit;
 			border-bottom: 0;
 		}
+		/* Freands */
+	.freand {
+		display: -moz-flex;
+		display: -webkit-flex;
+		display: -ms-flex;
+		display: flex;
+		-moz-flex-direction: row;
+		-webkit-flex-direction: row;
+		-ms-flex-direction: row;
+		flex-direction: row;
+		-moz-align-items: center;
+		-webkit-align-items: center;
+		-ms-align-items: center;
+		align-items: center;
+		-moz-justify-content: -moz-flex-end;
+		-webkit-justify-content: -webkit-flex-end;
+		-ms-justify-content: -ms-flex-end;
+		justify-content: center;
+		border-bottom: 0;
+		font-family: "Raleway", Helvetica, sans-serif;
+		font-size: 0.6em;
+		font-weight: 400;
+		letter-spacing: 0.25em;
+		text-transform: uppercase;
+		white-space: nowrap;
+/*        vertical-align: baseline;*/
+	}
+
+		.freand .name {
+			-moz-transition: border-bottom-color 0.2s ease;
+			-webkit-transition: border-bottom-color 0.2s ease;
+			-ms-transition: border-bottom-color 0.2s ease;
+			transition: border-bottom-color 0.2s ease;
+			
+			display: block;
+			margin: 0 1.5em 0 0;
+            justify-content: flex-start;
+		}
+
+		.freand img {
+			border-radius: 100%;
+			display: block;
+			width: 6em;
+		}
+
+		.freand:hover .name {
+			border-bottom-color: transparent;
+		}
+/* .rounded-circle {
+    border-radius: 50%
+} */
+       .link_F{
+        margin: 0;
+        list-style: none;
+           text-transform: uppercase;
+           font-size: 0.8em;
+		  font-weight: 800;
+           letter-spacing: 0.25em;
+           font-family: "Raleway", Helvetica, sans-serif;
+}
+    .f {
+       margin: 0;
+        list-style: none;
+           text-transform: uppercase;
+           font-size: 0.8em;
+		  font-weight: 400;
+           letter-spacing: 0.25em;
+           font-family: "Raleway", Helvetica, sans-serif;  
+    }  
+    .message-button {
+    font-size: 2em;
+    color: #646464;
+    font-weight: 400;   
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    }
 .shapka{
     color: white;
 }

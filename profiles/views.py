@@ -62,3 +62,8 @@ class SettingProfile(UpdateView):
     pk_url_kwarg = 'user_id'
     success_url = reverse_lazy('home')
 
+class ShowUsers(ListView):
+
+    model = get_user_model()
+    template_name = 'profiles/all_users.html'
+    context_object_name = 'sh_users'
