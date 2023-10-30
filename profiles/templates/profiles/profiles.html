@@ -34,11 +34,19 @@
                     <ul class="qqq">
 
                         <li><a href="#" class="icon solid fa-camera">Изменить фото</a></li>
-
-                    </ul>            
+                        
+                    </ul>
+                               
                         <div class="meta"> 
-                      <p class="text-secondary mb-1">Был в сети 15 мин назад</p>
-                      
+                            {% if user.is_authenticated %}
+ 
+                            {% if user.online %}     
+                      <p class="text-secondary mb-1">Online</p>
+                      {% else %}
+                      <p class="text-secondary mb-1">Offline</p>
+                      {% endif %}
+ 
+                        {% endif %}
                     </div>
 
 

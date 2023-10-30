@@ -66,7 +66,7 @@
                     <li>
                         {{user.pk}}
                         {{user.get_absolute_url}}
-                        <a href="{{user.get_absolute_url}}">
+                        <a href="{% url 'account' user.username%}">
                         
                             <h3>Мой кабинет</h3>
                             <p></p>

@@ -11,6 +11,6 @@ path('profile/<str:username>/', ShowProfile.as_view(), name='profile'),
 path('addprofile/<int:user_id>/', AddProfile.as_view(), name='addprofile'), 
 path('settingprofile/<int:user_id>/', SettingProfile.as_view(), name='settingprofile'),
 path('users/', ShowUsers.as_view(), name='show_users'),
-
+path('id:<str:username>/', ShowProfile.as_view(), name='account'),
 
 ]

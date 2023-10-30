@@ -1,4 +1,6 @@
 
+
+import datetime
 from django.db import models
 from django.urls import reverse
 from django.contrib.auth.models import User
@@ -27,3 +29,5 @@ class Post(models.Model):
         verbose_name = 'Все новости организации'
         verbose_name_plural = 'Все новости организации'
         ordering = ['-time_create', 'title'] #Сортирока как на сайте так и в админке от новой новости к более старой
+
+

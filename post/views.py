@@ -40,7 +40,7 @@ class ShowPost(DetailView):
     #     return super().form_valid(form)
 
 
-class AddPost(CreateView):
+class AddPost(FormView):
     # model = Post
     form_class = AddPostForm
     template_name = 'profiles/profiles.html'
@@ -48,9 +48,11 @@ class AddPost(CreateView):
     
     
     def form_valid(self, form):
+        
+        
         post = form.save(commit=False)
         post.author = self.request.user
-        
+        form.save()
         return super().form_valid(form)
    
     success_url = reverse_lazy('home')
