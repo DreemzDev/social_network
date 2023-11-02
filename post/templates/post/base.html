@@ -1,17 +1,21 @@
 {% load static %}
+{% load emoji_picker_tags %}
 <!DOCTYPE HTML>
 
 <html>
 
 <head>
+    {% emoji_picker_css %}
     <title>Название организации</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <link rel="stylesheet" href="{% static 'post/css/main.css' %}" />
+  
 </head>
 
 <body class="is-preload">
-
+    
+    {% emoji_picker_js %}
     <!-- Wrapper -->
     <div id="wrapper">
 		
@@ -131,7 +135,7 @@
 
 
          <!--   Pagination -->
-         
+         {% if request.user.is_authenticated %}
             <ul class="actions pagination">
                 {% if page_obj.has_previous %}
                 <li><a href="?page={{ page_obj.previous_page_number }}" class="button large next">Предыдущая страница</a></li>
@@ -145,7 +149,8 @@
                 {% endif %}
 
             </ul>
-            
+            {%else%}
+            {%endif%}
         </div>
 
         <!-- Sidebar -->
@@ -264,6 +269,7 @@
     <script src="{% static 'post/js/util.js' %}"></script>
     <script src="{% static 'post/js/main.js' %}"></script>
     <script src="{% static 'post/js/show.js' %}"></script>
+   
  
     
    

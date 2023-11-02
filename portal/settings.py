@@ -34,6 +34,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'emoji_picker',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -45,6 +46,8 @@ INSTALLED_APPS = [
     'profiles.apps.ProfilesConfig',
     'register.apps.RegisterConfig',
     'login.apps.LoginConfig',
+    'dialog.apps.DialogConfig',
+    
 ]
 
 MIDDLEWARE = [
@@ -65,15 +68,18 @@ TEMPLATES = [
         'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
-            'context_processors': [
+            'context_processors': [ 
+                'emoji_picker.context_processors.emoji_picker',
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+               
             ],
         },
     },
 ]
+
 
 WSGI_APPLICATION = 'portal.wsgi.application'
 
@@ -121,17 +127,7 @@ USE_TZ = True
 
 AUTH_USER_MODEL = 'profiles.User'
 
-CACHES = {
 
-    'default': {
-
-        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-
-        'LOCATION': (BASE_DIR / 'cache'),
-
-    }
-
-}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/

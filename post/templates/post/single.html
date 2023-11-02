@@ -13,7 +13,7 @@
 										<h2>{{post.title}}</h2>
 										<p>{{post.cat}}</p>
 									</div>
-									{%if p.author.avatar%}
+									{%if post.author.avatar%}
 									<div class="meta">
 										<time class="published" datetime="{{post.time_create}}">{{post.time_update|time:"G:i"}}<br>{{post.time_update|date:"d F Y"}}</time>
 										<a href="#" class="author"><span class="name">{{post.author.last_name}}<br>{{post.author.first_name}}<br>{{post.author.patronymic}}</span>
@@ -21,20 +21,28 @@
 									</div>
 									{%else%}
 									<div class="meta">
+										
 										<time class="published" datetime="{{post.time_create}}">{{post.time_update|time:"G:i"}}<br>{{post.time_update|date:"d F Y"}}</time>
 										<a href="#" class="author"><span class="name">{{post.author.last_name}}<br>{{post.author.first_name}}<br>{{post.author.patronymic}}</span>
 											<img src="{% static 'post/images/avatar7.png' %}" alt="" /></a>
 											{% endif %}
+											
 								</header>
+								{% if user.is_authenticated %}
+								<div class="a">
+								<ul class="aa">
+									<li><a href="{% url 'settingpost' post.id %}" class="icon solid fa-pencil-alt">Редактировать новость</a></li>
+									<li><a href="#" class="icon solid fa-trash-alt">Удалить</a></li>
+									{%else%}
+									{% endif%}
+								</ul>
+								</div>
 								{% if post.photo %}
 								<span class="image featured"><img src="{{post.photo.url}}" alt="" /></span>
 								{% endif%}
 								<p>{{post.content|linebreaks}}</p>
 								<footer>
-									<ul class="stats">
-										<li><a href="#">Наверх</a></li>
-										
-									</ul>
+						
 								</footer>
 							</article>
 

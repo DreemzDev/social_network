@@ -9,7 +9,7 @@ urlpatterns = [
    
     path('id<str:username>/', AddPost.as_view(), name='addpost'), 
     
+    path('settingpost/<int:post_id>/', SettingPost.as_view(), name='settingpost'),
+   
     
-   
-   
 ]

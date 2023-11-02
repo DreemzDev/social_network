@@ -1,11 +1,11 @@
-<!-- {% extends 'profiles/profiles.html' %}
+{% extends 'post/base.html' %}
 {% block add %}
 
 						
                         <article class="post">
 								<section>
 
-									<form action="{% url 'addpost'user.username}" method="post" enctype="multipart/form-data">
+									<form action="{% url 'settingpost' post.id %}" method="post" enctype="multipart/form-data">
 										{% csrf_token %}
 										<div class="row gtr-uniform">
 											<div class="col-6 col-12-xsmall">
@@ -30,17 +30,18 @@
                             <footer>
                                 <ul class="actions">
 
-									<button type="submit">Добавить</button> 
+									<button type="submit">Сохранить</button> 
+									
                                 </ul>
                                 <ul class="stats">
-									
+									{{form.photo}}
 
                                     <li>
 										
-										{{form.photo}}
+										
 
    										<label for="id_photo" class="input__file-button">
-										<a for="id_photo" class="icon solid fa-camera" ></a>
+										<a for="id_photo" class="icon solid fa-camera"></a>
      									<span class="input__file-button-text"></span>
 										 
    										</label>
@@ -59,4 +60,4 @@
 
 					
 
-						{% endblock add %} -->
+						{% endblock add %}

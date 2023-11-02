@@ -1,0 +1,17 @@
+{% extends 'post/base.html' %}
+{% block content %}
+<h1>Inbox</h1>
+{% if messages %}
+<ul>
+{% for message in messages %}
+{% if not message.read_at %}
+<li><strong>{{ message.sender.username }}:</strong> {{ message.text }} <a href="{% url 'message' message.id %}">(read it)</a></li>
+{% else %}
+<li>{{ message.sender.username }}: {{ message.text }}</li>
+{% endif %}
+{% endfor %}
+</ul>
+{% else %}
+<p>No messages received.</p>
+{% endif %}
+{% endblock %}

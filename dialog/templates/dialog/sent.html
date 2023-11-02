@@ -1,0 +1,13 @@
+{% extends 'post/base.html' %}
+{% block content %}
+<h1>Sent Messages</h1>
+{% if messages %}
+<ul>
+{% for message in messages %}
+<li>{{ message.recipient.username }}: {{ message.text }}</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No messages sent.</p>
+{% endif %}
+{% endblock %}

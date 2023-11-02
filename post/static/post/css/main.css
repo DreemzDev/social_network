@@ -2176,6 +2176,46 @@ input, select, textarea {
   padding: 10px;
 
 }
+.aaa {
+    cursor: default;
+  list-style: none;
+  padding: 0;
+  border-bottom: 0;
+  display: inline-block;
+  font-family: "Raleway", Helvetica, sans-serif;
+  font-size: 0.6em;
+  font-weight: 400;
+  letter-spacing: 0.25em;
+  line-height: 1;
+  /* padding-top: 8.7em; */
+  text-transform: uppercase; 
+}
+.aa {
+    cursor: default;
+  list-style: none;
+  padding: 0;
+  border-bottom: 0;
+  display: flex;
+  font-family: "Raleway", Helvetica, sans-serif;
+  font-size: 0.6em;
+  font-weight: 400;
+  letter-spacing: 0.25em;
+  line-height: 1;
+  /* padding-top: 8.7em; */
+  text-transform: uppercase; 
+  margin: 1em 1em 1em 0;
+  width: 100%;
+  justify-content: space-between;
+}
+.a {
+
+  display: flex;
+  justify-content: right;
+  width: 100%;
+  padding: 10px;
+  background-color: #f4f4f4;
+  margin-bottom: 0.2em;
+}
 .post >.qqq li .icon::before{
     color: rgba(160, 160, 160, 0.3);
   margin-right: 0.75em;
