@@ -1,10 +1,10 @@
 from django import forms
-from emoji_picker.widgets import EmojiPickerTextarea
+
 from.models import *
 
 
 class AddPostForm(forms.ModelForm):
-    content = forms.CharField(widget=EmojiPickerTextarea())
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['cat'].empty_label = "Кто может видеть новость"
