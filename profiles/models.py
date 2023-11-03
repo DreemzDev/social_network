@@ -13,12 +13,10 @@ from django.contrib.auth.signals import user_logged_in, user_logged_out
 # Create your models here.
 
 class User(AbstractUser):
-    # user = models.OneToOneField(User, default=None, on_delete=models.CASCADE)
+    
     avatar = models.ImageField(upload_to = 'images/avatar/', blank=True, verbose_name="Аватар")
     position = models.CharField( max_length=100, blank=True, verbose_name="Должность" )
     rank = models.CharField( max_length=100, blank=True, verbose_name="Ранг" )
-    # last_name = models.CharField( max_length=100, blank=True, verbose_name="Фамилия" )
-    # first_name= models.CharField( max_length=100, blank=True, verbose_name="Имя" )
     patronymic = models.CharField( max_length=100, blank=True, verbose_name="Отчество" )
     birth_date = models.DateField(null=True, blank=True, verbose_name="Дата рождения")
     phone = models.CharField( max_length=12, blank=True, verbose_name="Номер телефона" )

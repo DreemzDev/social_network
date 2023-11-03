@@ -4,18 +4,16 @@
 
 {% block profiles %}
 
-{{user}}
------
-{{cats}}
+
 
 <article class="post">
-    <header>
+    <!-- <header>
         <div class="title">
-            <h2><a href="#">Личный кабинет {{user.pk}}{{users.last_name}}</a></h2>
+            <h2><a href="#">Личный кабинет </a></h2>
 
         </div>
 
-    </header>
+    </header> -->
 
     
 
@@ -32,9 +30,9 @@
                     <img src="{% static 'post/images/avatar7.png' %}" alt="" class="rounded-circle" width="250">
                     {% endif%}
                     <ul class="qqq">
-
+                        {%if request.user == user %}
                         <li><a href="#" class="icon solid fa-camera">Изменить фото</a></li>
-                        
+                        {%endif%}
                     </ul>
                                
                         <div class="meta"> 
@@ -110,14 +108,17 @@
                             </tbody>
 
                         </table>
+                       
                         <div class="q">
                             <ul class="qq">
-        
+                                {%if request.user == user %}
                                 <li><a href="{% url 'settingprofile' user.id %}" class="icon solid fa-desktop">Изменить информации</a></li>
-        
-                            </ul> </div>
+                                {%endif%}
+                            </ul> 
+                        </div>
+                       
                     </div>
-                    
+                         
   
                   </div>
 
@@ -133,11 +134,14 @@
 
 </article>
 
+                    
+{%if request.user == user %}
 <article class="post">
-    <section>
-{{user.username}}
-        <form action="" method="post" enctype="multipart/form-data">
-            {% csrf_token %}
+    
+        <section>
+            <form action="" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+        
             <div class="row gtr-uniform">
                 <div class="col-6 col-12-xsmall">
                  
@@ -156,7 +160,7 @@
 
             </div>
         
-    </section>
+        </section>
 
 
 <footer>
@@ -184,10 +188,52 @@
             <a href="#" class="icon solid fa-file-word"></a></li></label>
     </ul>
 </footer>
+</form>
+</article>
+{%endif%}
+
+
+{% for p in posts %}
+
+<article class="post">
+
+    <header>
+        <div class="title">
+           
+            <h2><a href="{{p.get_absolute_url}}">{{p.title}}</a></h2>
+            <p>{{p.cat}}</p>
+        </div>
+        <div class="meta">
+            <time class="published" datetime="{{p.time_create}}">{{p.time_update|time:"G:i"}}<br>{{p.time_update|date:"d F Y"}}</time>
+            {%if p.author.avatar%}
+            <a href="{{p.author.get_absolute_url}}" class="author"><span class="name">{{p.author.last_name}}<br>{{p.author.first_name}}<br>{{p.author.patronymic}}</span><img
+                    src="{{p.author.avatar.url}}" alt="" /></a>
+                    {%else%}
+                    <a href="{{p.author.get_absolute_url}}" class="author"><span class="name">{{p.author.last_name}}<br>{{p.author.first_name}}<br>{{p.author.patronymic}}</span><img
+                        src="{% static 'post/images/avatar7.png' %}" alt="" /></a>
+                    {% endif %}
+                    
+        </div>
+    </header>
+    
+    {% if p.photo %}
+    <a href="{{p.get_absolute_url}}" class="image featured">    <img src="{{p.photo.url}}" alt="" /></a>
+    {% endif %}
+    <p>{{p.content|linebreaks|truncatewords:40}}</p> <!--linebreak добавляется перенос строки и абзацы в тексте; truncatewords:40 отображение только 40 слов статьи-->
+    <footer>
+        <ul class="actions">
+            <li><a href="{{p.get_absolute_url}}" class="button large">Подробнее</a></li>
+        </ul>
+        <ul class="stats">
+            <li><a href="#" class="icon solid fa-comment">128</a></li>
+            <li><a href="#" class="icon solid fa-heart">28</a></li>
+
+        </ul>
+
+    </footer>
 
 </article>
-
-</form>
+{% endfor %}
 
 {% endblock profiles %}
 

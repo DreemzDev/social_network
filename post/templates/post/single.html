@@ -28,15 +28,17 @@
 											{% endif %}
 											
 								</header>
-								{% if user.is_authenticated %}
+								
+								{% if post.author == user%}
 								<div class="a">
 								<ul class="aa">
 									<li><a href="{% url 'settingpost' post.id %}" class="icon solid fa-pencil-alt">Редактировать новость</a></li>
 									<li><a href="#" class="icon solid fa-trash-alt">Удалить</a></li>
-									{%else%}
-									{% endif%}
+									
+									
 								</ul>
 								</div>
+								{% endif%}
 								{% if post.photo %}
 								<span class="image featured"><img src="{{post.photo.url}}" alt="" /></span>
 								{% endif%}

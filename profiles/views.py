@@ -1,5 +1,5 @@
 from django.urls import reverse_lazy
-from category.models import Category
+from post.models import Post
 from post.forms import AddPostForm
 from post.views import AddPost
 from django.core.cache import cache
@@ -16,15 +16,15 @@ from django.utils.deprecation import MiddlewareMixin
 
 # Create your views here.
 
-def all_users(request):
-    users = get_user_model().objects.all()
-    return render(request, 'all_users.html', {'users': users})
+# def all_users(request):
+#     users = get_user_model().objects.all()
+#     return render(request, 'all_users.html', {'users': users})
 
 
 
 
 
-class ShowProfile( CreateView, DetailView):
+class ShowProfile(CreateView, DetailView):
     
 
     model = get_user_model()
@@ -35,16 +35,11 @@ class ShowProfile( CreateView, DetailView):
    
     def get(self, request, username):
         user = get_object_or_404(get_user_model(), username=username)
-        return render(request, 'profiles/profiles.html', {'user': user})
-
-    def get_context_data(self, *, object_list=None, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['cats'] = Category.objects.all()
         
-        return context
+        return render(request, 'profiles/profiles.html', {'user': user})
+      
     
-
-
+    
 class AddProfile(UpdateView):
     model = get_user_model()
     form_class = AddProfileForm
@@ -64,3 +59,4 @@ class ShowUsers(ListView):
     model = get_user_model()
     template_name = 'profiles/all_users.html'
     context_object_name = 'sh_users'
+

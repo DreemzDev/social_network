@@ -70,12 +70,11 @@
                 <ul class="links">
                     {%if user.pk%}
                     <li>
-                        {{user.pk}}
-                        {{user.get_absolute_url}}
+                        
                         <a href="{% url 'account' user.username%}">
                         
                             <h3>Мой кабинет</h3>
-                            <p></p>
+                            <p>Описание</p>
 
                         </a>
                        
@@ -274,6 +273,7 @@
     <script src="{% static 'post/js/emojionearea.js' %}"></script>
     <script>
         $("#id_content").emojioneArea()
+        $("#id_title").emojioneArea()
     </script>
    
  

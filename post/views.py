@@ -10,6 +10,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from category.models import Category
 from .forms import *
 from .models import Post
+from django.core.paginator import Paginator
 
 
 
@@ -19,6 +20,7 @@ class PortalHome(LoginRequiredMixin, ListView):
     template_name = 'post/index.html'
     context_object_name = 'posts'
     login_url = 'login'
+    
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context['cats'] = Category.objects.all()
@@ -39,14 +41,24 @@ class ShowPost( DetailView):
     #     post.author = self.request.user
         
     #     return super().form_valid(form)
-
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['cats'] = Category.objects.all()
+       
+        return context
 
 class AddPost(FormView):
-    # model = Post
+    
     form_class = AddPostForm
     template_name = 'profiles/profiles.html'
     # pk_url_kwarg = 'user_username'
     
+    def get_context_data(self, *, object_list=None, **kwargs):
+        
+        context = super().get_context_data(**kwargs)
+        context['posts'] = Post.objects.filter(author = self.request.user)
+        
+        return context
     
     def form_valid(self, form):
         
