@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'register.apps.RegisterConfig',
     'login.apps.LoginConfig',
     'dialog.apps.DialogConfig',
+    'comments.apps.CommentsConfig',
     
 ]
 

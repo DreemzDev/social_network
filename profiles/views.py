@@ -1,3 +1,4 @@
+from typing import Any
 from django.urls import reverse_lazy
 from post.models import Post
 from post.forms import AddPostForm
@@ -59,4 +60,9 @@ class ShowUsers(ListView):
     model = get_user_model()
     template_name = 'profiles/all_users.html'
     context_object_name = 'sh_users'
-
+    # def get_context_data(self, *, object_list=None, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     context["user_list"] = get_user_model().objects.all().exclude(username=self.request.user)
+    #     return context
+    def get_queryset(self):
+        return get_user_model().objects.exclude(username=self.request.user)

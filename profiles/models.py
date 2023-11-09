@@ -27,7 +27,7 @@ class User(AbstractUser):
       return reverse('profile', kwargs={'username': self.username})
 
     def __str__(self):
-        return str(self.rank)
+        return str(self.last_name)
     
   
     

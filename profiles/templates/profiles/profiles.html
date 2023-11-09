@@ -4,21 +4,10 @@
 
 {% block profiles %}
 
-
+<!-- Профиль -->
 
 <article class="post">
-    <!-- <header>
-        <div class="title">
-            <h2><a href="#">Личный кабинет </a></h2>
 
-        </div>
-
-    </header> -->
-
-    
-
-      
-   
           <div class="row gutters-sm">
             <div class="col-md-4 mb-3">
               <div class="card_avatar">
@@ -134,7 +123,9 @@
 
 </article>
 
-                    
+<!-- Форма добавления поста-->
+
+{% if user.is_authenticated %}                    
 {%if request.user == user %}
 <article class="post">
     
@@ -191,8 +182,9 @@
 </form>
 </article>
 {%endif%}
+{%endif%}
 
-
+<!-- Посты созданные этим пользователем -->
 {% for p in posts %}
 
 <article class="post">

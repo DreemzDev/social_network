@@ -1454,7 +1454,7 @@ document = window.document || {};
                 initAutocomplete();
             } else {
                 $.ajax({
-                    url: "https://cdn.rawgit.com/yuku-t/jquery-textcomplete/v1.3.4/dist/jquery.textcomplete.js",
+                    // url: "https://cdn.rawgit.com/yuku-t/jquery-textcomplete/v1.3.4/dist/jquery.textcomplete.js",
                     dataType: "script",
                     cache: true,
                     success: initAutocomplete
@@ -1482,8 +1482,9 @@ document = window.document || {};
         //}, self.id === 1); // calcElapsedTime()
     };
     var cdn = {
-        defaultBase: "https://cdnjs.cloudflare.com/ajax/libs/emojione/",
+        // defaultBase: "https://cdnjs.cloudflare.com/ajax/libs/emojione/",
         defaultBase3: "https://cdn.jsdelivr.net/",
+        
         base: null,
         isLoading: false
     };

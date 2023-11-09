@@ -21,14 +21,18 @@
             <table>
 
                 <tbody>
+
+                    
                     {% for p in sh_users %}
+                  
                     <tr>
                         <td>									
-                            
+                           
                             <div class="freand"> 
                                 {% if p.avatar %}<a href="{{p.get_absolute_url}}"><img src="{{p.avatar.url}}" alt="" ></a>{%else%}
                                 <a href="{{p.get_absolute_url}}"><img src="{% static 'post/images/avatar7.png' %}" alt="" ></a>
                                 {%endif%}
+                                
                        </div>
                        
                         </td>
@@ -42,6 +46,7 @@
                        </td>
                         <td></td>
                     </tr>
+                  
                     {%endfor%}
 
 

@@ -83,7 +83,11 @@ input, select, textarea {
   .input__file-button-text{
 	font-size: 0.35em;
   }
-
+  .row2 {
+	display: flex;
+	align-items: center;
+	
+  }
 /* Basic */
 
 	@-ms-viewport {
@@ -592,6 +596,7 @@ input, select, textarea {
 
 			.row > * {
 				padding: 0 0 0 1em;
+				width: 50%;
 			}
 
 			.row.gtr-uniform {
@@ -1979,7 +1984,7 @@ input, select, textarea {
 		text-decoration: none;
 		text-transform: uppercase;
 		white-space: nowrap;
-		/* margin-left: 1.5em; */
+		margin-left: 1.5em;
 	}
 
 		input[type="submit"]:hover,
@@ -2612,9 +2617,9 @@ input, select, textarea {
 		}
 
 	ul {
-		list-style: disc;
+		/* list-style: disc; */
 		margin: 0 0 2em 0;
-		padding-left: 1em;
+		/* padding-left: 1em; */
 	}
 
 		ul li {
@@ -2660,7 +2665,7 @@ input, select, textarea {
 		display: flex;
 		cursor: default;
 		list-style: none;
-		margin-left: -1em;
+		margin-left: -2em;
 		padding-left: 0;
 	}
 
@@ -2908,7 +2913,7 @@ input, select, textarea {
 			}
 
 		.mini-post header {
-			padding: 1.25em 4.25em 0.1em 1.25em ;
+			padding: 1.25em 1.25em 0.1em 1.25em ;
 			min-height: 4em;
 			position: relative;
 			-moz-flex-grow: 1;

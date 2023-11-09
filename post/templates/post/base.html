@@ -11,6 +11,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <link rel="stylesheet" href="{% static 'post/css/main.css' %}" />
     <link rel="stylesheet" href="{% static 'post/css/emojionearea.css' %}" />
+    <link rel="stylesheet" href="{% static 'post/css/font-awesome.css' %}" />
 
   
 </head>
@@ -22,7 +23,7 @@
     <div id="wrapper">
 		
         <header id="header">
-            <h1 class="shapka"><a href="{% url 'home' %}">Название организации</a></h1>
+            <h1 class="shapka"><a href="#">Название организации</a></h1>
             
             <nav class="links">
                 <ul>
@@ -68,12 +69,12 @@
             <!-- Links -->
             <section>
                 <ul class="links">
-                    {%if user.pk%}
+                    
                     <li>
                         
-                        <a href="{% url 'account' user.username%}">
+                        <a href="#">
                         
-                            <h3>Мой кабинет</h3>
+                            <h3>Раздел 1</h3>
                             <p>Описание</p>
 
                         </a>
@@ -81,8 +82,8 @@
                     </li>
                     
                     <li>
-                        <a href="{% url 'show_users' %}">
-                            <h3>Коллеги</h3>
+                        <a href="#">
+                            <h3>Раздел 2</h3>
                             <p>Описание</p>
                         </a>
                     </li>
@@ -100,7 +101,7 @@
                         </a>
                     </li>
                 </ul>
-                {%endif%}
+                
             </section>
 
             <!-- Actions -->
@@ -158,28 +159,63 @@
         <section id="sidebar">
 
             <!-- Intro -->
-            <section id="intro">
+            <!-- <section id="intro">
                 <a href="#" class="logo"><img src="{% static 'post/images/uk.png' %}" alt="" /></a>
                 <header>
                     <h2>Название организации</h2>
                     <p>Левой-дрочу, правой-жопу щекочу </p>
                 </header>
-            </section>
+            </section> -->
 
             <!-- Mini Posts -->
             <section>
                 <div class="mini-posts">
 
-                    <!-- Mini Post -->
+                    <!-- Mini Post --> 
+                    {% if request.user.is_authenticated %}
+                    {%if user.pk%}
                     <article class="mini-post">
                         <header>
-                            <h3><a href="single.html">Пост статичной информации 1</a></h3>
-                            <time class="published" datetime="2023-08-08">8 августа 2023</time>
-                            <a href="#" class="author"><img src="images/avatar.jpg" alt="" /></a>
+                            <div class="table-wrapper">
+                                <table>
+ 
+                                    <tbody>
+                                        <tr>
+                                            <td ><a href="{% url 'account' user.username%}" class="icon solid fa-user-circle">Личный кабинет</a></td>
+                                            <td></td>
+                                            
+                                            
+                                            
+                                        </tr>
+                                        <tr>
+                                            <td><a href="{% url 'home' %}" class="icon solid fa-newspaper-o">Новости</a></td>
+                                            
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td><a href="#" class="icon solid fa-comment">Мессенджер</a></td>
+                                            
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td><a href="{% url 'show_users' %}" class="icon solid fa-users">Коллеги</a></td>
+                                            
+                                            
+                                        </tr>
+                                        <tr>
+                                            <td><a href="#" class="icon solid fa-photo">Фотографии</a></td>
+                                           
+                                            <td></td>
+                                        </tr>
+                                    </tbody>
+                     
+                                </table>
+                            </div>
                         </header>
-                        <a href="single.html" class="image"><img src="images/pic04.jpg" alt="" /></a>
+                        <!-- <a href="single.html" class="image"><img src="images/pic04.jpg" alt="" /></a> -->
                     </article>
-
+                    {% endif %}
+                    {% endif %}
                     <!-- Mini Post -->
                     <article class="mini-post">
                         <header>
@@ -219,19 +255,19 @@
                     <li>
                         <article>
                             <header>
-                                <h3><a href="single.html">Важное 1</a></h3>
+                                <h3><a href="single.html">Convallis maximus nisl mattis nunc id lorem</a></h3>
                                 <time class="published" datetime="2023-08-08">8 августа 2023</time>
                             </header>
-                            <a href="single.html" class="image"><img src="images/pic08.jpg" alt="" /></a>
+                            <a href="single.html" class="image"><img src="{% static 'post/images/pic08.jpg' %}" alt="" /></a>
                         </article>
                     </li>
                     <li>
                         <article>
                             <header>
-                                <h3><a href="single.html">Важное 2</a></h3>
+                                <h3><a href="single.html">Euismod amet placerat vivamus porttitor</a></h3>
                                 <time class="published" datetime="2023-08-08">8 августа 2023</time>
                             </header>
-                            <a href="single.html" class="image"><img src="images/pic09.jpg" alt="" /></a>
+                            <a href="single.html" class="image"><img src="{% static 'post/images/pic08.jpg' %}" alt="" /></a>
                         </article>
                     </li>
                     <li>
@@ -274,6 +310,7 @@
     <script>
         $("#id_content").emojioneArea()
         $("#id_title").emojioneArea()
+        $("#id_comment_text").emojioneArea()
     </script>
    
  

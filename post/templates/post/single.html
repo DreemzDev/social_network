@@ -2,7 +2,7 @@
 {% load static %}
 
 
-<!-- Post -->
+<!-- Открытый пост -->
 {% block content %}
 
 
@@ -47,5 +47,63 @@
 						
 								</footer>
 							</article>
+
+
+
+<!-- Форма создания поста -->
+{% if user.is_authenticated %}                    
+
+<article class="post">
+	<link href="{% static 'post/css/comment.css' %}" rel="stylesheet">
+<section class="content-item" id="comments">
+    <div class="container">   
+    	<div class="row1">
+            <div class="col-sm-8">   
+				<section>
+					<form action="" method="post" enctype="multipart/form-data">
+						{% csrf_token %}
+				
+						<div class="row2">
+							
+							<div class="col-sm-3 col-lg-2 hidden-xs">
+                            	<img class="img-responsive" src="{{user.avatar.url}}" alt="">
+                            </div>
+							
+							{{form.comment_text}}
+							<button type="submit">Добавить</button>
+						 </div>
+					</form>
+				
+				</section>
+		
+				
+                <h3>Комментарии</h3>
+                
+                <!-- COMMENT 1 - START -->
+                <div class="media">
+					{% for c in post.post_comments.all %} 
+                    <a class="pull-left" href="#"><img class="media-object" src="{% static 'post/images/avatar7.png' %}" alt=""></a>
+                    <div class="media-body">
+						
+                        <h4 class="media-heading">{{c.comment_author.last_name}}&nbsp;{{c.comment_author.author.first_name}}</h4>
+						
+                        <p>{{c.comment_text}}</p>
+                        <ul class="list-unstyled list-inline media-detail pull-left">
+                            <li>{{c.comment_pubdate|time:"G:i"}}&nbsp;{{c.comment_pubdate|date:"d F Y"}}</li> 
+                        </ul>
+						
+                    </div>
+					{%endfor%}
+                </div>
+				
+                <!-- COMMENT 1 - END -->
+
+            
+            </div>
+        </div>
+    </div>
+</section>
+</article>
+{%endif%}
 
 {% endblock content %}

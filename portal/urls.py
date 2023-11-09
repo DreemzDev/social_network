@@ -30,6 +30,7 @@ urlpatterns = [
     path('', include('register.urls')),
     path('', include('login.urls')),
     path('', include('profiles.urls')),
+    path('', include('comments.urls')),
     path('', include('dialog.urls'))
 ]
 
