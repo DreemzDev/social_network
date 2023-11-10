@@ -64,5 +64,5 @@ class ShowUsers(ListView):
     #     context = super().get_context_data(**kwargs)
     #     context["user_list"] = get_user_model().objects.all().exclude(username=self.request.user)
     #     return context
-    def get_queryset(self):
-        return get_user_model().objects.exclude(username=self.request.user)
+    # def get_queryset(self):
+    #     return get_user_model().objects.exclude(username=self.request.user)

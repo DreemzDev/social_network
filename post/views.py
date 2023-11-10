@@ -1,4 +1,5 @@
 from typing import Any
+
 from urllib import request
 from django.db.models.query import QuerySet
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
@@ -31,7 +32,10 @@ class PortalHome(LoginRequiredMixin, ListView):
         context['cats'] = Category.objects.all()
        
         return context
-   
+    # def get_context_data(self, *, object_list=None, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+    #     context['title'] = Category.objects.all()
+    #     return context
 
 
 
@@ -46,8 +50,17 @@ class ShowPost(DetailView, FormView ):
         form.save()
         return super().form_valid(form)
     
+
+    def post(self, request, *args, **kwargs):
+        new_comment = Comment(comment_text=request.POST.get('comment_text'),
+                                  comment_author=self.request.user,
+                                  comment_pubdate=datetime.datetime.now(),
+                                  post=self.get_object())
+        new_comment.save()
+        return self.get(self, request, *args, **kwargs)
+
     def get_context_data(self, *, object_list=None, **kwargs):
-        # self.object = self.get_object() # assign the object to the view
+        self.object = self.get_object() # assign the object to the view
         # print(self.object)
         context = super().get_context_data(**kwargs)
         context['comment'] = Comment.objects.all()

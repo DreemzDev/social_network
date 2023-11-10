@@ -218,12 +218,49 @@
                     {% endif %}
                     <!-- Mini Post -->
                     <article class="mini-post">
-                        <header>
-                            <h3><a href="single.html">Пост статичной информации 2</a></h3>
-                            <time class="published" datetime="2023-08-08">8 августа 2023</time>
-                            <a href="#" class="author"><img src="images/avatar.jpg" alt="" /></a>
-                        </header>
-                        <a href="single.html" class="image"><img src="images/pic05.jpg" alt="" /></a>
+                        <section>
+                        <h4 class="GG">Коллеги онлайн</h4>
+                        <div class="table-wrapper">
+                            <table>
+                
+                                <tbody>
+                
+                                    
+                                    {% for p in sh_users %}
+                                  
+                                    <tr>
+                                        <td>									
+                                           
+                                            <div class="freand"> 
+                                                {% if p.avatar %}
+                                                <a href="{{p.get_absolute_url}}"><img src="{{p.avatar.url}}" alt="" ></a>
+                                                {%else%}
+                                                <a href="{{p.get_absolute_url}}"><img src="{% static 'post/images/avatar7.png' %}" alt="" ></a>
+                                                {%endif%}
+                                                
+                                       </div>
+                                       
+                                        </td>
+                                        <td>
+                                            <ul class="link_FF">
+                                                <li ><a href="{{p.get_absolute_url}}">{{p.last_name}}&nbsp;{{p.first_name}}</a>
+                                                <li class="f">Категория
+                                                
+                                            </ul>       
+                                       </td>
+                                        <td></td>
+                                    </tr>
+                                  
+                                    {%endfor%}
+                
+                
+                
+                                </tbody>
+                
+                            </table>
+                        </div>
+                        <!-- <a href="single.html" class="image"><img src="images/pic05.jpg" alt="" /></a> -->
+                    </section>
                     </article>
 
                     <!-- Mini Post -->
