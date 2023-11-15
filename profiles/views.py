@@ -15,11 +15,7 @@ from django.views.generic import DetailView, ListView, CreateView, UpdateView, T
 from django.contrib.auth import get_user_model
 from django.utils.deprecation import MiddlewareMixin
 
-# Create your views here.
 
-# def all_users(request):
-#     users = get_user_model().objects.all()
-#     return render(request, 'all_users.html', {'users': users})
 
 
 

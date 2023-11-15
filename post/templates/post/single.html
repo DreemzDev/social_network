@@ -60,7 +60,7 @@
     	<div class="row1">
             <div class="col-sm-8">   
 				<section>
-					<form action="" method="post" enctype="multipart/form-data">
+					<form action="" method="post" id="comment-form" enctype="multipart/form-data">
 						{% csrf_token %}
 				
 						<div class="row2">
@@ -82,10 +82,14 @@
                 <!-- COMMENT 1 - START -->
                 <div class="media">
 					{% for c in post.post_comments.all %} 
+					{%if c.comment_author.avatar%}
+					<a class="pull-left" href="#"><img class="media-object" src="{{c.comment_author.avatar.url}}" alt=""></a>
+					{%else%}
                     <a class="pull-left" href="#"><img class="media-object" src="{% static 'post/images/avatar7.png' %}" alt=""></a>
-                    <div class="media-body">
+                    {%endif%}
+					<div class="media-body">
 						
-                        <h4 class="media-heading">{{c.comment_author.last_name}}&nbsp;{{c.comment_author.author.first_name}}</h4>
+                        <h4 class="media-heading">{{c.comment_author.last_name}}&nbsp;{{c.comment_author.first_name}}</h4>
 						
                         <p>{{c.comment_text}}</p>
                         <ul class="list-unstyled list-inline media-detail pull-left">

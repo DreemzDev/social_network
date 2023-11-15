@@ -16,7 +16,7 @@ class AddPostForm(forms.ModelForm):
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': "Заголовок"}),
             'content': forms.Textarea(attrs={ 'cols':60, 'rows':1, 'placeholder': "Что у вас нового?"}),
-            # 'photo': forms.ImageField(attrs={'class': 'input-file'})
+           
             
 
         }
