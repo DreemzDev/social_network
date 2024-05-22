@@ -1,5 +1,2 @@
-# social_network
-# social_network
-# social_network
-‣潳楣污湟瑥潷歲�
-7176155578:AAE-j8rgt-eM3olNo_94BGXkj7yv3mWgvWI
+Это access_token
+USERRGINRLFUUS5P1K6URQ3R630D39MHK6ARKPD7ITLHF7H5HIEDNNP2FQQLDV9Q
