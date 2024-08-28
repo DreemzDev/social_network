@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+
+
+
+        <div class="flex-1 justify-center items-center pt-6 pl-10 pr-24">
+            
+            <div class="mb-4 dark:bg-zinc-800 dark:border-zinc-700 dark:text-white">
+                <div class="">
+                    <div class="w-full text-center mb-8">
+                        <label class="text-black font-semibold text-2xl">Добро пожаловать!</label>
+                        <!-- <p class="py-3 text-gray-500 font-medium text-lg">Воспользуйтесь порталом и оставайтесь в курсе новостей</p> -->
+
+                    </div>
+                    <div class="w-auto items-center">
+                        <img src="{% static '/img/welcom3.png' %}" alt="welcom">
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <div class="flex flex-wrap w-80 mt-4">
+            <div class=" h-auto bg-white mx-4 p-5 border rounded">
+                {% include "includes/notifications.html" %}
+                <form  class="flex flex-wrap justify-center items-center" method="post">
+                    {% csrf_token %}
+                    
+                    <input class="form-control block w-full mb-3 p-2 text-gray-900 border border-gray-300 rounded bg-gray-50 sm:text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" id="id_username" name="username" autofocus="false" autocapitalize="none" autocomplete="username" maxlength="150" required="" placeholder="Логин">
+                    <input class="form-control block w-full mb-5 p-2 text-gray-900 border border-gray-300 rounded bg-gray-50 sm:text-xs focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" id="id_password" type="password" name="password" autocomplete="current-password" required="" placeholder="Введите пароль">
+                    
+                    
+                    <button class=" text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded text-base px-8 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800 " type="submit">Войти</button>
+                </form>
+            </div>
+            <div class="flex flex-wrap justify-center w-full h-auto mt-3 bg-white mx-4 p-5 border rounded">
+                <label class=" text-black font-medium text-xl">Впервые в "Название"?</label>
+                <p class="pt-1 pb-6 text-gray-500 font-medium text-sm">Моментальная регистация</p>
+                <a href="{% url 'register' %}" class="w-full text-center focus:outline-none text-white bg-green-500 hover:bg-green-600 focus:ring-4 focus:ring-green-300 font-medium rounded text-base px-5 py-2.5 me-2 mb-2 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800">Начать регистацию</a>
+                
+            </div>
+            <div class="flex flex-wrap justify-center w-full h-auto mt-3 bg-white mx-4 p-5 border rounded">
+                <p class="pt-1  text-center text-gray-500 font-medium text-sm">После регистрации вы получите доступ ко всем возможностям портала "Название".</p>
+                
+                
+            </div>
+        </div>
+       
+
+{% endblock content %}

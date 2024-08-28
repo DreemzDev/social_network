@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "tailwindcss": "^3.4.1"
+  },
+  "dependencies": {
+    "emojionearea": "^3.0.0",
+    "flowbite": "^2.2.1"
+  }
+}

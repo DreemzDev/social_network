@@ -1,0 +1,133 @@
+{% extends 'base.html' %} {% load static %} {% block content %}
+<div
+  class="flex flex-1 bg-white rounded border mb-4 shadow dark:bg-zinc-800 dark:border-zinc-700 dark:text-white"
+>
+  <div class="p-4 w-full">
+    <div class="">
+      <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
+        <ul
+          class="flex flex-wrap -mb-px text-sm font-semibold text-center"
+          id="default-tab"
+          data-tabs-toggle="#default-tab-content"
+          role="tablist"
+        >
+          <li class="me-2 bg-gray-100 rounded-md" role="presentation">
+            <button
+              class="inline-block p-4 border-b-2 rounded-t-lg"
+              id="all-tab"
+              data-tabs-target="#all"
+              type="button"
+              role="tab"
+              aria-controls="all"
+              aria-selected="false"
+            >
+              Все коллеги {{object_list.count}}
+            </button>
+          </li>
+          <li class="me-2 bg-gray-100 rounded-md" role="presentation">
+            <button
+              class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+              id="online-tab"
+              data-tabs-target="#online"
+              type="button"
+              role="tab"
+              aria-controls="online"
+              aria-selected="false"
+            >
+              Коллеги онлайн {{sh_online.count}}
+            </button>
+          </li>
+        </ul>
+      </div>
+
+    <form action="{% url 'show_users' %}" method="get">
+  <div class="w-full mt-4 mb-2 mr-4 flex-shrink-0">
+    <div class="relative">
+      <input name="q" type="text"
+        type="text"
+        class="w-full h-9 pr-4 pl-8 ps-10 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none placeholder-gray-400 dark:bg-zinc-600"
+        placeholder="Поиск коллеги (учесть регистр)"
+      />
+
+      <div
+        class="absolute top-0 left-0 h-full w-8 flex justify-center items-center"
+      >
+        <svg
+          class="w-4 h-4 text-gray-400"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="1.5"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+          />
+        </svg>
+      </div>
+    </div>
+  </div>
+    </form>
+    </div>
+    <div id="default-tab-content">
+      <div
+        class="hidden rounded-lg dark:bg-gray-800"
+        id="all"
+        role="tabpanel"
+        aria-labelledby="all-tab"
+      >
+        {% for p in object_list %}
+        <div class="flex justify-start p-2 items-center rounded-md  hover:bg-gray-100">
+          <a href="{% url 'addpost' p.username%}">
+            <img
+              class="w-16 h-16 rounded-full  shrink-0"
+              src="{% if p.avatar %}{{p.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
+              alt="name"
+            />
+          </a>
+          <div class="pl-4">
+            <a
+              href="{% url 'addpost' p.username%}"
+              class="block font-semibold text-blue-500 hover:underline"
+              >{{p.first_name}}&nbsp;{{p.last_name}}</a
+            >
+            
+            <div class="inline-block bg-sky-100 text-sky-800 text-xs font-medium px-2.5 py-0.5 rounded-full">{{p.cat.name}}</div>
+            
+          </div>
+        </div>
+        {%endfor%}
+      </div>
+
+      <div
+        class="hidden rounded-lg dark:bg-gray-800"
+        id="online"
+        role="tabpanel"
+        aria-labelledby="online-tab"
+      >
+        {% for p in sh_online %} 
+        <div class="flex items-center pt-4">
+          <a href="{% url 'addpost' p.username%}">
+            <img
+              class="w-16 h-16 rounded-full shrink-0"
+              src="{% if p.avatar %}{{p.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
+              alt="name"
+            />
+          </a>
+          <div class="pl-4">
+            <a
+              href="{% url 'addpost' p.username%}"
+              class="block font-semibold text-blue-500 hover:underline"
+              >{{p.first_name}}&nbsp;{{p.last_name}}</a
+            >
+            <div class="block text-gray-400">Номер отдела</div>
+          </div>
+        </div>
+        {%endfor%}
+      </div>
+    </div>
+  </div>
+</div>
+{% include "includes/filterUsers.html" %} {% endblock content %}

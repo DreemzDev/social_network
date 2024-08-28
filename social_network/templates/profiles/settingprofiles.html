@@ -1,0 +1,353 @@
+{% extends 'base.html' %} {% load static %}
+ {% block content %}
+<style>
+  .myfield {
+    border-radius: 0.25rem;
+    width: 100%;
+    font-size: 0.875rem; /* 14px */
+    line-height: 1.25rem; /* 20px */
+  }
+</style>
+
+<div class="flex flex-1">
+  <div
+    class="bg-white w-full rounded border mb-4 shadow dark:bg-zinc-800 dark:border-zinc-700 dark:text-white"
+  >
+    <form
+    x-data="activateImagePreview()"
+        
+      action="{% url 'settingprofile' user.id %}"
+      method="post"
+      enctype="multipart/form-data"
+    >
+      {% csrf_token %}
+
+      <div
+        id="default-tab-content"
+        class="flex justify-center items-center flex-wrap"
+      >
+        <div
+          id="profile"
+          role="tabpanel"
+          aria-labelledby="profile-tab"
+          class="w-full"
+        >
+          <div class="ml-4 my-4">Личные данные</div>
+          <div class="bg-gray-200 h-px my-4 mx-4 dark:bg-zinc-700"></div>
+
+          <div class="flex mx-14">
+            <div class="relative group cursor-pointer w-24 h-24 flex-shrink-0">
+              <img
+                class="w-24 h-24 flex-shrink-0 rounded-full"
+                src="{%if user.avatar%}{{user.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
+                alt=""
+              />
+              <div class="absolute inset-0">
+                <button type="button" data-modal-target="static-modal" data-modal-toggle="static-modal" class="flex justify-center items-center w-full h-full text-white text-opacity-75 hover:text-opacity-100 focus:outline-none">
+                  <svg class="w-12" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                  </svg>
+                  
+                      
+                </button>
+            </div>
+            </div> 
+           
+
+            <span class="ml-7 my-auto text-base w-full text-left">
+              {{user.first_name}} {{user.last_name }}
+              <div class="text-sm text-gray-500">
+                <span class="pr-1">ID:</span>{{user.username}}
+              </div>
+            </span>
+          </div>
+          <div class="bg-gray-200 h-px my-4 mx-4 dark:bg-zinc-700"></div>
+          <div class="mx-14">
+            <table cellpadding="6" class="w-full">
+              <tbody class="">
+                <tr>
+                  <td class="w-32 text-right ">Фамилия:</td>
+                  <td class="">{{form.last_name}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">Имя:</td>
+                  <td>{{form.first_name}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">Отчество:</td>
+                  <td class="text-xs">{{form.patronymic}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">Дата рождения:</td>
+                  <td>{{form.birthday}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div
+          id="dashboard"
+          role="tabpanel"
+          aria-labelledby="dashboard-tab"
+          class="w-full"
+        >
+          <div class="ml-4 my-4">Контакты</div>
+          <div class="bg-gray-200 h-px my-4 mx-4 dark:bg-zinc-700"></div>
+          <div class="mx-14">
+            <table cellpadding="6" class="w-full">
+              <tbody>
+                <tr>
+                  <td class="w-28 text-right">PTS:</td>
+                  <td class="">{{form.phone_pts}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">Город:</td>
+                  <td>{{form.phone_city}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">ZS:</td>
+                  <td class="text-xs">{{form.phone_zs}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">ATS-9:</td>
+                  <td>{{form.phone_9}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">HiCom:</td>
+                  <td>{{form.phone_hc}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div
+          class="w-full"
+          id="settings"
+          role="tabpanel"
+          aria-labelledby="settings-tab"
+        >
+          <div class="ml-4 my-4">Военная служба</div>
+          <div class="bg-gray-200 h-px my-4 mx-4 dark:bg-zinc-700"></div>
+          <div class="mx-14">
+            <table cellpadding="6" class="w-full">
+              <tbody class="">
+                <tr>
+                  <td class="w-32 text-right">Номер кабинета:</td>
+                  <td>{{form.cab}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">Отдел:</td>
+                  <td>{{form.cat}}</td>
+                </tr>
+                <tr>
+                  <td class="text-right">Должность:</td>
+                  <td>{{form.position}}</td>
+                </tr>
+
+                <tr>
+                  <td class="text-right">Звание:</td>
+                  <td>{{form.rank}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div
+          class="hidden p-4 rounded-lg bg-gray-50 dark:bg-gray-800"
+          id="contacts"
+          role="tabpanel"
+          aria-labelledby="contacts-tab"
+        >
+          {{form.avatar}}
+        </div>
+      </div>
+
+      <div class="bg-gray-200 h-px mt-4 mx-4 dark:bg-zinc-700"></div>
+      <div>
+        <div class="text-center my-4">
+          <button
+            class="text-white bg-blue-700 hover:bg-blue-800 ml-10 focus:ring-4 focus:ring-blue-300 font-medium rounded text-base px-8 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+            type="submit"
+          >
+            Сохранить
+          </button>
+        </div>
+      </div>
+        <!-- Main modal -->
+  <div
+  id="static-modal"
+  data-modal-backdrop="static"
+  tabindex="-1"
+  aria-hidden="true"
+  class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full"
+>
+  <div class="relative p-4 w-full max-w-2xl max-h-full">
+    <!-- Modal content -->
+    <div  class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+      <!-- Modal header -->
+      <div
+        class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600"
+      >
+        <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+          Загрузка новой фотографии
+        </h3>
+        <button
+          type="button"
+          class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white"
+          data-modal-hide="static-modal"
+        >
+          <svg
+            class="w-3 h-3"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 14 14"
+          >
+            <path
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"
+            />
+          </svg>
+          <span class="sr-only">Close modal</span>
+        </button>
+      </div>
+      <!-- Modal body -->
+      <div class="p-4 md:p-5 space-y-4">
+        <p class="text-sm text-center text-gray-500 dark:text-gray-400">
+          Коллегам будет проще узнать вас, если вы загрузите свою настоящую
+          фотографию. Вы можете загрузить изображение в формате JPG, GIF или
+          PNG.
+        </p>
+        <form
+        
+      >
+        <div  class="p-4 md:p-5 space-y-4">
+          {% csrf_token %}
+          <input 
+            class="block w-full h-10.5 leading-9 rounded overflow-hidden text-sm text-gray-900 bg-gray-50 border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+            id="id_avatar"
+            name="avatar"
+            @change="showPreview(event, $refs.previewSingle)"
+            type="file"
+            accept="image/*"
+          />
+          <div x-ref="previewSingle" class="flex justify-center flex-wrap"></div>
+          <!-- <button type="submit">Загрузить</button> -->
+        </div>
+        <p class="text-sm text-center text-gray-500 dark:text-gray-400">
+          Если у вас возникают проблемы с загрузкой фотографии, попробуйте
+          выбрать фотографию меньшего размера.
+        </p>
+      </div>
+      <!-- Modal footer -->
+      <div 
+        class="flex justify-center items-center flex-wrap p-4 md:p-5 border-t border-gray-200 rounded-b dark:border-gray-600"
+      >
+      
+        
+        
+        <div  class="pt-4">
+          <button data-modal-hide="static-modal" type="button" class="text-white bg-blue-700 hover:bg-blue-800 ml-10 focus:ring-4 focus:ring-blue-300 font-medium rounded text-base px-8 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Сохранить и продолжить</button>
+          <button @click="$refs.previewSingle.remove()"  type="reset" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">Сбросить фото</button>
+          
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+    </form>
+  </div>
+</div>
+<div
+  class="bg-white w-72 rounded border mb-4 mx-4 shadow dark:bg-zinc-800 dark:border-zinc-700 dark:text-white"
+>
+  <div class="dark:border-gray-700">
+    <ul
+      class="-mb-px text-sm font-medium text-left"
+      id="default-tab"
+      data-tabs-toggle="#default-tab-content"
+      role="tablist"
+    >
+      <li class="me-2" role="presentation">
+        <button
+          class="inline-block p-4 border-l-2 text-left"
+          id="profile-tab"
+          data-tabs-target="#profile"
+          type="button"
+          role="tab"
+          aria-controls="profile"
+          aria-selected="false"
+        >
+          Личные данные
+          <div class="text-xs text-gray-400">Имя, фамилия, дата рождения</div>
+        </button>
+      </li>
+      <li class="me-2" role="presentation">
+        <button
+          class="inline-block p-4 border-l-2 hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+          id="dashboard-tab"
+          data-tabs-target="#dashboard"
+          type="button"
+          role="tab"
+          aria-controls="dashboard"
+          aria-selected="false"
+        >
+          Контакты
+        </button>
+      </li>
+      <li class="me-2" role="presentation">
+        <button
+          class="inline-block p-4 border-l-2 hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+          id="settings-tab"
+          data-tabs-target="#settings"
+          type="button"
+          role="tab"
+          aria-controls="settings"
+          aria-selected="false"
+        >
+          Военная служба
+        </button>
+      </li>
+      <!-- <li role="presentation">
+        <button
+          class="inline-block p-4 border-l-2 hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300"
+          id="contacts-tab"
+          data-tabs-target="#contacts"
+          type="button"
+          role="tab"
+          aria-controls="contacts"
+          aria-selected="false"
+        >
+          Аватар
+        </button>
+      </li> -->
+    </ul>
+  </div>
+
+</div>
+<script>
+    function activateImagePreview() {
+      return {
+        showPreview(event, previewBox) {
+          previewBox.replaceChildren();
+  
+          for (const i in event.target.files) {
+            let img = document.createElement("img");
+            img.className = "aspect-auto my-2 mx-1 h-24 rounded shadow";
+            img.src = URL.createObjectURL(event.target.files[i]);
+            previewBox.appendChild(img);
+          }
+        },
+      };
+    }
+  </script>
+  
+  
+  
+{% endblock content %}

@@ -1,0 +1,77 @@
+{% extends 'base.html' %}{% load static %} {% block content %}
+
+
+
+<!-- Открытый пост -->
+
+
+<!-- Post -->
+<div
+  class="bg-white rounded border w-full mb-4 shadow dark:bg-zinc-800 dark:border-zinc-700 dark:text-white"
+>
+  <div class="p-4">
+    <div class="flex justify-between">
+      
+      <div class="flex items-center">
+        <a href="#" class="block flex-shrink-0"
+          ><img class="w-12 h-12 rounded-full" src="{%if post.author.avatar%}{{post.author.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
+        /></a>
+        <!-- Дата публикаиции -->
+        <div class="pl-4">
+          <a href="#" class="block font-semibold text-blue-500 hover:underline"
+            >{{post.author.first_name}} {{post.author.last_name}}</a
+          >
+          <div class="block text-gray-400">
+            {{post.time_update|date:"d M Y"}} в {{post.time_update|time:"G:i"}}
+          </div>
+        </div>
+      </div>
+    </div>
+    <form action="{% url 'settingpost' post.id %}" method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="pt-3">
+          
+        <p class="text-base border rounded bg-gray-50">{{form.content}}</p>
+        <!--linebreak добавляется перенос строки и абзацы в тексте; truncatewords:40 отображение только 40 слов статьи-->
+        <div class="pt-2">
+          <div>
+            {% if post.photo %}
+            <img src="{{post.photo.url}}" alt="" />
+            {%endif%}
+          </div>
+          <div">{{form.photo}}</div>
+        </div>
+      </div>
+      <div class="pt-3">
+        <div class="bg-gray-200 h-px"></div>
+        <div class="">
+          <div  class="pt-4">
+            <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 ml-10 focus:ring-4 focus:ring-blue-300 font-medium rounded text-base px-8 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Сохранить</button>
+            <a href="{% url 'home' %}" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">Отменить</a>
+            
+          </div>
+
+        </div>
+      </div>
+    </form>
+  </div>
+
+</div>
+
+
+
+
+
+  <!-- <form action="" method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="row gtr-uniform">
+            <div class="col-6 col-12-xsmall"></div>
+
+            <div class="col-12">{{form.content}}</div>
+            {{form.photo}}
+            <button type="submit">Сохранить</button>
+          </div>
+  </form> -->
+
+
+{% endblock content %}
