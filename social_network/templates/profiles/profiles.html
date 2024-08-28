@@ -3,43 +3,7 @@
 {% load static %}
 
 {% block Profiles %}
-<style>
-        textarea {
-            border: none;
-            outline: none;
-            box-shadow: none;
-            resize: none;
-            padding: 10px;
-            font-size: 16px;
-            max-height: 200px;
-        }
 
-        #emoji-picker {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 5px;
-            margin-top: 5px;
-            border: 1px solid #ccc;
-            padding: 10px;
-            background-color: white;
-            position: absolute;
-            z-index: 1000;
-        }
-
-        .emoji {
-            cursor: pointer;
-            font-size: 24px;
-            text-align: center;
-        }
-
-        #emoji-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 20px;
-            margin-left: 10px;
-        }
-    </style>
 <div class="w-64 mr-4 flex-shrink-0">
 
     <!-- Центральная часть -->
@@ -418,20 +382,25 @@
                     </div>
                     
                 </div>
-                <div x-ref="previewSingle" class="flex justify-center flex-wrap"></div>
-                
-                
-                
-                <div x-cloak x-show="open"  class="border-b h-px  mb-4 "></div>
-                
-                
-                <div class="mb-2 hidden">
-                      
-                    <input class="input__file-button block w-full h-10.5 leading-9 rounded overflow-hidden text-sm text-gray-900 bg-gray-50 border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" id="id_photo" name="photo" multiple @change="showPreview(event, $refs.previewSingle)" type="file">
-                </div>
-                
-                <div x-cloak x-show="open"  class="flex justify-end items-center my-2">
+
+                <div class="grid grid-cols-4 gap-2 py-2">
+                <div id="preview-container" class="relative group cursor-pointer">
                     
+                        <img id="preview" class=" w-full h-full object-center object-cover rounded" style="display: none;" src="#" alt="Предварительный просмотр">
+                    
+                    
+                        <button type="button" id="remove-button" style="display: none;" class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 flex justify-center items-center w-4 h-4 bg-black bg-opacity-50 text-white text-opacity-75 hover:text-opacity-100 rounded-tr-sm rounded-bl-sm focus:outline-none">
+                            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>   
+                        </button>
+                </div>
+                </div>
+                <div x-cloak x-show="open"  class="border-b h-px  mb-4 "></div>
+                <div class="mb-2 hidden">
+                    <input class="input__file-button block w-full h-10.5 leading-9 rounded overflow-hidden text-sm text-gray-900 bg-gray-50 border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400" id="id_photo" name="photo"accept="image/*"  type="file">
+                </div>
+                <div x-cloak x-show="open"  class="flex justify-end items-center my-2">
                     <div class="mr-4">
                         <label for="id_photo" class="input__file-button cursor-pointer  ">
                             <a for="id_photo">
@@ -494,6 +463,36 @@ function autoResize(element) {
   element.style.height = element.scrollHeight + "px";
 }
 </script>
+<!-- Препросмотр при загрузке фотографий для поста -->
+    <script>
+        const fileInput = document.getElementById('id_photo');
+        const preview = document.getElementById('preview');
+        const removeButton = document.getElementById('remove-button');
+        const previewContainer = document.getElementById('preview-container');
+
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block'; // Показываем изображение
+                    removeButton.style.display = 'block'; // Показываем кнопку удаления
+                }
+                reader.readAsDataURL(file); // Читаем файл как Data URL
+            } else {
+                preview.style.display = 'none'; // Скрываем изображение, если файл не выбран
+                removeButton.style.display = 'none'; // Скрываем кнопку удаления
+            }
+        });
+
+        removeButton.addEventListener('click', function() {
+            preview.src = '#';
+            preview.style.display = 'none';
+            removeButton.style.display = 'none';
+            fileInput.value = ''; // Очищаем значение input[type="file"]
+        });
+    </script>
 {% endblock Profiles %}
 
 {%block content%}

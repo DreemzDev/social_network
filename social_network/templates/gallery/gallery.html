@@ -2,7 +2,32 @@
 
 <!-- Открытый пост -->
 {% block content %}
-
+<style>
+        #preview-container {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        #preview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 0.5rem;
+            display: block;
+        }
+        .remove-button {
+            position: absolute;
+            top: 0;
+            right: 0;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .group:hover .remove-button {
+            opacity: 1;
+        }
+    </style>
 <!-- Post -->
 <div class="bg-white min-h-dvh w-full rounded border pb-4 shadow dark:bg-zinc-800 dark:border-zinc-700 dark:text-white">
   <div class="flex justify-between items-center">
@@ -90,21 +115,21 @@
       <!-- Modal body -->
 
       <form
-        x-data="activateImagePreview()"
+        
         method="post"
         enctype="multipart/form-data"
       >
         <div class="p-4 md:p-5 space-y-4">
           {% csrf_token %}
           <input
-            class="block w-full h-10.5 leading-9 rounded overflow-hidden text-sm text-gray-900 bg-gray-50 border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
-            id="id_images"
-            name="images"
-            @change="showPreview(event, $refs.previewMulti)"
-            type="file"
-            multiple
-          />
-          <div x-ref="previewMulti" class="flex justify-center flex-wrap"></div>
+        class="block w-full h-10.5 leading-9 rounded overflow-hidden text-sm text-gray-900 bg-gray-50 border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+        id="id_images"
+        name="images"
+        accept="image/*"
+        type="file"
+        multiple
+    />
+    <div id="preview-container"></div>
           <!-- <button type="submit">Загрузить</button> -->
         </div>
         <!-- Modal footer -->
@@ -129,7 +154,7 @@
     </div>
   </div>
 </div>
-<script>
+<!-- <script>
   function activateImagePreview() {
     return {
       showPreview(event, previewBox) {
@@ -144,5 +169,62 @@
       },
     };
   }
-</script>
+</script> -->
+<script>
+        const fileInput = document.getElementById('id_images');
+        const previewContainer = document.getElementById('preview-container');
+
+        // Хранение выбранных файлов
+        let selectedFiles = [];
+
+        fileInput.addEventListener('change', function(event) {
+            const files = Array.from(event.target.files);
+            selectedFiles = selectedFiles.concat(files); // Обновляем массив выбранных файлов
+            updatePreview(); // Обновляем предпросмотр
+        });
+
+        function updatePreview() {
+            previewContainer.innerHTML = ''; // Очищаем контейнер перед добавлением новых изображений
+
+            selectedFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imageContainer = document.createElement('div');
+                    imageContainer.className = 'relative group';
+
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'w-full h-full object-center object-cover rounded';
+
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'remove-button flex justify-center items-center w-4 h-4 bg-black bg-opacity-50 text-white text-opacity-75 hover:text-opacity-100 rounded-tr-sm rounded-bl-sm focus:outline-none';
+                    removeButton.innerHTML = `
+                        <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    `;
+
+                    // Удаление изображения при нажатии на кнопку
+                    removeButton.addEventListener('click', function() {
+                        selectedFiles.splice(index, 1); // Удаляем файл из массива
+                        updatePreview(); // Обновляем предпросмотр
+                        fileInput.files = createFileList(selectedFiles); // Обновляем список файлов в input
+                    });
+
+                    imageContainer.appendChild(img);
+                    imageContainer.appendChild(removeButton);
+                    previewContainer.appendChild(imageContainer);
+                }
+                reader.readAsDataURL(file); // Читаем файл как Data URL
+            });
+        }
+
+        // Функция для создания нового списка файлов
+        function createFileList(files) {
+            const dataTransfer = new DataTransfer();
+            files.forEach(file => dataTransfer.items.add(file));
+            return dataTransfer.files;
+        }
+    </script>
 {% endblock content %}
