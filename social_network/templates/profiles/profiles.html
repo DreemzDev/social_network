@@ -3,6 +3,43 @@
 {% load static %}
 
 {% block Profiles %}
+<style>
+        textarea {
+            border: none;
+            outline: none;
+            box-shadow: none;
+            resize: none;
+            padding: 10px;
+            font-size: 16px;
+            max-height: 200px;
+        }
+
+        #emoji-picker {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 5px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background-color: white;
+            position: absolute;
+            z-index: 1000;
+        }
+
+        .emoji {
+            cursor: pointer;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        #emoji-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            margin-left: 10px;
+        }
+    </style>
 <div class="w-64 mr-4 flex-shrink-0">
 
     <!-- Центральная часть -->
@@ -377,7 +414,7 @@
                         <img class="w-11 h-11 flex-shrink-0 rounded-full" src="{%if user.avatar%}{{user.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}" alt="">
                     </div>
                     <div class="w-full">
-                        <textarea  rows="1" id="id_content" name="content"  required="" class=" text-base pl-3 w-full hidden border-none rounded resize-none py-1 focus:outline-none" placeholder="Что у вас нового?"></textarea>
+                        <textarea  rows="1" id="id_content" name="content"  required="" class=" text-base pl-3 w-full  rounded py-3 resize-none border-none outline-none focus:outline-none" placeholder="Что у вас нового?" oninput="autoResize(this)"></textarea>
                     </div>
                     
                 </div>
@@ -385,7 +422,7 @@
                 
                 
                 
-                <div x-cloak x-show="open"  class="border-b h-px  mb-4 mt-2"></div>
+                <div x-cloak x-show="open"  class="border-b h-px  mb-4 "></div>
                 
                 
                 <div class="mb-2 hidden">
@@ -451,7 +488,12 @@
             }
         }
     </script>
-
+<script>
+function autoResize(element) {
+  element.style.height = "auto";
+  element.style.height = element.scrollHeight + "px";
+}
+</script>
 {% endblock Profiles %}
 
 {%block content%}
@@ -460,114 +502,5 @@
 
 {%endblock content%}
 
-{% block test %}
 
-<!-- Профиль -->
-
-
-<!-- Форма добавления поста-->
-
-{% if user.is_authenticated %}                    
-{%if request.user == user %}
-<article class="post">
-    
-        <section>
-            <form action="" method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-        
-            <div class="row gtr-uniform">
-                <div class="col-6 col-12-xsmall">
-                 
-                    {{form.title}}
-
-                </div>
-                <div class="col-6 col-12-xsmall">
-                    {{form.cat}}
-
-                </div>
-
-
-                <div class="col-12">
-                    {{form.content}}
-                </div>
-
-            </div>
-        
-        </section>
-
-
-<footer>
-    <ul class="actions">
-
-        <button type="submit">Добавить</button> 
-    </ul>
-    <ul class="stats">
-        
-
-        <li>
-            
-            {{form.photo}}
-
-               <label for="id_photo" class="input__file-button">
-            <a for="id_photo" class="icon solid fa-camera" ></a>
-             <span class="input__file-button-text"></span>
-             
-               </label>
-
-        </li>
-        <li>
-            <label for="id_photo" class="input__file-button">
-
-            <a href="#" class="icon solid fa-file-word"></a></li></label>
-    </ul>
-</footer>
-</form>
-</article>
-{%endif%}
-{%endif%}
-
-<!-- Посты созданные этим пользователем -->
-{% for p in posts %}
-
-<article class="post">
-
-    <header>
-        <div class="title">
-           
-            <h2><a href="{{p.get_absolute_url}}">{{p.title}}</a></h2>
-            <p>{{p.cat}}</p>
-        </div>
-        <div class="meta">
-            <time class="published" datetime="{{p.time_create}}">{{p.time_update|time:"G:i"}}<br>{{p.time_update|date:"d F Y"}}</time>
-            {%if p.author.avatar%}
-            <a href="{{p.author.get_absolute_url}}" class="author"><span class="name">{{p.author.last_name}}<br>{{p.author.first_name}}<br>{{p.author.patronymic}}</span><img
-                    src="{{p.author.avatar.url}}" alt="" /></a>
-                    {%else%}
-                    <a href="{{p.author.get_absolute_url}}" class="author"><span class="name">{{p.author.last_name}}<br>{{p.author.first_name}}<br>{{p.author.patronymic}}</span><img
-                        src="{% static 'post/images/avatar7.png' %}" alt="" /></a>
-                    {% endif %}
-                    
-        </div>
-    </header>
-    
-    {% if p.photo %}
-    <a href="{{p.get_absolute_url}}" class="image featured">    <img src="{{p.photo.url}}" alt="" /></a>
-    {% endif %}
-    <p>{{p.content|linebreaks|truncatewords:40}}</p> <!--linebreak добавляется перенос строки и абзацы в тексте; truncatewords:40 отображение только 40 слов статьи-->
-    <footer>
-        <ul class="actions">
-            <li><a href="{{p.get_absolute_url}}" class="button large">Подробнее</a></li>
-        </ul>
-        <ul class="stats">
-            <li><a href="#" class="icon solid fa-comment">128</a></li>
-            <li><a href="#" class="icon solid fa-heart">28</a></li>
-
-        </ul>
-
-    </footer>
-
-</article>
-{% endfor %}
-
-{% endblock test %}
 

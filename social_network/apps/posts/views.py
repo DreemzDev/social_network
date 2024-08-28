@@ -70,7 +70,12 @@ class ShowPost(FormMixin, DetailView):
         self.object.comment_author = self.request.user
         self.object.save()
         return super().form_valid(form)
-   
+    
+    def get(self, request, *args, **kwargs):
+        post = self.get_object()
+        post.views += 1  # Увеличиваем счетчик просмотров
+        post.save()
+        return super().get(request, *args, **kwargs)
 
 def toggle_like(request, post_id):
     if request.method == 'POST':
@@ -95,24 +100,6 @@ class AddPost(FormView, TemplateView):
         form.save()
         return super().form_valid(form)
     
-
-    def add_remove_like(request, pk):
-        data = {}
-        post = Post.objects.get(pk=pk)
-
-        if request.method == "POST":
-            user = request.user
-            if post.likes.filter(id=user.id).exists():
-                liked = False
-                post.likes.remove(user)
-            else:
-                post.likes.add(user)
-                liked = True
-
-
-        data["count"] = Post.likes.count()
-        data["liked"] = liked
-        return JsonResponse(data) 
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

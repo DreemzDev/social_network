@@ -2,7 +2,6 @@
 
 <!-- Открытый пост -->
 {% block content %}
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <!-- Post -->
 <div
   class="bg-white rounded border w-full mb-4 shadow dark:bg-zinc-800 dark:border-zinc-700 dark:text-white"
@@ -170,7 +169,7 @@
               clip-rule="evenodd"
             />
           </svg>
-          <div class="pl-1 text-xs text-gray-400">341</div>
+          <div class="pl-1 text-xs text-gray-400">{{ post.views }}</div>
         </div>
       </div>
     </div>
@@ -181,19 +180,13 @@
       <div class="bg-gray-200 h-px mx-4"></div>
       <!-- <div class="bg-gray-200 h-px"></div> -->
       <div class="flex items-start p-4">
-        {%if c.comment_author.avatar%}
+        
         <a href="#" class="block flex-shrink-0"
           ><img
             class="w-12 h-12 rounded-full"
-            src="{{c.comment_author.avatar.url}}"
+            src="{%if c.comment_author.avatar%}{{c.comment_author.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{% endif %}"
         /></a>
-        {%else%}
-        <a href="#" class="block flex-shrink-0"
-          ><img
-            class="w-12 h-12 rounded-full"
-            src="{% static 'post/images/avatar7.png' %}"
-        /></a>
-        {% endif %}
+
         <!-- Дата публикаиции -->
         <div class="pl-4 w-full">
           <a href="#" class="block font-semibold text-blue-500 hover:underline"
@@ -223,7 +216,7 @@
             <div class="py-3 flex-shrink-0 mr-4">
               <img
                 class="w-10 h-10 flex-shrink-0 rounded-full"
-                src="{{user.avatar.url}}"
+                src="{% if user.avatar %}{{user.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
                 alt=""
               />
             </div>
@@ -234,7 +227,8 @@
                 name="comment_text"
                 maxlength="350"
                 required=""
-                class="text-sm px-3 w-full hidden border-none rounded resize-none py-1 focus:outline-none"
+                class="text-base pl-3 w-full  rounded py-3 resize-none border-none outline-none focus:outline-none" 
+                oninput="autoResize(this)"
                 placeholder="Написать комментарий..."
               ></textarea>
             </div>
@@ -260,6 +254,11 @@
   </div>
 </div>
 
-
+<script>
+function autoResize(element) {
+  element.style.height = "auto";
+  element.style.height = element.scrollHeight + "px";
+}
+</script>
 
 {% endblock content %}

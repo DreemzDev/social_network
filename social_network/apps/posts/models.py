@@ -17,7 +17,7 @@ class Post(models.Model):
     time_update = models.DateTimeField(auto_now=True, verbose_name="Время изменения")
     author = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, related_name='posts', null=True, default=None, verbose_name="Создатель поста")
     likes = models.ManyToManyField(get_user_model(), related_name='liked_posts', blank=True)
-
+    views = models.IntegerField(default=0) 
    
     
     def __str__(self):
@@ -32,9 +32,3 @@ class Post(models.Model):
         verbose_name_plural = 'Все новости организации'
         ordering = ['-time_create',] #Сортирока как на сайте так и в админке от новой новости к более старой
 
-# class Like(models.Model):
-#     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
-#     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-
-#     class Meta:
-#         unique_together = ('user', 'post')  # Уникальная пара пользователь-пост
