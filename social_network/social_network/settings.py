@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'compressor',
-    
+    'channels',
     'posts.apps.PostsConfig',
     'profiles.apps.ProfilesConfig',
     'category.apps.CategoryConfig',
@@ -60,7 +60,9 @@ INSTALLED_APPS = [
     'comments.apps.CommentsConfig',
     'gallery.apps.GalleryConfig',
     'phonebook.apps.PhonebookConfig',
+    'chats.apps.ChatsConfig',
     'minio_storage',
+
     
     
 
@@ -96,9 +98,19 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'social_network.wsgi.application'
+# WSGI_APPLICATION = 'social_network.wsgi.application'
+ASGI_APPLICATION = 'social_network.asgi.application'
 
 
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 # DATABASES = {

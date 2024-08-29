@@ -121,7 +121,7 @@
       >
         <div class="p-4 md:p-5 space-y-4">
           {% csrf_token %}
-          <input
+        <input
         class="block w-full h-10.5 leading-9 rounded overflow-hidden text-sm text-gray-900 bg-gray-50 border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
         id="id_images"
         name="images"
@@ -129,8 +129,8 @@
         type="file"
         multiple
     />
-    <div id="preview-container"></div>
-          <!-- <button type="submit">Загрузить</button> -->
+        <div id="preview-container"></div>
+          
         </div>
         <!-- Modal footer -->
         <div
@@ -144,7 +144,7 @@
           </button>
           <button
             data-modal-hide="small-modal"
-            @click="$refs.previewMulti.remove()"  type="reset"
+            type="reset"
             class="ms-3 text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
           >
             Отмена
@@ -154,22 +154,7 @@
     </div>
   </div>
 </div>
-<!-- <script>
-  function activateImagePreview() {
-    return {
-      showPreview(event, previewBox) {
-        previewBox.replaceChildren();
 
-        for (const i in event.target.files) {
-          let img = document.createElement("img");
-          img.className = "aspect-auto my-2 mx-1 h-24 rounded shadow";
-          img.src = URL.createObjectURL(event.target.files[i]);
-          previewBox.appendChild(img);
-        }
-      },
-    };
-  }
-</script> -->
 <script>
         const fileInput = document.getElementById('id_images');
         const previewContainer = document.getElementById('preview-container');

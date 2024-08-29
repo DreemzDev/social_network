@@ -1,0 +1,30 @@
+<h1>Чат {{ chat.id }}</h1>
+<textarea id="chat-log" cols="100" rows="20" readonly></textarea><br>
+<input id="chat-message-input" type="text" size="100">
+<button onclick="sendMessage()">Отправить</button>
+
+<script>
+    const chatSocket = new WebSocket(
+        'ws://' + window.location.host + '/ws/chat/{{ chat.id }}/'
+    );
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        document.querySelector('#chat-log').value += (data.sender + ': ' + data.message + '\n');
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('Chat socket closed unexpectedly');
+    };
+
+    function sendMessage() {
+        const messageInputDom = document.querySelector('#chat-message-input');
+        const message = messageInputDom.value;
+        const sender = '{{ user.username }}';
+        chatSocket.send(JSON.stringify({
+            'message': message,
+            'sender': sender
+        }));
+        messageInputDom.value = '';
+    }
+</script>

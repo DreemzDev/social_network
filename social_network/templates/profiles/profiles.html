@@ -422,41 +422,7 @@
     </div>
     {%endif%}
 
-    <script>
-        let inputs = document.querySelectorAll('#id_photo');
-        Array.prototype.forEach.call(inputs, function (input) {
-          let label = input.nextElementSibling,
-            labelVal = label.querySelector('.input__file-button-text').innerText;
-      
-          input.addEventListener('change', function (e) {
-            let countFiles = '';
-            if (this.files && this.files.length >= 1)
-              countFiles = this.files.length;
-      
-            if (countFiles)
-              label.querySelector('.input__file-button-text').innerText = 'Выбрано файлов: ' + countFiles;
-            else
-              label.querySelector('.input__file-button-text').innerText = labelVal;
-          });
-        });
-        
-        function activateImagePreview() {
-            return {
-                showPreview(event, previewBox) {
-                    previewBox.replaceChildren();
 
-                    for (const i in event.target.files) {
-                        let img = document.createElement('img');
-                        img.className = 'aspect-auto my-2 mx-1 h-24 rounded shadow';
-                        img.src = URL.createObjectURL(event.target.files[i]);
-                        previewBox.appendChild(img);
-                        
-
-                    } 
-                }
-            }
-        }
-    </script>
 <script>
 function autoResize(element) {
   element.style.height = "auto";

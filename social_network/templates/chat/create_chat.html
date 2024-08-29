@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Создать чат</title>
+</head>
+<body>
+    <h1>Создать новый чат</h1>
+    <form method="post">
+        {% csrf_token %}
+        <h2>Выберите пользователей:</h2>
+        {% for user in users %}
+            <div>
+                <input type="checkbox" name="users" value="{{ user.id }}">
+                <label>{{ user.username }}</label>
+            </div>
+        {% endfor %}
+        <button type="submit">Создать чат</button>
+    </form>
+    <a href="{% url 'chat_list' %}">Назад к списку чатов</a>
+</body>
+</html>

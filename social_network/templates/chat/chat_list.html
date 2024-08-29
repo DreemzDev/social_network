@@ -1,0 +1,8 @@
+<h1>Список чатов</h1>
+<ul>
+    {% for chat in chats %}
+        <li><a href="{% url 'chat_detail' chat.id %}">Чат {{ chat.id }}</a></li>
+    {% empty %}
+        <li>У вас нет чатов.</li>
+    {% endfor %}
+</ul>

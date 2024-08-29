@@ -32,6 +32,7 @@ urlpatterns = [
     path('', include('comments.urls')),
     path('', include('gallery.urls')),
     path('', include('phonebook.urls')),
+    path('', include('chats.urls')),
 
 ]
 urlpatterns +=static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
