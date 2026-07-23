@@ -14,7 +14,11 @@ class AddImages(FormView, ListView):
     context_object_name = 'gallery'
     template_name = 'gallery/gallery.html'  # Replace with your template.
     success_url = reverse_lazy('home')
-    
+
+    def get_queryset(self):
+        return GalleryImage.objects.order_by('-uploaded_at')
+
+
     def post(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         form = self.get_form(form_class)

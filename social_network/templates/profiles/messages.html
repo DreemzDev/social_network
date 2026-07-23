@@ -2,49 +2,48 @@
 {% load static %}
 
 {% block content %}
-<div class="w-full flex">
-<div class="w-1/4 bg-white border-r border-gray-200 flex flex-col dark:bg-zinc-800 dark:border-zinc-700">
+<div class="flex w-full min-w-0 overflow-hidden rounded-xl border border-gray-100 dark:border-zinc-800" style="height: calc(100vh - 96px);">
+<div class="hidden w-full flex-shrink-0 flex-col border-r border-gray-100 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:flex md:w-80">
     <!-- Поиск диалогов -->
-    <div class="p-4 border-b border-gray-200 dark:border-zinc-700">
+    <div class="border-b border-gray-100 p-3 dark:border-zinc-800">
         <div class="relative">
-            <input type="text" id="search-chats" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-zinc-700 dark:border-zinc-600 dark:text-white dark:placeholder-gray-400" placeholder="Поиск диалогов...">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+            <input type="text" id="search-chats" class="block w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white" placeholder="Поиск диалогов...">
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
                 </svg>
             </div>
         </div>
     </div>
-    
+
     <!-- Список диалогов -->
     <div class="flex-1 overflow-y-auto" id="dialogs-list">
         {% for dialog in dialogs %}
-        <a href="{% url 'dialog_messages' user_id=dialog.other_user.pk %}" 
+        <a href="{% url 'dialog_messages' user_id=dialog.other_user.pk %}"
            data-search-text="{{ dialog.other_user.get_full_name|default:dialog.other_user.username }} {{ dialog.last_message.text|default:'' }}"
-           class="block chat-item p-4 border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-zinc-700 dark:border-zinc-700 {% if dialog.other_user.pk == active_user_id %}bg-blue-50 dark:bg-zinc-600{% endif %}">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 mr-3 relative">
+           class="chat-item flex items-center gap-3 border-b border-gray-50 p-3 hover:bg-gray-50 dark:border-zinc-800 dark:hover:bg-zinc-800 {% if dialog.other_user.pk == active_user_id %}bg-[#EAF3FF] dark:bg-zinc-800{% endif %}">
+                <div class="relative flex-shrink-0">
                     {% if dialog.other_user.avatar %}
-                        <img class="h-10 w-10 rounded-full" src="{{ dialog.other_user.avatar.url }}" alt="{{ dialog.other_user.get_full_name }}">
+                        <img class="h-10 w-10 rounded-full object-cover" src="{{ dialog.other_user.avatar.url }}" alt="{{ dialog.other_user.get_full_name }}">
                     {% else %}
-                        <div class="h-10 w-10 rounded-full bg-gray-300 dark:bg-zinc-600 flex items-center justify-center text-gray-600 dark:text-gray-300 font-semibold">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF3FF] font-semibold text-[#0077FF] dark:bg-zinc-700">
                             {{ dialog.other_user.username|first|upper }}
                         </div>
                     {% endif %}
-                    <span class="absolute bottom-0 right-0 block h-3 w-3 rounded-full {% if dialog.other_user.is_online %}bg-green-500{% else %}bg-gray-400{% endif %} ring-2 ring-white dark:ring-zinc-800"></span>
+                    <span class="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-white {% if dialog.other_user.is_online %}bg-green-400{% else %}bg-gray-300{% endif %} dark:border-zinc-900"></span>
                 </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between">
-                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
                             {{ dialog.other_user.get_full_name|default:dialog.other_user.username }}
                         </p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                        <p class="flex-shrink-0 text-xs text-gray-400">
                             {% if dialog.last_message %}
                                 {{ dialog.last_message.created|date:"H:i" }}
                             {% endif %}
                         </p>
                     </div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
+                    <p class="truncate text-sm text-gray-500 dark:text-gray-400">
                         {% if dialog.last_message %}
                             {% if dialog.last_message.sender == request.user %}
                                 Вы: {{ dialog.last_message.text|truncatechars:30 }}
@@ -57,80 +56,74 @@
                     </p>
                 </div>
                 {% if dialog.unread_count > 0 %}
-                <div class="ml-2">
-                    <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-full unread-badge" data-user-id="{{ dialog.other_user.pk }}">
-                        {{ dialog.unread_count }}
-                    </span>
-                </div>
+                <span class="unread-badge inline-flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#0077FF] px-1.5 text-xs font-medium leading-none text-white" data-user-id="{{ dialog.other_user.pk }}">
+                    {{ dialog.unread_count }}
+                </span>
                 {% endif %}
-            </div>
         </a>
         {% empty %}
-        <div class="text-center py-10 px-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div class="px-4 py-10 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <h3 class="mt-2 text-lg font-medium text-gray-900 dark:text-white">Нет диалогов</h3>
-            <p class="mt-1 text-gray-500 dark:text-gray-400">Начните новый диалог с пользователями</p>
+            <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">Нет диалогов</h3>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Начните новый диалог с пользователями</p>
         </div>
         {% endfor %}
     </div>
 </div>
 
-<div class="flex-1 flex flex-col">
+<div class="flex min-w-0 flex-1 flex-col bg-white dark:bg-zinc-900">
     <!-- Заголовок -->
-    <div class="bg-white border-b border-gray-200 p-2 dark:bg-zinc-800 dark:border-zinc-700">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center justify-center">
-                <a href="{% url 'dialogs_list' %}" class="text-gray-500 hover:text-gray-700 mr-2 dark:text-gray-400 dark:hover:text-gray-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                    </svg>
-                </a>
-                
-                <img class="h-10 w-10 rounded-full mr-3" 
-                     src="{% if other_user.avatar %}{{ other_user.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}" 
-                     alt="{{ other_user.first_name }} {{ other_user.last_name }}">
-                
-                <div>
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
-                        {{ other_user.last_name }} {{ other_user.first_name }}
-                    </h3>
-                    <p class="text-sm {% if other_user.is_online %}text-green-600{% else %}text-gray-500{% endif %} dark:text-gray-400">
-                        {% if other_user.is_online %}Онлайн{% else %}Офлайн{% endif %}
-                    </p>
-                    <div id="typing-indicator" class="text-sm text-gray-500 italic px-1 py-1 h-6"></div>
-                </div>
+    <div class="flex-shrink-0 border-b border-gray-100 p-3 dark:border-zinc-800">
+        <div class="flex min-w-0 items-center">
+            <a href="{% url 'dialogs_list' %}" class="mr-2 flex-shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 md:hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+            </a>
+
+            <img class="mr-3 h-10 w-10 flex-shrink-0 rounded-full object-cover"
+                 src="{% if other_user.avatar %}{{ other_user.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
+                 alt="{{ other_user.first_name }} {{ other_user.last_name }}">
+
+            <div class="min-w-0">
+                <h3 class="truncate text-base font-medium text-gray-900 dark:text-white">
+                    {{ other_user.last_name }} {{ other_user.first_name }}
+                </h3>
+                <p class="text-xs {% if other_user.is_online %}text-green-600{% else %}text-gray-400{% endif %}">
+                    {% if other_user.is_online %}Онлайн{% else %}Офлайн{% endif %}
+                </p>
+                <div id="typing-indicator" class="h-4 truncate text-xs italic text-gray-400"></div>
             </div>
         </div>
     </div>
 
     <!-- Контейнер сообщений -->
     <div id="messages-container"
-         class="flex-1 overflow-y-auto p-4 bg-white space-y-4"
-         style="max-height: calc(100vh - 200px);">
-        
-        <div id="loading-indicator" class="text-center py-2 hidden">
-            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-            <p class="text-sm text-gray-500 mt-1">Загрузка сообщений...</p>
+         class="flex-1 space-y-4 overflow-y-auto bg-[#EDEEF0] p-4 dark:bg-zinc-950">
+
+        <div id="loading-indicator" class="hidden py-2 text-center">
+            <div class="inline-block h-6 w-6 animate-spin rounded-full border-b-2 border-[#0077FF]"></div>
+            <p class="mt-1 text-sm text-gray-500">Загрузка сообщений...</p>
         </div>
 
         {% for message in messages %}
         <div class="flex {% if message.sender == request.user %}justify-end{% else %}justify-start{% endif %} gap-2.5">
             <img src="{% if message.sender.avatar %}{{ message.sender.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
-                 alt="Аватар" class="w-10 h-10 rounded-full" />
+                 alt="Аватар" class="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
 
-            <div class="flex flex-col w-full max-w-[320px] leading-1.5 py-2 px-4 border-gray-200 {% if message.sender == request.user %}bg-blue-500 text-white{% else %}bg-gray-200 text-gray-800{% endif %} rounded-e-xl rounded-es-xl">
-                <div class="flex items-center space-x-2">
+            <div class="flex w-full max-w-[75%] flex-col rounded-xl px-4 py-2 leading-1.5 sm:max-w-[320px] {% if message.sender == request.user %}bg-[#0077FF] text-white{% else %}bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100{% endif %}">
+                <div class="flex items-center gap-2">
                     <span class="text-sm font-semibold">{{ message.sender.last_name }} {{ message.sender.first_name }}</span>
-                    <span class="text-sm font-normal opacity-60">{{ message.created|time:"H:i" }}</span>
+                    <span class="text-xs font-normal opacity-60">{{ message.created|time:"H:i" }}</span>
                 </div>
-                <p class="text-sm font-normal py-2.5 whitespace-pre-wrap break-words">{{ message.text }}</p>
+                <p class="whitespace-pre-wrap break-words py-1.5 text-sm font-normal">{{ message.text }}</p>
 
                 {% if message.file %}
                 <div class="mt-1">
                     <a href="{{ message.file.url }}" target="_blank"
-                       class="inline-flex items-center text-sm underline hover:text-blue-200">
+                       class="inline-flex items-center text-sm underline hover:opacity-80">
                         📎 Файл
                     </a>
                 </div>
@@ -141,8 +134,8 @@
     </div>
 
     <!-- Форма отправки -->
-    <div class="p-4 bg-white border-t border-gray-200">
-        <div class="flex space-x-2 items-end">
+    <div class="flex-shrink-0 border-t border-gray-100 p-3 dark:border-zinc-800">
+        <div class="flex items-end gap-2">
             <textarea
                 rows="1"
                 id="message-input"
@@ -150,10 +143,10 @@
                 autofocus
                 maxlength="2000"
                 oninput="autoResize(this)"
-                class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 resize-none outline-none"
+                class="flex-grow resize-none rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 text-sm outline-none focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
                 placeholder="Напишите сообщение..."></textarea>
             <button id="send-button"
-                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300">
+                    class="flex-shrink-0 rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
                 Отправить
             </button>
         </div>
@@ -172,8 +165,7 @@ const currentUserPk = "{{ request.user.pk }}";
 const otherUserFullName = "{{ other_user.last_name }} {{ other_user.first_name }}";
 const currentUserFullName = "{{ request.user.last_name }} {{ request.user.first_name }}";
 
-// Используем глобальный WebSocket менеджер из base.html
-const wsManager = window.globalWsManager;
+// Используем глобальный WebSocket менеджер из base.html (объявлен там же, в window.globalWsManager)
 
 // Переменные состояния
 let typingTimeout = null;
@@ -274,15 +266,14 @@ function createMessageElement(messageData) {
 
   return `
     <div class="flex ${isSender ? 'justify-end' : 'justify-start'} gap-2.5" data-message-id="${messageData.id || ''}">
-      <img src="${senderAvatar}" alt="Аватар" class="w-10 h-10 rounded-full" />
-      <div class="flex flex-col w-full max-w-[320px] leading-1.5 py-2 px-4 border-gray-200 
-                  ${isSender ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} 
-                  rounded-e-xl rounded-es-xl">
-        <div class="flex items-center space-x-2">
+      <img src="${senderAvatar}" alt="Аватар" class="w-8 h-8 flex-shrink-0 rounded-full object-cover" />
+      <div class="flex flex-col w-full max-w-[75%] sm:max-w-[320px] leading-1.5 py-2 px-4 rounded-xl
+                  ${isSender ? 'bg-[#0077FF] text-white' : 'bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100'}">
+        <div class="flex items-center gap-2">
           <span class="text-sm font-semibold">${senderFullName}</span>
-          <span class="text-sm font-normal opacity-60">${timeString}</span>
+          <span class="text-xs font-normal opacity-60">${timeString}</span>
         </div>
-        <p class="text-sm font-normal py-2.5 whitespace-pre-wrap break-words">${text}</p>
+        <p class="text-sm font-normal py-1.5 whitespace-pre-wrap break-words">${text}</p>
         ${fileHtml}
       </div>
     </div>
@@ -350,10 +341,10 @@ function handleChatWebSocketMessage(data) {
   // Обработка текстовых сообщений
   if (data.msg_type === 3) { // TextMessage
     const isSender = data.sender === currentUserPk;
-    const isRecipient = data.recipient === currentUserPk;
-    
-    const isRelevantMessage = 
-      (isSender && data.recipient === recipientPk) || 
+    const isRecipient = data.receiver === currentUserPk;
+
+    const isRelevantMessage =
+      (isSender && data.receiver === recipientPk) ||
       (isRecipient && data.sender === recipientPk);
     
     if (!isRelevantMessage) {
