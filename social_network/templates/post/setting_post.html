@@ -1,77 +1,361 @@
-{% extends 'base.html' %}{% load static %} {% block content %}
+{% extends 'base.html' %}
+{% load static %}
 
-
-
-<!-- Открытый пост -->
-
-
-<!-- Post -->
-<div
-  class="bg-white rounded border w-full mb-4 shadow dark:bg-zinc-800 dark:border-zinc-700 dark:text-white"
->
-  <div class="p-4">
-    <div class="flex justify-between">
-      
-      <div class="flex items-center">
-        <a href="#" class="block flex-shrink-0"
-          ><img class="w-12 h-12 rounded-full" src="{%if post.author.avatar%}{{post.author.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
-        /></a>
-        <!-- Дата публикаиции -->
-        <div class="pl-4">
-          <a href="#" class="block font-semibold text-blue-500 hover:underline"
-            >{{post.author.first_name}} {{post.author.last_name}}</a
-          >
-          <div class="block text-gray-400">
-            {{post.time_update|date:"d M Y"}} в {{post.time_update|time:"G:i"}}
+{% block content %}
+<div class="w-full min-w-0 mx-auto space-y-6">
+  <!-- Post Edit Card -->
+  <div class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800">
+    <!-- Header -->
+    <div class="p-4 border-b border-gray-100 dark:border-zinc-800 sm:p-6">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center space-x-3">
+          <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+            <img
+              src="{% if post.author.avatar %}{{ post.author.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
+              class="w-full h-full object-cover"
+              alt="Аватар"
+            />
           </div>
+          <div class="min-w-0">
+            <h2 class="truncate text-lg font-semibold text-gray-900 dark:text-white">
+              {{ post.author.first_name }} {{ post.author.last_name }}
+            </h2>
+            <p class="truncate text-sm text-gray-500 dark:text-gray-400">
+              Редактирование записи • {{ post.time_update|date:"d M Y" }} в {{ post.time_update|time:"H:i" }}
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="px-2 py-1 text-xs bg-[#EAF3FF] text-[#0077FF] dark:bg-zinc-800 dark:text-blue-300 rounded-full">
+            Редактирование
+          </span>
         </div>
       </div>
     </div>
-    <form action="{% url 'settingpost' post.id %}" method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-      <div class="pt-3">
-          
-        <p class="text-base border rounded bg-gray-50">{{form.content}}</p>
-        <!--linebreak добавляется перенос строки и абзацы в тексте; truncatewords:40 отображение только 40 слов статьи-->
-        <div class="pt-2">
-          <div>
-            {% if post.photo %}
-            <img src="{{post.photo.url}}" alt="" />
-            {%endif%}
-          </div>
-          <div">{{form.photo}}</div>
-        </div>
-      </div>
-      <div class="pt-3">
-        <div class="bg-gray-200 h-px"></div>
-        <div class="">
-          <div  class="pt-4">
-            <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 ml-10 focus:ring-4 focus:ring-blue-300 font-medium rounded text-base px-8 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Сохранить</button>
-            <a href="{% url 'home' %}" class="py-2.5 px-5 ms-3 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">Отменить</a>
-            
-          </div>
 
+    <!-- Edit Form -->
+    <form action="{% url 'settingpost' post.id %}" method="post" enctype="multipart/form-data" class="p-4 sm:p-6">
+      {% csrf_token %}
+      
+      <!-- Content Field -->
+      <div class="mb-6">
+        <label for="id_content" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Текст записи
+        </label>
+        <div class="relative border rounded-lg bg-white dark:bg-zinc-800 flex items-end">
+          <textarea
+            rows="1"
+            id="id_content"
+            name="content"
+            required=""
+            class="text-base pl-3 pr-10 w-full rounded py-3 resize-none border-none outline-none focus:outline-none dark:bg-zinc-800 dark:text-white"
+            placeholder="Что у вас нового?"
+            oninput="autoResize(this)"
+          >{{ form.content.value|default:"" }}</textarea>
+          <div class="absolute bottom-3 right-3 flex items-center space-x-2">
+            <span class="text-xs text-gray-400" id="char-count">0/5000</span>
+          </div>
         </div>
+        {% if form.content.errors %}
+          <div class="mt-1 text-sm text-red-600 dark:text-red-400">
+            {{ form.content.errors }}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Photo Field -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Изображение
+        </label>
+        
+        <!-- Current Photo Preview -->
+        {% if post.photo %}
+        <div class="mb-4" id="current-photo-container">
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Текущее изображение:</p>
+          <div class="relative inline-block">
+            <img src="{{ post.photo.url }}" alt="Текущее изображение" class="w-32 h-32 object-cover rounded-xl border border-gray-200 dark:border-zinc-600">
+            <button 
+              type="button" 
+              id="remove-photo-btn"
+              class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+            >
+              ×
+            </button>
+          </div>
+          <!-- Скрытые стандартные поля Django -->
+          <div class="hidden">
+            На данный момент: <a href="{{ post.photo.url }}">{{ post.photo.name }}</a><br>
+            <input type="checkbox" name="photo-clear" id="photo-clear_id">
+            <label for="photo-clear_id">Очистить</label>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- File Upload -->
+        <div class="flex items-center justify-center w-full">
+          <label for="custom-photo-upload" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-zinc-800 hover:bg-gray-100 dark:border-zinc-600 dark:hover:border-zinc-500 dark:hover:bg-zinc-700 transition-colors">
+            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+              <svg class="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+              </svg>
+              <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                <span class="font-semibold">Нажмите для загрузки</span> или перетащите
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, GIF (MAX. 10MB)</p>
+            </div>
+            <!-- Кастомный input file -->
+            <input type="file" name="photo" accept="image/*" id="custom-photo-upload" class="hidden">
+          </label>
+        </div>
+        
+        <!-- File Preview -->
+        <div id="file-preview" class="mt-3 hidden">
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Новое изображение:</p>
+          <div class="relative inline-block">
+            <img id="preview-image" class="w-32 h-32 object-cover rounded-xl border border-gray-200 dark:border-zinc-600">
+            <button 
+              type="button" 
+              onclick="clearFileInput()"
+              class="absolute -top-2 -right-2 bg-gray-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-gray-600 transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        <!-- Скрытый стандартный input file Django -->
+        <div class="hidden">
+          {{ form.photo }}
+        </div>
+
+        {% if form.photo.errors %}
+          <div class="mt-1 text-sm text-red-600 dark:text-red-400">
+            {{ form.photo.errors }}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Hidden field for photo-clear -->
+      <input type="hidden" name="photo-clear" id="photo-clear" value="">
+
+      <!-- Actions -->
+      <div class="flex flex-col-reverse gap-3 pt-6 border-t border-gray-100 dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-col gap-3 sm:flex-row sm:space-x-3">
+          <a
+            href="{% url 'home' %}"
+            class="rounded-lg border border-gray-300 bg-white px-6 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0077FF] focus:border-[#0077FF] dark:bg-zinc-800 dark:text-gray-300 dark:border-zinc-600 dark:hover:bg-zinc-700 transition-colors"
+          >
+            Отменить
+          </a>
+          <button
+            type="button"
+            data-modal-target="preview-modal"
+            data-modal-toggle="preview-modal"
+            class="rounded-lg border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0077FF] focus:border-[#0077FF] dark:bg-zinc-800 dark:text-gray-300 dark:border-zinc-600 dark:hover:bg-zinc-700 transition-colors"
+          >
+            Предпросмотр
+          </button>
+        </div>
+        <button
+          type="submit"
+          class="rounded-lg bg-[#0077FF] px-8 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 transition-colors"
+        >
+          Сохранить изменения
+        </button>
       </div>
     </form>
   </div>
-
 </div>
 
+<!-- Preview Modal -->
+<div id="preview-modal" tabindex="-1" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full inset-0 h-full bg-black bg-opacity-50">
+  <div class="relative p-4 w-full max-w-2xl max-h-full">
+    <div class="relative bg-white dark:bg-zinc-800 rounded-xl shadow-lg">
+      <div class="flex items-center justify-between p-4 md:p-5 border-b border-gray-100 dark:border-zinc-700">
+        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+          Предпросмотр записи
+        </h3>
+        <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-100 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-zinc-600 dark:hover:text-white" data-modal-hide="preview-modal">
+          <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+          </svg>
+          <span class="sr-only">Close modal</span>
+        </button>
+      </div>
+      <div class="p-4 md:p-5 space-y-4">
+        <div class="bg-gray-50 dark:bg-zinc-700 rounded-xl p-4">
+          <div id="preview-content" class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed"></div>
+          <div id="preview-image-container" class="mt-3"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
+<script>
+  function autoResize(element) {
+    element.style.height = "auto";
+    element.style.height = element.scrollHeight + "px";
+  }
 
+  document.addEventListener('DOMContentLoaded', function() {
+    const contentTextarea = document.getElementById('id_content');
+    const charCount = document.getElementById('char-count');
+    const customFileInput = document.getElementById('custom-photo-upload');
+    const djangoFileInput = document.getElementById('{{ form.photo.id_for_label }}');
+    const filePreview = document.getElementById('file-preview');
+    const previewImage = document.getElementById('preview-image');
+    const removePhotoBtn = document.getElementById('remove-photo-btn');
+    const photoClearInput = document.getElementById('photo-clear');
+    const previewContent = document.getElementById('preview-content');
+    const previewImageContainer = document.getElementById('preview-image-container');
+    const currentPhotoContainer = document.getElementById('current-photo-container');
 
+    // Авто-ресайз при загрузке
+    if (contentTextarea) {
+      autoResize(contentTextarea);
+    }
 
-  <!-- <form action="" method="post" enctype="multipart/form-data">
-          {% csrf_token %}
-          <div class="row gtr-uniform">
-            <div class="col-6 col-12-xsmall"></div>
+    // Счетчик символов
+    function updateCharCount() {
+      const length = contentTextarea.value.length;
+      charCount.textContent = `${length}/5000`;
+      
+      if (length > 4500) {
+        charCount.classList.add('text-red-500');
+      } else {
+        charCount.classList.remove('text-red-500');
+      }
+    }
 
-            <div class="col-12">{{form.content}}</div>
-            {{form.photo}}
-            <button type="submit">Сохранить</button>
-          </div>
-  </form> -->
+    contentTextarea.addEventListener('input', updateCharCount);
+    updateCharCount(); // Инициализация
 
+    // Предпросмотр изображения для кастомного input
+    customFileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        // Синхронизируем с Django input
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        djangoFileInput.files = dataTransfer.files;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          previewImage.src = e.target.result;
+          filePreview.classList.remove('hidden');
+        }
+        reader.readAsDataURL(file);
+      }
+    });
 
-{% endblock content %}
+    // Удаление текущего изображения
+    if (removePhotoBtn) {
+      removePhotoBtn.addEventListener('click', function() {
+        photoClearInput.value = '1';
+        if (currentPhotoContainer) {
+          currentPhotoContainer.style.display = 'none';
+        }
+        // Также очищаем файловые inputs
+        customFileInput.value = '';
+        djangoFileInput.value = '';
+        filePreview.classList.add('hidden');
+      });
+    }
+
+    // Очистка выбранного файла
+    window.clearFileInput = function() {
+      customFileInput.value = '';
+      djangoFileInput.value = '';
+      filePreview.classList.add('hidden');
+    }
+
+    // Предпросмотр в модальном окне
+    const previewModal = document.getElementById('preview-modal');
+    if (previewModal) {
+      // Используем обработчик для кнопки предпросмотра
+      document.querySelector('[data-modal-target="preview-modal"]').addEventListener('click', function() {
+        // Сохраняем переносы строк с помощью whitespace-pre-wrap
+        previewContent.textContent = contentTextarea.value || 'Текст записи...';
+        
+        // Показ изображения в предпросмотре
+        previewImageContainer.innerHTML = '';
+        
+        // Проверяем новое изображение
+        if (customFileInput.files[0]) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'max-w-full h-auto rounded-lg max-h-64 object-contain';
+            previewImageContainer.appendChild(img);
+          }
+          reader.readAsDataURL(customFileInput.files[0]);
+        } 
+        // Проверяем текущее изображение (только если оно есть и не удалено)
+        else if (photoClearInput.value !== '1' && currentPhotoContainer && currentPhotoContainer.style.display !== 'none') {
+          // Если есть текущее фото и оно не скрыто, показываем его
+          const currentImg = currentPhotoContainer.querySelector('img');
+          if (currentImg) {
+            const img = document.createElement('img');
+            img.src = currentImg.src;
+            img.className = 'max-w-full h-auto rounded-lg max-h-64 object-contain';
+            previewImageContainer.appendChild(img);
+          }
+        }
+      });
+    }
+
+    // Drag and drop для файлов
+    const dropArea = customFileInput.parentElement;
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight() {
+      dropArea.classList.add('border-blue-400', 'bg-blue-50', 'dark:bg-blue-900/20');
+    }
+
+    function unhighlight() {
+      dropArea.classList.remove('border-blue-400', 'bg-blue-50', 'dark:bg-blue-900/20');
+    }
+
+    dropArea.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      
+      if (files.length > 0) {
+        customFileInput.files = files;
+        
+        // Синхронизируем с Django input
+        const dataTransfer = new DataTransfer();
+        for (let file of files) {
+          dataTransfer.items.add(file);
+        }
+        djangoFileInput.files = dataTransfer.files;
+        
+        // Триггерим change event
+        const event = new Event('change');
+        customFileInput.dispatchEvent(event);
+      }
+    }
+  });
+</script>
+{% endblock %}

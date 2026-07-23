@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="w-full">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Мои диалоги</h1>
+        <span class="text-sm text-gray-500">
+            {{ dialogs|length }} диалогов
+        </span>
+    </div>
+
+    <div id="dialogs-list" class="space-y-3">
+        {% for dialog in dialogs %}
+        <a href="{% url 'dialog_messages' user_id=dialog.other_user.pk %}" 
+           class="block bg-white p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors dialog-item"
+           data-user-id="{{ dialog.other_user.pk }}">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="relative">
+                        <div class="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-semibold">
+                            {{ dialog.other_user.username|first|upper }}
+                        </div>
+                        {% if dialog.other_user.is_online %}
+                        <span class="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-400 ring-2 ring-white"></span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-gray-900">{{ dialog.other_user.get_full_name|default:dialog.other_user.username }}</h3>
+                        <p class="text-sm text-gray-500 truncate max-w-xs last-message">
+                            {% if dialog.last_message %}
+                                {% if dialog.last_message.sender == request.user %}
+                                    Вы: {{ dialog.last_message.text|truncatechars:30 }}
+                                {% else %}
+                                    {{ dialog.last_message.text|truncatechars:30 }}
+                                {% endif %}
+                            {% else %}
+                                Нет сообщений
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end">
+                    <span class="text-xs text-gray-400 last-message-time">
+                        {% if dialog.last_message %}
+                            {{ dialog.last_message.created|date:"d M H:i" }}
+                        {% endif %}
+                    </span>
+                    <span class="unread-counter mt-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full {% if dialog.unread_count == 0 %}hidden{% endif %}">
+                        {{ dialog.unread_count }}
+                    </span>
+                </div>
+            </div>
+        </a>
+        {% empty %}
+        <div class="text-center py-10">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <h3 class="mt-2 text-lg font-medium text-gray-900">Нет диалогов</h3>
+            <p class="mt-1 text-gray-500">Начните новый диалог с пользователями</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const currentUserPk = "{{ request.user.pk }}";
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const chatSocket = new WebSocket(`${wsScheme}://${window.location.host}/chat_ws`);
+    const dialogsList = document.getElementById("dialogs-list");
+
+    chatSocket.onopen = () => console.log("WebSocket connected");
+
+    chatSocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        // 🔔 Обновление счётчика непрочитанных сообщений
+        if (data.msg_type === 9) { // NewUnreadCount
+            const dialogEl = document.querySelector(`[data-user-id="${data.sender}"]`);
+            if (dialogEl) {
+                const counterEl = dialogEl.querySelector(".unread-counter");
+                if (data.unread_count > 0) {
+                    counterEl.textContent = data.unread_count;
+                    counterEl.classList.remove("hidden");
+                } else {
+                    counterEl.classList.add("hidden");
+                }
+            }
+        }
+
+        // 📝 Обновление последнего сообщения и времени, перемещение наверх
+        if (data.msg_type === 3) { // TextMessage
+            const senderId = data.sender;
+            const isSender = senderId === currentUserPk;
+            const dialogEl = document.querySelector(`[data-user-id="${senderId}"]`);
+            if (dialogEl) {
+                const lastMessageEl = dialogEl.querySelector(".last-message");
+                const lastMessageTimeEl = dialogEl.querySelector(".last-message-time");
+
+                lastMessageEl.textContent = (isSender ? "Вы: " : data.sender_username + ": ") + data.text;
+                const created = new Date(data.created || Date.now());
+                lastMessageTimeEl.textContent = created.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' }) + ' ' +
+                                               created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                // плавное перемещение наверх
+                dialogEl.style.transition = "all 0.3s ease";
+                dialogsList.prepend(dialogEl);
+                dialogEl.classList.add("animate-pulse");
+                setTimeout(() => dialogEl.classList.remove("animate-pulse"), 500);
+            }
+        }
+    };
+
+    chatSocket.onclose = () => console.warn("WebSocket closed");
+});
+</script>
+{% endblock %}

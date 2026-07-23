@@ -28,30 +28,57 @@ class User(AbstractUser):
     phone_zs = models.CharField(max_length=20, blank=True, verbose_name="Номер телефона 3" )
     phone_9 = models.CharField(max_length=20, blank=True, verbose_name="Номер телефона 4" )
     phone_hc = models.CharField(max_length=20, blank=True, verbose_name="Номер телефона 5" )
-    online = models.BooleanField(default=False)
-
-    
+    last_activity = models.DateTimeField(default=timezone.now, verbose_name="Последняя активность")
 
     def get_absolute_url(self):
-      return reverse('profile', kwargs={'username': self.username})
+        return reverse('profile', kwargs={'username': self.username})
+
+    @property
+    def is_online(self):
+        """Проверяет онлайн статус на основе последней активности"""
+        if not self.last_activity:
+            return False
+        return (timezone.now() - self.last_activity) < timedelta(minutes=5)
+
+    @property
+    def online_status(self):
+        """Возвращает детальный статус для отображения"""
+        if not self.last_activity:
+            return "offline"
+            
+        time_diff = timezone.now() - self.last_activity
+        
+        if time_diff < timedelta(minutes=5):
+            return "online"
+        elif time_diff < timedelta(minutes=15):
+            return "recently"
+        else:
+            return "offline"
+
+    def get_status_display(self):
+        """Текстовое представление статуса"""
+        status_map = {
+            "online": "Онлайн",
+            "recently": "Был(а) недавно", 
+            "offline": "Офлайн"
+        }
+        return status_map.get(self.online_status, "Офлайн")
 
     def __str__(self):
-        return str(self.last_name)
-    
-  
-    
+        return f"{self.last_name} {self.first_name}"
+
     class Meta:
         verbose_name = 'Личный кабинет'
         verbose_name_plural = 'Личные кабинеты'
 
 @receiver(user_logged_in)
 def user_logged_in_callback(sender, request, user, **kwargs):
-    user.online = True
-    user.save()
- 
+    """Обновляем время активности при входе"""
+    user.last_activity = timezone.now()
+    user.save(update_fields=['last_activity'])
+
 @receiver(user_logged_out)
 def user_logged_out_callback(sender, request, user, **kwargs):
-    user.online = False
-    user.save()
-
-    
+    """Обновляем время активности при выходе"""
+    user.last_activity = timezone.now()
+    user.save(update_fields=['last_activity'])

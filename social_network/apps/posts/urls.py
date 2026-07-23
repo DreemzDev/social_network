@@ -14,5 +14,8 @@ urlpatterns = [
 
     # path('post/<int:post_id>/like/', LikePostView.as_view(), name='like_post'),
     path('toggle_like/<int:post_id>/', toggle_like, name='toggle_like'),
-    
+
+    path('deletepost/<int:pk>/', PostDeleteView.as_view(), name='delete-post'),
+
+    path('help/', HelpView.as_view(), name='help'),
 ]

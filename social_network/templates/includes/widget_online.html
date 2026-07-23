@@ -1,0 +1,24 @@
+{% load static %}
+<div class="rounded-xl border border-gray-100 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+    <div class="mb-2 flex items-center justify-between px-1">
+        <span class="text-sm font-semibold text-gray-900 dark:text-white">Коллеги онлайн</span>
+        <a href="{% url 'show_users' %}" class="text-xs text-[#0077FF] hover:underline">Все</a>
+    </div>
+    {% if widget_online_users %}
+    <ul class="space-y-1">
+        {% for u in widget_online_users %}
+        <li>
+            <a href="{% url 'addpost' u.username %}" class="flex items-center gap-2 rounded-lg px-1 py-1.5 hover:bg-gray-100 dark:hover:bg-zinc-800">
+                <span class="relative flex-shrink-0">
+                    <img class="h-8 w-8 rounded-full object-cover" src="{% if u.avatar %}{{ u.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}" alt="{{ u.username }}">
+                    <span class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-400 dark:border-zinc-900"></span>
+                </span>
+                <span class="truncate text-sm text-gray-800 dark:text-gray-200">{{ u.first_name }} {{ u.last_name }}</span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="px-1 py-2 text-xs text-gray-400">Сейчас никого нет онлайн</p>
+    {% endif %}
+</div>

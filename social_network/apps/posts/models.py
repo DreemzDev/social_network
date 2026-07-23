@@ -17,8 +17,8 @@ class Post(models.Model):
     time_update = models.DateTimeField(auto_now=True, verbose_name="Время изменения")
     author = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, related_name='posts', null=True, default=None, verbose_name="Создатель поста")
     likes = models.ManyToManyField(get_user_model(), related_name='liked_posts', blank=True)
-    views = models.IntegerField(default=0) 
-   
+    viewers = models.ManyToManyField(get_user_model(), related_name='viewed_posts', blank=True)
+
     
     def __str__(self):
         return self.content   

@@ -1,0 +1,575 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="w-full flex">
+<div class="w-1/4 bg-white border-r border-gray-200 flex flex-col dark:bg-zinc-800 dark:border-zinc-700">
+    <!-- Поиск диалогов -->
+    <div class="p-4 border-b border-gray-200 dark:border-zinc-700">
+        <div class="relative">
+            <input type="text" id="search-chats" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-zinc-700 dark:border-zinc-600 dark:text-white dark:placeholder-gray-400" placeholder="Поиск диалогов...">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                </svg>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Список диалогов -->
+    <div class="flex-1 overflow-y-auto" id="dialogs-list">
+        {% for dialog in dialogs %}
+        <a href="{% url 'dialog_messages' user_id=dialog.other_user.pk %}" 
+           data-search-text="{{ dialog.other_user.get_full_name|default:dialog.other_user.username }} {{ dialog.last_message.text|default:'' }}"
+           class="block chat-item p-4 border-b border-gray-100 hover:bg-gray-50 dark:hover:bg-zinc-700 dark:border-zinc-700 {% if dialog.other_user.pk == active_user_id %}bg-blue-50 dark:bg-zinc-600{% endif %}">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 mr-3 relative">
+                    {% if dialog.other_user.avatar %}
+                        <img class="h-10 w-10 rounded-full" src="{{ dialog.other_user.avatar.url }}" alt="{{ dialog.other_user.get_full_name }}">
+                    {% else %}
+                        <div class="h-10 w-10 rounded-full bg-gray-300 dark:bg-zinc-600 flex items-center justify-center text-gray-600 dark:text-gray-300 font-semibold">
+                            {{ dialog.other_user.username|first|upper }}
+                        </div>
+                    {% endif %}
+                    <span class="absolute bottom-0 right-0 block h-3 w-3 rounded-full {% if dialog.other_user.is_online %}bg-green-500{% else %}bg-gray-400{% endif %} ring-2 ring-white dark:ring-zinc-800"></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {{ dialog.other_user.get_full_name|default:dialog.other_user.username }}
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            {% if dialog.last_message %}
+                                {{ dialog.last_message.created|date:"H:i" }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {% if dialog.last_message %}
+                            {% if dialog.last_message.sender == request.user %}
+                                Вы: {{ dialog.last_message.text|truncatechars:30 }}
+                            {% else %}
+                                {{ dialog.last_message.text|truncatechars:30 }}
+                            {% endif %}
+                        {% else %}
+                            Нет сообщений
+                        {% endif %}
+                    </p>
+                </div>
+                {% if dialog.unread_count > 0 %}
+                <div class="ml-2">
+                    <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-white bg-blue-600 dark:bg-blue-500 rounded-full unread-badge" data-user-id="{{ dialog.other_user.pk }}">
+                        {{ dialog.unread_count }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </a>
+        {% empty %}
+        <div class="text-center py-10 px-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <h3 class="mt-2 text-lg font-medium text-gray-900 dark:text-white">Нет диалогов</h3>
+            <p class="mt-1 text-gray-500 dark:text-gray-400">Начните новый диалог с пользователями</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="flex-1 flex flex-col">
+    <!-- Заголовок -->
+    <div class="bg-white border-b border-gray-200 p-2 dark:bg-zinc-800 dark:border-zinc-700">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center justify-center">
+                <a href="{% url 'dialogs_list' %}" class="text-gray-500 hover:text-gray-700 mr-2 dark:text-gray-400 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                </a>
+                
+                <img class="h-10 w-10 rounded-full mr-3" 
+                     src="{% if other_user.avatar %}{{ other_user.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}" 
+                     alt="{{ other_user.first_name }} {{ other_user.last_name }}">
+                
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+                        {{ other_user.last_name }} {{ other_user.first_name }}
+                    </h3>
+                    <p class="text-sm {% if other_user.is_online %}text-green-600{% else %}text-gray-500{% endif %} dark:text-gray-400">
+                        {% if other_user.is_online %}Онлайн{% else %}Офлайн{% endif %}
+                    </p>
+                    <div id="typing-indicator" class="text-sm text-gray-500 italic px-1 py-1 h-6"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Контейнер сообщений -->
+    <div id="messages-container"
+         class="flex-1 overflow-y-auto p-4 bg-white space-y-4"
+         style="max-height: calc(100vh - 200px);">
+        
+        <div id="loading-indicator" class="text-center py-2 hidden">
+            <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <p class="text-sm text-gray-500 mt-1">Загрузка сообщений...</p>
+        </div>
+
+        {% for message in messages %}
+        <div class="flex {% if message.sender == request.user %}justify-end{% else %}justify-start{% endif %} gap-2.5">
+            <img src="{% if message.sender.avatar %}{{ message.sender.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
+                 alt="Аватар" class="w-10 h-10 rounded-full" />
+
+            <div class="flex flex-col w-full max-w-[320px] leading-1.5 py-2 px-4 border-gray-200 {% if message.sender == request.user %}bg-blue-500 text-white{% else %}bg-gray-200 text-gray-800{% endif %} rounded-e-xl rounded-es-xl">
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm font-semibold">{{ message.sender.last_name }} {{ message.sender.first_name }}</span>
+                    <span class="text-sm font-normal opacity-60">{{ message.created|time:"H:i" }}</span>
+                </div>
+                <p class="text-sm font-normal py-2.5 whitespace-pre-wrap break-words">{{ message.text }}</p>
+
+                {% if message.file %}
+                <div class="mt-1">
+                    <a href="{{ message.file.url }}" target="_blank"
+                       class="inline-flex items-center text-sm underline hover:text-blue-200">
+                        📎 Файл
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Форма отправки -->
+    <div class="p-4 bg-white border-t border-gray-200">
+        <div class="flex space-x-2 items-end">
+            <textarea
+                rows="1"
+                id="message-input"
+                required
+                autofocus
+                maxlength="2000"
+                oninput="autoResize(this)"
+                class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 resize-none outline-none"
+                placeholder="Напишите сообщение..."></textarea>
+            <button id="send-button"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300">
+                Отправить
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ========================================
+// 🔧 КОНСТАНТЫ И ПЕРЕМЕННЫЕ
+// ========================================
+const recipientPk = "{{ other_user.pk }}";
+const currentUserPk = "{{ request.user.pk }}";
+const otherUserFullName = "{{ other_user.last_name }} {{ other_user.first_name }}";
+const currentUserFullName = "{{ request.user.last_name }} {{ request.user.first_name }}";
+
+// Используем глобальный WebSocket менеджер из base.html
+const wsManager = window.globalWsManager;
+
+// Переменные состояния
+let typingTimeout = null;
+let isLoadingMessages = false;
+let hasMoreMessages = true;
+let messagesOffset = {{ messages|length }};
+let lastMessageId = null;
+let isMarkingRead = false; // Флаг для предотвращения дублирования запросов
+
+// ========================================
+// 🔧 УТИЛИТЫ
+// ========================================
+
+function autoResize(element) {
+  element.style.height = "auto";
+  element.style.height = element.scrollHeight + "px";
+}
+
+function scrollToBottom(smooth = false) {
+  const container = document.getElementById('messages-container');
+  if (smooth) {
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'smooth'
+    });
+  } else {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// ========================================
+// 📨 ОБНОВЛЕНИЕ СЧЕТЧИКОВ
+// ========================================
+
+async function updateUnreadCounts() {
+  try {
+    const response = await fetch('/get-unread-count/');
+    if (!response.ok) throw new Error('Network response was not ok');
+    
+    const data = await response.json();
+    
+    // Обновляем бейджи в списке диалогов
+    document.querySelectorAll('.unread-badge').forEach(badge => {
+      const userId = badge.getAttribute('data-user-id');
+      const unreadCount = data.dialogs_unread[userId] || 0;
+      
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+        badge.parentElement.style.display = 'block';
+      } else {
+        badge.parentElement.style.display = 'none';
+      }
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('❌ Ошибка обновления счетчиков:', error);
+    return null;
+  }
+}
+
+// ========================================
+// 💬 РАБОТА С СООБЩЕНИЯМИ
+// ========================================
+
+function createMessageElement(messageData) {
+  const isSender = messageData.sender === currentUserPk || messageData.sender_id == currentUserPk;
+  const senderFullName = isSender ? currentUserFullName : otherUserFullName;
+  const senderAvatar = isSender 
+    ? '{% if request.user.avatar %}{{ request.user.avatar.url }}{% else %}{% static "img/avatar7.png" %}{% endif %}'
+    : '{% if other_user.avatar %}{{ other_user.avatar.url }}{% else %}{% static "img/avatar7.png" %}{% endif %}';
+  
+  const timeString = messageData.created || new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const text = messageData.text || '';
+  const fileHtml = messageData.file ? `
+    <div class="mt-1">
+      <a href="${messageData.file}" target="_blank" 
+         class="inline-flex items-center text-sm underline hover:text-blue-200">
+        📎 Файл
+      </a>
+    </div>
+  ` : '';
+
+  return `
+    <div class="flex ${isSender ? 'justify-end' : 'justify-start'} gap-2.5" data-message-id="${messageData.id || ''}">
+      <img src="${senderAvatar}" alt="Аватар" class="w-10 h-10 rounded-full" />
+      <div class="flex flex-col w-full max-w-[320px] leading-1.5 py-2 px-4 border-gray-200 
+                  ${isSender ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} 
+                  rounded-e-xl rounded-es-xl">
+        <div class="flex items-center space-x-2">
+          <span class="text-sm font-semibold">${senderFullName}</span>
+          <span class="text-sm font-normal opacity-60">${timeString}</span>
+        </div>
+        <p class="text-sm font-normal py-2.5 whitespace-pre-wrap break-words">${text}</p>
+        ${fileHtml}
+      </div>
+    </div>
+  `;
+}
+
+function addMessageToUI(messageData) {
+  const messagesContainer = document.getElementById('messages-container');
+  const messageHtml = createMessageElement(messageData);
+  
+  messagesContainer.insertAdjacentHTML('beforeend', messageHtml);
+  scrollToBottom(true);
+}
+
+// ========================================
+// 📖 ПОМЕТКА СООБЩЕНИЙ КАК ПРОЧИТАННЫХ
+// ========================================
+
+async function markMessagesAsRead() {
+  if (isMarkingRead) return; // Предотвращаем дублирование
+  
+  isMarkingRead = true;
+  
+  try {
+    // 1. Отправляем через WebSocket
+    if (wsManager && wsManager.isConnected) {
+      wsManager.send({
+        msg_type: 11,
+        sender_pk: recipientPk,
+        recipient_pk: currentUserPk
+      });
+      console.log('✅ Отправлено событие "прочитано" через WebSocket');
+    }
+    
+    // 2. Дублируем через HTTP (fallback)
+    const response = await fetch(`/mark-messages-read/${recipientPk}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ Помечено ${data.marked_read} сообщений как прочитанные`);
+      
+      // Обновляем счетчики
+      setTimeout(updateUnreadCounts, 300);
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при пометке сообщений:', error);
+  } finally {
+    isMarkingRead = false;
+  }
+}
+
+// ========================================
+// 🔌 WEBSOCKET ОБРАБОТЧИКИ
+// ========================================
+
+function handleChatWebSocketMessage(data) {
+  console.log('📩 WebSocket message:', data);
+  
+  // Обработка текстовых сообщений
+  if (data.msg_type === 3) { // TextMessage
+    const isSender = data.sender === currentUserPk;
+    const isRecipient = data.recipient === currentUserPk;
+    
+    const isRelevantMessage = 
+      (isSender && data.recipient === recipientPk) || 
+      (isRecipient && data.sender === recipientPk);
+    
+    if (!isRelevantMessage) {
+      console.log('📭 Сообщение для другого диалога');
+      // Обновляем счетчики для других диалогов
+      setTimeout(updateUnreadCounts, 300);
+      return;
+    }
+
+    // Предотвращаем дублирование
+    if (lastMessageId && data.id === lastMessageId) {
+      console.log('⚠️ Дублирующееся сообщение');
+      return;
+    }
+    lastMessageId = data.id;
+
+    // Добавляем сообщение в UI
+    addMessageToUI(data);
+
+    // Если получили сообщение (не отправили), помечаем как прочитанное
+    if (isRecipient && !isSender) {
+      console.log('📖 Помечаем новое сообщение как прочитанное');
+      setTimeout(() => markMessagesAsRead(), 500);
+    }
+  }
+
+  // Обработка индикатора печати
+  if (data.msg_type === 5 && data.user_pk === recipientPk) {
+    document.getElementById('typing-indicator').innerText = `${otherUserFullName} печатает...`;
+  }
+
+  // Остановка индикатора печати
+  if (data.msg_type === 10 && data.user_pk === recipientPk) {
+    document.getElementById('typing-indicator').innerText = '';
+  }
+
+  // Обработка события "прочитано"
+  if (data.msg_type === 11) {
+    console.log('📖 Получено событие "прочитано"');
+    setTimeout(updateUnreadCounts, 300);
+  }
+}
+
+// Подключаем обработчик
+if (wsManager) {
+  wsManager.addListener(handleChatWebSocketMessage);
+  console.log('✅ WebSocket listener добавлен');
+  
+  window.addEventListener('beforeunload', () => {
+    wsManager.removeListener(handleChatWebSocketMessage);
+  });
+} else {
+  console.error('❌ Global WebSocket Manager не найден!');
+}
+
+// ========================================
+// 📤 ОТПРАВКА СООБЩЕНИЙ
+// ========================================
+
+function sendMessage() {
+  const input = document.getElementById('message-input');
+  const text = input.value.trim();
+  
+  if (!text) return;
+  
+  if (!wsManager || !wsManager.isConnected) {
+    console.error('❌ WebSocket не подключен');
+    alert('Ошибка подключения. Попробуйте обновить страницу.');
+    return;
+  }
+
+  const randomId = -Math.floor(Math.random() * 1000000);
+
+  // Добавляем сообщение в UI (оптимистическое обновление)
+  addMessageToUI({
+    text: text,
+    sender: currentUserPk,
+    created: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+  });
+
+  // Отправляем через WebSocket
+  wsManager.send({
+    msg_type: 3,
+    text: text,
+    user_pk: recipientPk,
+    random_id: randomId
+  });
+
+  input.value = '';
+  input.style.height = 'auto';
+  
+  sendTypingStopped();
+}
+
+function sendTypingStopped() {
+  if (wsManager && wsManager.isConnected) {
+    wsManager.send({
+      msg_type: 10,
+      user_pk: currentUserPk
+    });
+  }
+}
+
+// ========================================
+// 🔄 ЛЕНИВАЯ ЗАГРУЗКА
+// ========================================
+
+async function loadMoreMessages() {
+  if (isLoadingMessages || !hasMoreMessages) return;
+  
+  isLoadingMessages = true;
+  const loadingIndicator = document.getElementById('loading-indicator');
+  loadingIndicator.classList.remove('hidden');
+  
+  const messagesContainer = document.getElementById('messages-container');
+  const previousScrollHeight = messagesContainer.scrollHeight;
+  
+  try {
+    const response = await fetch(`/load-messages/${recipientPk}/?offset=${messagesOffset}`);
+    const data = await response.json();
+    
+    if (data.messages.length > 0) {
+      const fragment = document.createDocumentFragment();
+      const tempDiv = document.createElement('div');
+      
+      data.messages.forEach(msg => {
+        tempDiv.innerHTML = createMessageElement(msg);
+        fragment.insertBefore(tempDiv.firstElementChild, fragment.firstChild);
+      });
+      
+      messagesContainer.insertBefore(fragment, loadingIndicator.nextSibling);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight - previousScrollHeight;
+      
+      messagesOffset += data.messages.length;
+      hasMoreMessages = data.has_more;
+    } else {
+      hasMoreMessages = false;
+    }
+  } catch (error) {
+    console.error('❌ Ошибка загрузки:', error);
+  } finally {
+    isLoadingMessages = false;
+    loadingIndicator.classList.add('hidden');
+  }
+}
+
+// ========================================
+// 🔍 ПОИСК
+// ========================================
+
+function setupDialogSearch() {
+  const searchInput = document.getElementById('search-chats');
+  if (!searchInput) return;
+  
+  searchInput.addEventListener('input', function(e) {
+    const searchText = e.target.value.toLowerCase();
+    document.querySelectorAll('.chat-item').forEach(item => {
+      const itemText = item.getAttribute('data-search-text').toLowerCase();
+      item.style.display = itemText.includes(searchText) ? 'block' : 'none';
+    });
+  });
+}
+
+// ========================================
+// 🎯 ИНИЦИАЛИЗАЦИЯ
+// ========================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('🚀 Инициализация чата');
+  
+  scrollToBottom();
+  setupDialogSearch();
+  
+  // Ленивая загрузка при скролле вверх
+  const messagesContainer = document.getElementById('messages-container');
+  messagesContainer.addEventListener('scroll', () => {
+    if (messagesContainer.scrollTop === 0) {
+      loadMoreMessages();
+    }
+  });
+  
+  // Отправка сообщения по кнопке
+  document.getElementById('send-button').addEventListener('click', sendMessage);
+  
+  // Отправка сообщения по Enter (без Shift)
+  const messageInput = document.getElementById('message-input');
+  messageInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  
+  // Индикатор печати
+  messageInput.addEventListener('input', () => {
+    if (wsManager && wsManager.isConnected) {
+      wsManager.send({
+        msg_type: 5,
+        user_pk: currentUserPk
+      });
+
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(sendTypingStopped, 1500);
+    }
+  });
+  
+  // Первичное обновление счетчиков
+  updateUnreadCounts();
+  
+  // Помечаем существующие сообщения как прочитанные при открытии диалога
+  setTimeout(() => markMessagesAsRead(), 1000);
+  
+  console.log('✅ Чат инициализирован');
+});
+
+// Периодическое обновление счетчиков (backup)
+setInterval(updateUnreadCounts, 30000);
+</script>
+{% endblock %}

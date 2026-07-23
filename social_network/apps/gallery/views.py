@@ -34,5 +34,5 @@ class AddImages(FormView, ListView):
         context = super().get_context_data(**kwargs)
         context["birthday"] = get_user_model().objects.filter(birthday__day=date.today().day, birthday__month=date.today().month)
         dt =date.today().day+1
-        context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
+        # context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
         return context

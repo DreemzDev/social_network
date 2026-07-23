@@ -1,6 +1,6 @@
-from django.db.models import Count
+from django.db.models import Count, F
 from typing import Any
-
+from django.contrib import messages
 from datetime import date, timedelta
 from urllib import request
 from django.db.models.query import QuerySet
@@ -23,7 +23,7 @@ from django.views.generic.detail import SingleObjectMixin
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-
+from django.utils import timezone
 
 
 class PortalHome(LoginRequiredMixin, ListView):
@@ -40,9 +40,9 @@ class PortalHome(LoginRequiredMixin, ListView):
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context['cats'] = Category.objects.all()
-        context["birthday"] = get_user_model().objects.filter(birthday__day=date.today().day, birthday__month=date.today().month)
-        dt =date.today().day+1
-        context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
+        # context["birthday"] = get_user_model().objects.filter(birthday__day=date.today().day, birthday__month=date.today().month)
+        # dt =date.today().day+1
+        # context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
         return context
     
 
@@ -73,8 +73,8 @@ class ShowPost(FormMixin, DetailView):
     
     def get(self, request, *args, **kwargs):
         post = self.get_object()
-        post.views += 1  # Увеличиваем счетчик просмотров
-        post.save()
+        if request.user.is_authenticated:
+            post.viewers.add(request.user)
         return super().get(request, *args, **kwargs)
 
 def toggle_like(request, post_id):
@@ -100,27 +100,53 @@ class AddPost(FormView, TemplateView):
         form.save()
         return super().form_valid(form)
     
-
+    def get_online_users(self):
+        """Возвращает пользователей, которые были активны в последние 5 минут"""
+        User = get_user_model()
+        time_threshold = timezone.now() - timedelta(minutes=5)
+        return User.objects.filter(last_activity__gte=time_threshold)
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['user_list'] = get_user_model().objects.all()
-        context["sh_online"] = get_user_model().objects.filter(online=True)
-        user = get_object_or_404(get_user_model(), username=self.kwargs.get('username'))
+        User = get_user_model()
+        
+        user = get_object_or_404(User, username=self.kwargs.get('username'))
+        user_list = User.objects.all().order_by('-last_activity')
+        
+        # Считаем онлайн пользователей
+        online_count = sum(1 for u in user_list if u.is_online)
+
+        context['user_list'] = user_list  # Используем уже созданный user_list
+        context["sh_online"] = self.get_online_users()
         context['posts'] = Post.objects.annotate(num_comments=Count('post_comments')).filter(author=user).order_by('-time_create')
         context['user'] = user
-        context["birthday"] = get_user_model().objects.filter(birthday__day=date.today().day, birthday__month=date.today().month)
-        dt =date.today().day+1
-        context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
+        context['profile_user'] = user
+        context['online_count'] = online_count  # Добавляем в контекст!
+
         return context
   
+class PostDeleteView(DeleteView):
+    model = Post
+    success_url = reverse_lazy('home')  # или куда нужно
+
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self.object.delete()
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return HttpResponse(status=204)
+        messages.success(request, 'Пост удалён')
+        return super().delete(request, *args, **kwargs)
+
     
 
+class HelpView(TemplateView):
+    template_name = 'post/help.html'
 
-    
 
 class SettingPost( LoginRequiredMixin, UpdateView):
+    form_class = AddPostForm
     model = Post
-    fields = ['content','photo']
+ 
     template_name = 'post/setting_post.html'
     pk_url_kwarg = 'post_id'
     success_url = reverse_lazy('home') 

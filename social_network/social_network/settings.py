@@ -34,16 +34,26 @@ SECRET_KEY = 'django-insecure-=2#(c!ojl3^elc3w90tb^884+aw%ajo=zrb%wzl**(r8y51=@a
 # DEBUG = int(env('DEBUG', default=1))
 DEBUG = True
 # ALLOWED_HOSTS = env('ALLOWED_HOSTS').split()
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'social.uk.ru',
+    'www.social.uk.ru',
+    'localhost',
+    '127.0.0.1',
+    # '192.168.1.100', # замените на IP вашего сервера
+]
 
 
 # CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS').split()
-
+CSRF_TRUSTED_ORIGINS = [
+    'http://social.uk.ru',
+    'https://social.uk.ru',
+]
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # Application definition
 
 INSTALLED_APPS = [
+    # 'daphne',  
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -52,6 +62,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'compressor',
     'channels',
+    'sitesettings.apps.SitesettingsConfig',
     'posts.apps.PostsConfig',
     'profiles.apps.ProfilesConfig',
     'category.apps.CategoryConfig',
@@ -60,12 +71,8 @@ INSTALLED_APPS = [
     'comments.apps.CommentsConfig',
     'gallery.apps.GalleryConfig',
     'phonebook.apps.PhonebookConfig',
-    'chats.apps.ChatsConfig',
+    'django_private_chat2',
     'minio_storage',
-
-    
-    
-
 ]   
 
 MIDDLEWARE = [
@@ -76,7 +83,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.middleware.common.CommonMiddleware',
+    'profiles.middleware.UserActivityMiddleware',
 ]
 CORS_ORIGIN_ALLOW_ALL = True
 ROOT_URLCONF = 'social_network.urls'
@@ -93,13 +100,17 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'profiles.context_processors.birthday_notifications',
+                'profiles.context_processors.online_users',
+                'profiles.context_processors.unread_messages_count',
+                'sitesettings.context_processors.site_settings',
             ],
         },
     },
 ]
 
 # WSGI_APPLICATION = 'social_network.wsgi.application'
-ASGI_APPLICATION = 'social_network.asgi.application'
+ASGI_APPLICATION = 'social_network.routing.application'
 
 
 
@@ -148,18 +159,18 @@ DATABASES = {
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    # {
-    #     'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    # },
-    # {
-    #     'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    # },
-    # {
-    #     'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    # },
-    # {
-    #     'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    # },
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
 ]
 
 

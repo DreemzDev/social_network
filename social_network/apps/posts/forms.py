@@ -15,6 +15,6 @@ class AddPostForm(forms.ModelForm):
         fields = [ 'content','photo']
         widgets = {
             
-            'content': forms.Textarea(attrs={ 'cols':60, 'rows':1, 'placeholder': "Что у вас нового?"}),
+            'content': forms.Textarea(attrs={ 'rows':1, 'placeholder': "Что у вас нового?",'class': 'text-base pl-3 w-full rounded py-3 resize-none border-none outline-none focus:outline-none','oninput':"autoResize(this)"}),
         }
 

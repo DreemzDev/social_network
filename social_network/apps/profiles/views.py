@@ -1,44 +1,31 @@
 from typing import Any
 from django.urls import reverse_lazy
+from django.core.cache import cache
+from django.db.models import Count, Q
+from django.utils import timezone
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.generic import (
+    DetailView, ListView, CreateView, UpdateView, TemplateView, View, FormView
+)
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
+from django.views.generic.edit import FormMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
+
 from posts.models import Post
 from posts.forms import AddPostForm
 from posts.views import AddPost
-from django.core.cache import cache
-from django.db.models import Count
-from django.utils import timezone
-from django.http import Http404
 from profiles.forms import AddProfileForm, SettingProfileForm
-from django.contrib.auth.models import User
-# from profiles.models import Profile
-from django.shortcuts import get_object_or_404, redirect, render
-from django.views.generic import DetailView, ListView, CreateView, UpdateView, TemplateView, View, FormView
-from django.contrib.auth import get_user_model
-from django.utils.deprecation import MiddlewareMixin
-from django.views.generic.edit import FormMixin
 from category.models import Category
 from phonebook.models import Phonebook
-from datetime import date
-from django.db.models import Q
 from phonebook.forms import UpdateBookForm
-
-
-
-# class ShowProfile(ListView):
-    
-    # model = get_user_model()
-    # template_name = 'profiles/profiles.html'
-
-    # def get_context_data(self, *, object_list=None, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     context["user_list"] = get_user_model().objects.all()
-    #     return context
-   
-   
-    
-
-# class UserProfileView(TemplateView):
-#     template_name = 'profiles/profiles.html'
-#     model = get_user_model()
+from django_private_chat2.models import MessageModel, DialogsModel
+from datetime import date
+from django.http import JsonResponse
+from django.utils import timezone
+from datetime import datetime
 
 
 class AddProfile(UpdateView):
@@ -54,13 +41,14 @@ class SettingProfile(UpdateView, DetailView):
     form_class = SettingProfileForm
     template_name = 'profiles/settingprofiles.html'
     pk_url_kwarg = 'user_id'
-    success_url = reverse_lazy('home')
+
+    def get_success_url(self):
+        return reverse_lazy('addpost', kwargs={'username': self.object.username})
+
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["birthday"] = get_user_model().objects.filter(birthday__day=date.today().day, birthday__month=date.today().month)
-        dt =date.today().day+1
-        context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
-        
+
+
         return context
 
 class ShowUsers(ListView):
@@ -77,11 +65,11 @@ class ShowUsers(ListView):
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["sh_online"] = get_user_model().objects.filter(online=True)
+        # context["sh_online"] = get_user_model().objects.filter(online=True)
         context["cats"] = Category.objects.all()
-        context["birthday"] = get_user_model().objects.filter(birthday__day=date.today().day, birthday__month=date.today().month)
-        dt =date.today().day+1
-        context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
+        context['profile_user'] = get_user_model()
+        context['user'] = get_user_model()
+        
         return context
 
 
@@ -106,8 +94,220 @@ class ShowPhones(ListView, FormView):
         context = super().get_context_data(**kwargs)
         context["cats"] = Category.objects.all()
         context["books"] = Phonebook.objects.all()
-        context["birthday"] = get_user_model().objects.filter(birthday__day=date.today().day, birthday__month=date.today().month)
-        dt =date.today().day+1
-        context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
         return context
 
+# ЧАТ И СООБЩЕНИЯ
+
+def clear_user_cache(user_pk):
+    """Централизованная очистка кеша пользователя"""
+    cache.delete(f'unread_count_{user_pk}')
+    cache.delete(f'dialogs_unread_{user_pk}')
+
+
+class DialogsWithUnreadMixin:
+    """Строит список диалогов текущего пользователя с непрочитанными и последним сообщением"""
+
+    def _get_dialogs_with_unread(self):
+        dialogs = DialogsModel.objects.filter(
+            Q(user1=self.request.user) | Q(user2=self.request.user)
+        ).select_related('user1', 'user2')
+
+        dialog_list = []
+        for dialog in dialogs:
+            other_user = dialog.user1 if dialog.user2 == self.request.user else dialog.user2
+
+            dialog.unread_count = MessageModel.objects.filter(
+                sender=other_user,
+                recipient=self.request.user,
+                read=False
+            ).count()
+
+            dialog.other_user = other_user
+
+            dialog.last_message = MessageModel.objects.filter(
+                Q(sender=self.request.user, recipient=other_user) |
+                Q(sender=other_user, recipient=self.request.user)
+            ).select_related('sender').order_by('-created').first()
+
+            dialog_list.append(dialog)
+
+        dialog_list.sort(
+            key=lambda d: d.last_message.created if d.last_message else timezone.make_aware(datetime.min),
+            reverse=True
+        )
+        return dialog_list
+
+
+class DialogMessagesView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
+    template_name = 'profiles/messages.html'
+    context_object_name = 'messages'
+    paginate_by = 30
+
+    def get_queryset(self):
+        self.other_user = get_object_or_404(get_user_model(), pk=self.kwargs['user_id'])
+
+        # НЕ помечаем сообщения как прочитанные здесь!
+        # Это будет делать WebSocket при получении события msg_type: 11
+        # Это предотвращает race condition
+
+        return MessageModel.objects.filter(
+            Q(sender=self.request.user, recipient=self.other_user) |
+            Q(sender=self.other_user, recipient=self.request.user)
+        ).select_related('sender', 'recipient').order_by('-created')[:self.paginate_by]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['other_user'] = self.other_user
+
+        # Получаем диалоги для сайдбара
+        dialogs = self._get_dialogs_with_unread()
+        
+        context['dialogs'] = dialogs
+        context['active_user_id'] = self.other_user.pk
+        
+        # Для правильного отображения в шаблоне (от старых к новым)
+        context['messages'] = list(reversed(context['messages']))
+
+        return context
+
+
+class LoadMoreMessagesView(LoginRequiredMixin, View):
+    """API endpoint для ленивой подгрузки сообщений"""
+    
+    def get(self, request, user_id):
+        other_user = get_object_or_404(get_user_model(), pk=user_id)
+        offset = int(request.GET.get('offset', 0))
+        limit = 30
+        
+        messages = MessageModel.objects.filter(
+            Q(sender=request.user, recipient=other_user) |
+            Q(sender=other_user, recipient=request.user)
+        ).select_related('sender', 'recipient').order_by('-created')[offset:offset + limit]
+        
+        messages_data = []
+        for msg in reversed(list(messages)):
+            messages_data.append({
+                'id': msg.id,
+                'text': msg.text,
+                'sender_id': msg.sender.id,
+                'sender_name': f"{msg.sender.last_name} {msg.sender.first_name}",
+                'sender_avatar': msg.sender.avatar.url if msg.sender.avatar else None,
+                'created': msg.created.strftime('%H:%M'),
+                'file': msg.file.url if hasattr(msg, 'file') and msg.file else None,
+            })
+        
+        total_messages = MessageModel.objects.filter(
+            Q(sender=request.user, recipient=other_user) |
+            Q(sender=other_user, recipient=request.user)
+        ).count()
+        
+        return JsonResponse({
+            'messages': messages_data,
+            'has_more': total_messages > offset + limit
+        })
+
+
+class GetUnreadCountView(LoginRequiredMixin, View):
+    """API endpoint для получения количества непрочитанных сообщений"""
+    
+    def get(self, request):
+        # Проверяем кеш
+        cache_key_total = f'unread_count_{request.user.pk}'
+        cache_key_dialogs = f'dialogs_unread_{request.user.pk}'
+        
+        total_unread = cache.get(cache_key_total)
+        dialogs_unread = cache.get(cache_key_dialogs)
+        
+        # Если хотя бы одно значение не в кеше, пересчитываем
+        if total_unread is None or dialogs_unread is None:
+            # Общее количество непрочитанных
+            total_unread = MessageModel.objects.filter(
+                recipient=request.user,
+                read=False
+            ).count()
+            
+            # Получаем все диалоги пользователя
+            dialogs = DialogsModel.objects.filter(
+                Q(user1=request.user) | Q(user2=request.user)
+            ).select_related('user1', 'user2')
+            
+            # Получаем всех собеседников
+            other_user_ids = []
+            for dialog in dialogs:
+                other_user = dialog.user1 if dialog.user2 == request.user else dialog.user2
+                other_user_ids.append(other_user.pk)
+            
+            # Один запрос для подсчета непрочитанных от всех собеседников
+            dialogs_unread = {}
+            if other_user_ids:
+                unread_counts = MessageModel.objects.filter(
+                    sender_id__in=other_user_ids,
+                    recipient=request.user,
+                    read=False
+                ).values('sender_id').annotate(count=Count('id'))
+                
+                for item in unread_counts:
+                    dialogs_unread[str(item['sender_id'])] = item['count']
+            
+            # Кешируем на 30 секунд
+            cache.set(cache_key_total, total_unread, 30)
+            cache.set(cache_key_dialogs, dialogs_unread, 30)
+        
+        response_data = {
+            'total_unread': total_unread,
+            'dialogs_unread': dialogs_unread
+        }
+        
+        return JsonResponse(response_data)
+
+
+class DialogsListView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
+    template_name = 'profiles/dialogs.html'
+    context_object_name = 'dialogs'
+
+    def get_queryset(self):
+        return self._get_dialogs_with_unread()
+
+
+@method_decorator(login_required, name='dispatch')
+class SendMessageView(View):
+    def post(self, request, user_id):
+        recipient = get_object_or_404(get_user_model(), pk=user_id)
+        text = request.POST.get('text', '').strip()
+        
+        if text:
+            MessageModel.objects.create(
+                sender=request.user,
+                recipient=recipient,
+                text=text
+            )
+            # Создаем/обновляем диалог
+            DialogsModel.create_if_not_exists(request.user, recipient)
+            
+            # Очищаем кеш ПОЛУЧАТЕЛЯ (не отправителя!)
+            clear_user_cache(recipient.pk)
+            
+        return redirect('dialog_messages', user_id=user_id)
+
+
+class MarkMessagesReadView(LoginRequiredMixin, View):
+    """API endpoint для пометки сообщений как прочитанных"""
+    
+    def post(self, request, user_id):
+        other_user = get_object_or_404(get_user_model(), pk=user_id)
+        
+        # Помечаем непрочитанные сообщения от собеседника как прочитанные
+        updated_count = MessageModel.objects.filter(
+            sender=other_user,
+            recipient=request.user,
+            read=False
+        ).update(read=True)
+        
+        # Очищаем кеш текущего пользователя
+        if updated_count > 0:
+            clear_user_cache(request.user.pk)
+        
+        return JsonResponse({
+            'success': True, 
+            'marked_read': updated_count
+        })

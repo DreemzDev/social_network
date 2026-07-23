@@ -88,12 +88,27 @@
         <!-- Dropdown menu -->
         <div id="dropdownAction" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600">
             <ul class="py-1 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownActionButton">
+
               {% for c in cats %}
-                <li>
-                    <a href="{% url 'filterPhones' c.id%}" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">{{c.name}}</a>
-                </li>
-              {%endfor%}
-                
+  <li class="mt-0.5 px-2 py-1 rounded group
+             {% if c.id == current_cat_id %}
+               bg-blue-100
+             {% else %}
+               hover:bg-gray-100
+             {% endif %}">
+    <a
+      class="tracking-wider text-sm font-medium rounded-sm
+             {% if c.id == current_cat_id %}
+               text-blue-600 font-semibold
+             {% else %}
+               text-gray-500 group-hover:text-blue-500
+             {% endif %}"
+      href="{% url 'filterPhones' c.id%}"
+    >
+      {{ c.name }}
+    </a>
+  </li>
+{% endfor %}  
             </ul>
             <div class="py-1">
               <a
@@ -141,7 +156,7 @@
             <tr class="bg-white border-b w-14 dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                 
                 <td scope="row" class="flex items-center px-6 py-4 text-gray-900 whitespace-nowrap dark:text-white">
-                    <img class="w-10 h-10 rounded-full" src="{% if p.avatar %}{{p.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}" alt="Jese image">
+                    <img class="w-16 h-16 rounded-full" src="{% if p.avatar %}{{p.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}" alt="Jese image">
                     <div class="ps-3">
                         <div class="text-base font-semibold">{{p.first_name}}&nbsp;{{p.last_name}}</div>
                         <span class="inline-flex items-center bg-sky-100 text-sky-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300"> 
