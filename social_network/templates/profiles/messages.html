@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load chat_extras %}
 
 {% block content %}
 <div class="flex w-full min-w-0 overflow-hidden rounded-xl border border-gray-100 dark:border-zinc-800" style="height: calc(100vh - 96px);">
@@ -83,12 +84,12 @@
                 </svg>
             </a>
 
-            <img class="mr-3 h-10 w-10 flex-shrink-0 rounded-full object-cover"
+            <img class="mr-3 h-12 w-12 flex-shrink-0 rounded-full object-cover"
                  src="{% if other_user.avatar %}{{ other_user.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
                  alt="{{ other_user.first_name }} {{ other_user.last_name }}">
 
             <div class="min-w-0">
-                <h3 class="truncate text-base font-medium text-gray-900 dark:text-white">
+                <h3 class="truncate text-lg font-medium text-gray-900 dark:text-white">
                     {{ other_user.last_name }} {{ other_user.first_name }}
                 </h3>
                 <p class="text-xs {% if other_user.is_online %}text-green-600{% else %}text-gray-400{% endif %}">
@@ -101,7 +102,7 @@
 
     <!-- Контейнер сообщений -->
     <div id="messages-container"
-         class="flex-1 space-y-4 overflow-y-auto bg-[#EDEEF0] p-4 dark:bg-zinc-950">
+         class="no-scrollbar flex-1 space-y-4 overflow-y-auto bg-[#EDEEF0] p-4 dark:bg-zinc-950">
 
         <div id="loading-indicator" class="hidden py-2 text-center">
             <div class="inline-block h-6 w-6 animate-spin rounded-full border-b-2 border-[#0077FF]"></div>
@@ -109,16 +110,16 @@
         </div>
 
         {% for message in messages %}
-        <div class="flex {% if message.sender == request.user %}justify-end{% else %}justify-start{% endif %} gap-2.5">
-            <img src="{% if message.sender.avatar %}{{ message.sender.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
-                 alt="Аватар" class="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
-
-            <div class="flex w-full max-w-[75%] flex-col rounded-xl px-4 py-2 leading-1.5 sm:max-w-[320px] {% if message.sender == request.user %}bg-[#0077FF] text-white{% else %}bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100{% endif %}">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-semibold">{{ message.sender.last_name }} {{ message.sender.first_name }}</span>
-                    <span class="text-xs font-normal opacity-60">{{ message.created|time:"H:i" }}</span>
-                </div>
-                <p class="whitespace-pre-wrap break-words py-1.5 text-sm font-normal">{{ message.text }}</p>
+        {% ifchanged message.created|date:"Y-m-d" %}
+        <div class="msg-date-separator flex justify-center py-1" data-date="{{ message.created|date:'Y-m-d' }}">
+            <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-500 shadow-sm dark:bg-zinc-800 dark:text-gray-400">
+                {{ message.created|chat_date_label }}
+            </span>
+        </div>
+        {% endifchanged %}
+        <div class="flex {% if message.sender == request.user %}justify-end{% else %}justify-start{% endif %}" data-message-id="{{ message.id }}" data-own="{% if message.sender == request.user %}true{% else %}false{% endif %}" data-text="{{ message.text }}">
+            <div class="flex w-full max-w-[75%] flex-col rounded-xl px-4 py-2 leading-1.5 sm:max-w-[380px] {% if message.sender == request.user %}bg-[#0077FF] text-white{% else %}bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100{% endif %}">
+                <p class="msg-text whitespace-pre-wrap break-words py-0.5 text-base font-normal">{{ message.text }}<span class="msg-meta float-right ml-2 mt-1.5 inline-flex items-center gap-1" data-read="{{ message.read|yesno:'true,false' }}"><span class="text-xs font-normal opacity-60">{{ message.created|time:"H:i" }}</span>{% if message.sender == request.user %}<span class="msg-status inline-flex">{% if message.read %}<svg class="h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none"><path d="M1 8.5L4.5 12L10 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 8.5L9 12L14.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% else %}<svg class="h-4 w-4 text-white/70" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none"><path d="M2 8.5L5.5 12L11 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endif %}</span>{% endif %}</span></p>
 
                 {% if message.file %}
                 <div class="mt-1">
@@ -128,23 +129,101 @@
                     </a>
                 </div>
                 {% endif %}
+
+                {% if message.reactions.all %}
+                <div class="msg-reactions mt-1.5 flex flex-wrap gap-2">
+                    {% regroup message.reactions.all by emoji as reaction_groups %}
+                    {% for group in reaction_groups %}
+                    <button type="button" class="reaction-pill flex items-center rounded-full bg-black/10 py-1 pl-1 pr-2.5 hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20" data-emoji="{{ group.grouper }}">
+                        <span class="reaction-avatars flex items-center">
+                            {% for reaction in group.list|slice:":3" %}
+                            <img src="{% if reaction.user.avatar %}{{ reaction.user.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}"
+                                 alt="{{ reaction.user.username }}"
+                                 class="h-7 w-7 rounded-full border-2 border-white object-cover dark:border-zinc-800 {% if not forloop.first %}-ml-2.5{% endif %}" />
+                            {% endfor %}
+                        </span>
+                        <span class="ml-1.5 text-base">{{ group.grouper }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
 
+    <!-- Контекстное меню сообщения (реакция/копировать/изменить/удалить) -->
+    <div id="msg-context-menu" class="fixed z-50 hidden w-52 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+        <div id="msg-context-reactions" class="flex items-center justify-around border-b border-gray-100 px-2 py-1.5 dark:border-zinc-700">
+            {% for emoji in reaction_emojis %}
+            <button type="button" class="reaction-pick rounded-lg p-1 text-2xl transition-transform hover:scale-125" data-emoji="{{ emoji }}">{{ emoji }}</button>
+            {% endfor %}
+        </div>
+        <button type="button" id="msg-context-copy" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700">
+            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" /></svg>
+            Копировать
+        </button>
+        <button type="button" id="msg-context-edit" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700">
+            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" /></svg>
+            Изменить
+        </button>
+        <button type="button" id="msg-context-delete" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
+            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+            Удалить
+        </button>
+    </div>
+
     <!-- Форма отправки -->
     <div class="flex-shrink-0 border-t border-gray-100 p-3 dark:border-zinc-800">
         <div class="flex items-end gap-2">
-            <textarea
-                rows="1"
-                id="message-input"
-                required
-                autofocus
-                maxlength="2000"
-                oninput="autoResize(this)"
-                class="flex-grow resize-none rounded-lg border border-gray-300 bg-gray-50 px-4 py-2 text-sm outline-none focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
-                placeholder="Напишите сообщение..."></textarea>
+            <div class="relative flex-grow" x-data="{ emojiOpen: false }" x-on:click.outside="emojiOpen = false">
+                <textarea
+                    rows="1"
+                    id="message-input"
+                    required
+                    autofocus
+                    maxlength="2000"
+                    oninput="autoResize(this)"
+                    style="max-height: 440px;"
+                    class="no-scrollbar w-full resize-none overflow-y-auto rounded-lg border border-gray-300 bg-gray-50 py-2 pl-4 pr-10 text-base outline-none focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+                    placeholder="Напишите сообщение..."></textarea>
+
+                <button
+                    type="button"
+                    id="msg-emoji-button"
+                    x-on:click="emojiOpen = !emojiOpen"
+                    class="absolute bottom-1.5 right-2 rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+                >
+                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h.01M8.99 9H9m12 3a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM6.6 13a5.5 5.5 0 0 0 10.81 0H6.6Z" />
+                    </svg>
+                </button>
+
+                <!-- Dropdown эмодзи-пикер -->
+                <div
+                    id="msgEmojiDropdown"
+                    x-cloak
+                    x-show="emojiOpen"
+                    class="absolute bottom-full right-0 z-20 mb-2 flex h-80 w-80 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800"
+                >
+                    <!-- Вкладки категорий -->
+                    <div class="flex flex-shrink-0 gap-1 border-b border-gray-200 bg-gray-50 p-2 dark:border-zinc-700 dark:bg-zinc-900">
+                        <button type="button" class="msg-category-tab rounded-md border border-gray-300 bg-white px-3 py-1 text-xs shadow-sm transition-colors dark:border-zinc-600 dark:bg-zinc-700" data-category="smileys">😊</button>
+                        <button type="button" class="msg-category-tab rounded-md px-3 py-1 text-xs text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200" data-category="hearts">❤️</button>
+                        <button type="button" class="msg-category-tab rounded-md px-3 py-1 text-xs text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200" data-category="gestures">👋</button>
+                        <button type="button" class="msg-category-tab rounded-md px-3 py-1 text-xs text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200" data-category="people">👶</button>
+                        <button type="button" class="msg-category-tab rounded-md px-3 py-1 text-xs text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200" data-category="animals">🐶</button>
+                        <button type="button" class="msg-category-tab rounded-md px-3 py-1 text-xs text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200" data-category="food">🍎</button>
+                        <button type="button" class="msg-category-tab rounded-md px-3 py-1 text-xs text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200" data-category="travel">🚗</button>
+                        <button type="button" class="msg-category-tab rounded-md px-3 py-1 text-xs text-gray-600 transition-colors hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200" data-category="objects">💡</button>
+                    </div>
+
+                    <!-- Контейнер для эмодзи -->
+                    <div class="flex-1 overflow-y-auto p-3">
+                        <div class="grid grid-cols-10 gap-1" id="msgEmojiGrid"></div>
+                    </div>
+                </div>
+            </div>
             <button id="send-button"
                     class="flex-shrink-0 rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
                 Отправить
@@ -164,6 +243,16 @@ const recipientPk = "{{ other_user.pk }}";
 const currentUserPk = "{{ request.user.pk }}";
 const otherUserFullName = "{{ other_user.last_name }} {{ other_user.first_name }}";
 const currentUserFullName = "{{ request.user.last_name }} {{ request.user.first_name }}";
+
+// Сообщаем base.html, что сейчас открыт диалог именно с этим собеседником
+// (чтобы глобальный счётчик не мигал: новое сообщение тут же будет
+// помечено прочитанным на этой странице)
+window.activeDialogUserPk = recipientPk;
+window.addEventListener('beforeunload', () => {
+  if (window.activeDialogUserPk === recipientPk) {
+    window.activeDialogUserPk = null;
+  }
+});
 
 // Используем глобальный WebSocket менеджер из base.html (объявлен там же, в window.globalWsManager)
 
@@ -229,9 +318,9 @@ async function updateUnreadCounts() {
       
       if (unreadCount > 0) {
         badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-        badge.parentElement.style.display = 'block';
+        badge.style.display = 'inline-flex';
       } else {
-        badge.parentElement.style.display = 'none';
+        badge.style.display = 'none';
       }
     });
     
@@ -248,32 +337,34 @@ async function updateUnreadCounts() {
 
 function createMessageElement(messageData) {
   const isSender = messageData.sender === currentUserPk || messageData.sender_id == currentUserPk;
-  const senderFullName = isSender ? currentUserFullName : otherUserFullName;
-  const senderAvatar = isSender 
-    ? '{% if request.user.avatar %}{{ request.user.avatar.url }}{% else %}{% static "img/avatar7.png" %}{% endif %}'
-    : '{% if other_user.avatar %}{{ other_user.avatar.url }}{% else %}{% static "img/avatar7.png" %}{% endif %}';
-  
+
   const timeString = messageData.created || new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   const text = messageData.text || '';
   const fileHtml = messageData.file ? `
     <div class="mt-1">
-      <a href="${messageData.file}" target="_blank" 
+      <a href="${messageData.file}" target="_blank"
          class="inline-flex items-center text-sm underline hover:text-blue-200">
         📎 Файл
       </a>
     </div>
   ` : '';
 
+  const statusHtml = isSender ? `
+    <span class="msg-status inline-flex">
+      <svg class="h-4 w-4 text-white/70" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none">
+        <path d="M2 8.5L5.5 12L11 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+  ` : '';
+
+  const escapedText = text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const messageIdAttr = messageData.id || (messageData.random_id !== undefined ? `pending-${messageData.random_id}` : '');
+
   return `
-    <div class="flex ${isSender ? 'justify-end' : 'justify-start'} gap-2.5" data-message-id="${messageData.id || ''}">
-      <img src="${senderAvatar}" alt="Аватар" class="w-8 h-8 flex-shrink-0 rounded-full object-cover" />
-      <div class="flex flex-col w-full max-w-[75%] sm:max-w-[320px] leading-1.5 py-2 px-4 rounded-xl
+    <div class="flex ${isSender ? 'justify-end' : 'justify-start'}" data-message-id="${messageIdAttr}" data-own="${isSender}" data-text="${escapedText}">
+      <div class="flex flex-col w-full max-w-[75%] sm:max-w-[380px] leading-1.5 py-2 px-4 rounded-xl
                   ${isSender ? 'bg-[#0077FF] text-white' : 'bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100'}">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-semibold">${senderFullName}</span>
-          <span class="text-xs font-normal opacity-60">${timeString}</span>
-        </div>
-        <p class="text-sm font-normal py-1.5 whitespace-pre-wrap break-words">${text}</p>
+        <p class="msg-text text-base font-normal py-0.5 whitespace-pre-wrap break-words">${text}<span class="msg-meta float-right ml-2 mt-1.5 inline-flex items-center gap-1" data-read="false"><span class="text-xs font-normal opacity-60">${timeString}</span>${statusHtml}</span></p>
         ${fileHtml}
       </div>
     </div>
@@ -282,10 +373,27 @@ function createMessageElement(messageData) {
 
 function addMessageToUI(messageData) {
   const messagesContainer = document.getElementById('messages-container');
+  ensureTodayDateSeparator(messagesContainer);
+
   const messageHtml = createMessageElement(messageData);
-  
+
   messagesContainer.insertAdjacentHTML('beforeend', messageHtml);
   scrollToBottom(true);
+}
+
+function ensureTodayDateSeparator(messagesContainer) {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const separators = messagesContainer.querySelectorAll('.msg-date-separator');
+  const lastSeparator = separators[separators.length - 1];
+
+  if (lastSeparator && lastSeparator.dataset.date === todayKey) return;
+
+  const separatorHtml = `
+    <div class="msg-date-separator flex justify-center py-1" data-date="${todayKey}">
+      <span class="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-500 shadow-sm dark:bg-zinc-800 dark:text-gray-400">Сегодня</span>
+    </div>
+  `;
+  messagesContainer.insertAdjacentHTML('beforeend', separatorHtml);
 }
 
 // ========================================
@@ -294,21 +402,10 @@ function addMessageToUI(messageData) {
 
 async function markMessagesAsRead() {
   if (isMarkingRead) return; // Предотвращаем дублирование
-  
+
   isMarkingRead = true;
-  
+
   try {
-    // 1. Отправляем через WebSocket
-    if (wsManager && wsManager.isConnected) {
-      wsManager.send({
-        msg_type: 11,
-        sender_pk: recipientPk,
-        recipient_pk: currentUserPk
-      });
-      console.log('✅ Отправлено событие "прочитано" через WebSocket');
-    }
-    
-    // 2. Дублируем через HTTP (fallback)
     const response = await fetch(`/mark-messages-read/${recipientPk}/`, {
       method: 'POST',
       headers: {
@@ -316,13 +413,14 @@ async function markMessagesAsRead() {
         'Content-Type': 'application/json'
       }
     });
-    
+
     if (response.ok) {
       const data = await response.json();
       console.log(`✅ Помечено ${data.marked_read} сообщений как прочитанные`);
-      
-      // Обновляем счетчики
+
+      // Обновляем счетчики: локальные бейджи диалогов и глобальный бейдж в меню
       setTimeout(updateUnreadCounts, 300);
+      setTimeout(updateGlobalUnreadCount, 300);
     }
   } catch (error) {
     console.error('❌ Ошибка при пометке сообщений:', error);
@@ -371,6 +469,14 @@ function handleChatWebSocketMessage(data) {
     }
   }
 
+  // Сервер подтвердил сохранение сообщения - подставляем реальный id
+  if (data.msg_type === 8) { // MessageIdCreated
+    const pendingEl = document.querySelector(`[data-message-id="pending-${data.random_id}"]`);
+    if (pendingEl) {
+      pendingEl.dataset.messageId = data.db_id;
+    }
+  }
+
   // Обработка индикатора печати
   if (data.msg_type === 5 && data.user_pk === recipientPk) {
     document.getElementById('typing-indicator').innerText = `${otherUserFullName} печатает...`;
@@ -381,11 +487,54 @@ function handleChatWebSocketMessage(data) {
     document.getElementById('typing-indicator').innerText = '';
   }
 
-  // Обработка события "прочитано"
-  if (data.msg_type === 11) {
-    console.log('📖 Получено событие "прочитано"');
-    setTimeout(updateUnreadCounts, 300);
+  // Обработка события "прочитано" (собеседник прочитал наши сообщения)
+  if (data.msg_type === 6 && data.sender === recipientPk) {
+    console.log('📖 Собеседник прочитал сообщения');
+    markOwnMessagesAsRead();
   }
+
+  // Собеседник отредактировал своё сообщение
+  if (data.msg_type === 100 && data.sender === recipientPk) {
+    const messageEl = document.querySelector(`[data-message-id="${data.message_id}"]`);
+    if (messageEl) {
+      messageEl.dataset.text = data.text;
+      const textEl = messageEl.querySelector('.msg-text');
+      if (textEl && textEl.childNodes[0]) {
+        textEl.childNodes[0].textContent = data.text;
+      }
+    }
+  }
+
+  // Собеседник удалил своё сообщение
+  if (data.msg_type === 101 && data.sender === recipientPk) {
+    const messageEl = document.querySelector(`[data-message-id="${data.message_id}"]`);
+    if (messageEl) {
+      messageEl.remove();
+    }
+  }
+
+  // Собеседник поставил/снял реакцию на сообщение (своё или наше)
+  if (data.msg_type === 102 && data.sender === recipientPk) {
+    const messageEl = document.querySelector(`[data-message-id="${data.message_id}"]`);
+    if (messageEl) {
+      renderMessageReactions(messageEl, data.reactions);
+    }
+  }
+}
+
+function markOwnMessagesAsRead() {
+  document.querySelectorAll('#messages-container .msg-meta[data-read="false"]').forEach((metaEl) => {
+    metaEl.setAttribute('data-read', 'true');
+    const statusEl = metaEl.querySelector('.msg-status');
+    if (statusEl) {
+      statusEl.innerHTML = `
+        <svg class="h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none">
+          <path d="M1 8.5L4.5 12L10 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5.5 8.5L9 12L14.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+    }
+  });
 }
 
 // Подключаем обработчик
@@ -407,9 +556,17 @@ if (wsManager) {
 function sendMessage() {
   const input = document.getElementById('message-input');
   const text = input.value.trim();
-  
+
   if (!text) return;
-  
+
+  // Режим редактирования - сохраняем изменения вместо отправки нового сообщения
+  if (editingMessageEl) {
+    const messageEl = editingMessageEl;
+    saveEditedMessage(messageEl, text);
+    cancelEditingMessage();
+    return;
+  }
+
   if (!wsManager || !wsManager.isConnected) {
     console.error('❌ WebSocket не подключен');
     alert('Ошибка подключения. Попробуйте обновить страницу.');
@@ -422,6 +579,7 @@ function sendMessage() {
   addMessageToUI({
     text: text,
     sender: currentUserPk,
+    random_id: randomId,
     created: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
   });
 
@@ -503,7 +661,7 @@ function setupDialogSearch() {
     const searchText = e.target.value.toLowerCase();
     document.querySelectorAll('.chat-item').forEach(item => {
       const itemText = item.getAttribute('data-search-text').toLowerCase();
-      item.style.display = itemText.includes(searchText) ? 'block' : 'none';
+      item.style.display = itemText.includes(searchText) ? 'flex' : 'none';
     });
   });
 }
@@ -553,14 +711,345 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Первичное обновление счетчиков
   updateUnreadCounts();
-  
+
   // Помечаем существующие сообщения как прочитанные при открытии диалога
   setTimeout(() => markMessagesAsRead(), 1000);
-  
+
+  initMessageEmojiPicker();
+  setupMessageContextMenu();
+
   console.log('✅ Чат инициализирован');
 });
 
 // Периодическое обновление счетчиков (backup)
 setInterval(updateUnreadCounts, 30000);
+
+// ========================================
+// 😀 ЭМОДЗИ-ПИКЕР (та же реализация, что и в форме поста)
+// ========================================
+
+const msgEmojiCategories = {
+  smileys: ["😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","🤡","💩","👻","💀","☠️","👽","👾"],
+  hearts: ["❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","♥️","🔥","💫","✨","💥","💦","💨","💫","🌟","⭐","🌈"],
+  gestures: ["👋","🤚","🖐️","✋","🖖","👌","🤌","🤏","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","🖕","👇","☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦾","🦵","🦿","🦶","👂","🦻","👃","🧠","🦷","🦴","👀","👁️","👅","👄","💋"],
+  people: ["👶","🧒","👦","👧","🧑","👨","👩","🧔","👴","👵","👨‍🦰","👩‍🦰","👨‍🦱","👩‍🦱","👨‍🦳","👩‍🦳","👨‍🦲","👩‍🦲","👱","👱‍♀️","👮","👮‍♀️","💂","💂‍♀️","👷","👷‍♀️","🤴","👸","👳","👳‍♀️","🧕","👲","🧔","👨‍💼","👩‍💼","👨‍🔬","👩‍🔬","👨‍💻","👩‍💻","👨‍🎤","👩‍🎤","👨‍🎨","👩‍🎨","👨‍✈️","👩‍✈️","👨‍🚀","👩‍🚀","👨‍🚒","👩‍🚒","🕵️"],
+  animals: ["🐵","🐒","🦍","🦧","🐶","🐕","🦮","🐩","🐺","🦊","🦝","🐱","🐈","🦁","🐯","🐅","🐆","🐴","🐎","🦄","🦓","🦌","🐮","🐂","🐃","🐄","🐷","🐖","🐗","🐽","🐏","🐑","🐐","🐪","🐫","🦙","🦒","🐘","🦏","🦛","🐭","🐁","🐀","🐹","🐰","🐇","🐿️","🦫","🦔","🦇","🐻","🐻‍❄️","🐨","🐼","🦥","🦦","🦨","🦘","🦡","🐾"],
+  food: ["🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🫐","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🥦","🥬","🥒","🌶️","🫑","🌽","🥕","🫒","🧄","🧅","🥔","🍠","🥐","🥯","🍞","🥖","🥨","🧀","🥚","🍳","🧈","🥞","🧇","🥓","🥩","🍗","🍖","🦴","🌭","🍔","🍟","🍕","🫓","🥪","🥙","🧆","🌮","🌯","🫔","🥗","🥘","🫕","🥫","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🦪"],
+  travel: ["🚗","🚕","🚙","🚌","🚎","🏎️","🚓","🚑","🚒","🚐","🛻","🚚","🚛","🚜","🏍️","🛵","🚲","🛴","🛹","🛼","🚁","✈️","🛩️","🛫","🛬","🪂","💺","🚀","🛸","🚉","🚊","🚝","🚄","🚅","🚈","🚂","🚆","🚇","🚞","🚋","🚌","🚍","🚎","🚐","🚑","🚒","🚓","🚔","🚕","🚖","🏠","🏡","🏢","🏣","🏤","🏥","🏦","🏨","🏩","🏪"],
+  objects: ["💡","🔦","🏮","🪔","📔","📕","📖","📗","📘","📙","📚","📓","📒","📃","📜","📄","📰","🗞️","📑","🔖","🏷️","💰","🪙","💴","💵","💶","💷","💸","💳","🧾","✉️","📧","📨","📩","📤","📥","📦","🪧","📫","📪","📬","📭","📮","🗳️","📝","📁","📂","🗂️","📅","📆"],
+};
+
+let msgCurrentEmojiCategory = "smileys";
+
+function initMessageEmojiPicker() {
+  loadMsgEmojiCategory(msgCurrentEmojiCategory);
+  setupMsgCategoryTabs();
+}
+
+function setupMsgCategoryTabs() {
+  document.querySelectorAll(".msg-category-tab").forEach((tab) => {
+    tab.addEventListener("click", function () {
+      const category = this.getAttribute("data-category");
+
+      document.querySelectorAll(".msg-category-tab").forEach((t) => {
+        t.classList.remove("bg-white", "dark:bg-zinc-700", "border", "border-gray-300", "dark:border-zinc-600", "shadow-sm");
+        t.classList.add("text-gray-600", "dark:text-gray-400", "hover:text-gray-800", "dark:hover:text-gray-200");
+      });
+
+      this.classList.remove("text-gray-600", "dark:text-gray-400", "hover:text-gray-800", "dark:hover:text-gray-200");
+      this.classList.add("bg-white", "dark:bg-zinc-700", "border", "border-gray-300", "dark:border-zinc-600", "shadow-sm");
+
+      msgCurrentEmojiCategory = category;
+      loadMsgEmojiCategory(category);
+    });
+  });
+}
+
+function loadMsgEmojiCategory(category) {
+  const emojiGrid = document.getElementById("msgEmojiGrid");
+  emojiGrid.innerHTML = "";
+
+  const categoryEmojis = msgEmojiCategories[category] || [];
+
+  categoryEmojis.forEach((emoji) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "emoji-item flex h-8 w-8 items-center justify-center rounded-lg text-lg transition-all duration-200 hover:scale-110 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 dark:hover:bg-zinc-700";
+    button.textContent = emoji;
+    button.onclick = (e) => {
+      e.stopPropagation();
+      insertMessageEmoji(emoji);
+    };
+    emojiGrid.appendChild(button);
+  });
+}
+
+function insertMessageEmoji(emoji) {
+  const textarea = document.getElementById('message-input');
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+
+  if (text.length + emoji.length > 2000) return;
+
+  textarea.value = text.substring(0, start) + emoji + text.substring(end);
+  textarea.focus();
+  textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+
+  autoResize(textarea);
+
+  const inputEvent = new Event('input', { bubbles: true });
+  textarea.dispatchEvent(inputEvent);
+}
+
+// ========================================
+// 🖱️ КОНТЕКСТНОЕ МЕНЮ СООБЩЕНИЯ (копировать/изменить/удалить)
+// ========================================
+
+let contextMenuTargetEl = null;
+
+function setupMessageContextMenu() {
+  const messagesContainer = document.getElementById('messages-container');
+  const contextMenu = document.getElementById('msg-context-menu');
+  const copyBtn = document.getElementById('msg-context-copy');
+  const editBtn = document.getElementById('msg-context-edit');
+  const deleteBtn = document.getElementById('msg-context-delete');
+
+  messagesContainer.addEventListener('contextmenu', (e) => {
+    const messageEl = e.target.closest('[data-message-id]');
+    if (!messageEl || !messageEl.dataset.messageId) return;
+
+    e.preventDefault();
+    contextMenuTargetEl = messageEl;
+    const isOwn = messageEl.dataset.own === 'true';
+
+    editBtn.style.display = isOwn ? 'flex' : 'none';
+    deleteBtn.style.display = isOwn ? 'flex' : 'none';
+
+    const menuWidth = 208;
+    const menuHeight = isOwn ? 172 : 104;
+    let left = e.clientX;
+    let top = e.clientY;
+    if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - 8;
+    if (top + menuHeight > window.innerHeight) top = window.innerHeight - menuHeight - 8;
+
+    contextMenu.style.left = `${left}px`;
+    contextMenu.style.top = `${top}px`;
+    contextMenu.classList.remove('hidden');
+  });
+
+  document.addEventListener('click', () => {
+    contextMenu.classList.add('hidden');
+  });
+
+  copyBtn.addEventListener('click', () => {
+    if (!contextMenuTargetEl) return;
+    const text = contextMenuTargetEl.dataset.text || '';
+    navigator.clipboard.writeText(text).catch(() => {
+      console.error('❌ Не удалось скопировать текст');
+    });
+    contextMenu.classList.add('hidden');
+  });
+
+  editBtn.addEventListener('click', () => {
+    if (!contextMenuTargetEl) return;
+    startEditingMessage(contextMenuTargetEl);
+    contextMenu.classList.add('hidden');
+  });
+
+  deleteBtn.addEventListener('click', () => {
+    if (!contextMenuTargetEl) return;
+    deleteMessage(contextMenuTargetEl);
+    contextMenu.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.reaction-pick').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!contextMenuTargetEl) return;
+      toggleReaction(contextMenuTargetEl, btn.dataset.emoji);
+      contextMenu.classList.add('hidden');
+    });
+  });
+
+  // Клик по существующей реакции под сообщением - тоже toggle
+  messagesContainer.addEventListener('click', (e) => {
+    const pill = e.target.closest('.reaction-pill');
+    if (!pill) return;
+    const messageEl = pill.closest('[data-message-id]');
+    if (!messageEl) return;
+    toggleReaction(messageEl, pill.dataset.emoji);
+  });
+}
+
+async function toggleReaction(messageEl, emoji) {
+  const messageId = messageEl.dataset.messageId;
+  if (!messageId || messageId.startsWith('pending-')) return;
+
+  try {
+    const response = await fetch(`/toggle-reaction/${messageId}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `emoji=${encodeURIComponent(emoji)}`,
+    });
+
+    if (!response.ok) throw new Error('Request failed');
+
+    const data = await response.json();
+    renderMessageReactions(messageEl, data.reactions);
+  } catch (error) {
+    console.error('❌ Ошибка при установке реакции:', error);
+  }
+}
+
+function renderMessageReactions(messageEl, reactions) {
+  let reactionsEl = messageEl.querySelector('.msg-reactions');
+
+  if (!reactions || reactions.length === 0) {
+    if (reactionsEl) reactionsEl.remove();
+    return;
+  }
+
+  if (!reactionsEl) {
+    reactionsEl = document.createElement('div');
+    reactionsEl.className = 'msg-reactions mt-1 flex flex-wrap gap-2';
+    const targetBubble = messageEl.querySelector('.rounded-xl');
+    if (targetBubble) targetBubble.appendChild(reactionsEl);
+  }
+
+  reactionsEl.innerHTML = '';
+  reactions.forEach((r) => {
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'reaction-pill flex items-center rounded-full bg-black/10 py-1 pl-1 pr-2.5 hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20';
+    pill.dataset.emoji = r.emoji;
+
+    const avatarsHtml = (r.users || []).map((u, i) => `
+      <img src="${u.avatar}" alt="${u.username}" class="h-7 w-7 rounded-full border-2 border-white object-cover dark:border-zinc-800 ${i > 0 ? '-ml-2.5' : ''}" />
+    `).join('');
+
+    pill.innerHTML = `<span class="reaction-avatars flex items-center">${avatarsHtml}</span><span class="ml-1.5 text-base">${r.emoji}</span>`;
+    reactionsEl.appendChild(pill);
+  });
+}
+
+let editingMessageEl = null;
+
+function startEditingMessage(messageEl) {
+  editingMessageEl = messageEl;
+  const currentText = messageEl.dataset.text || '';
+
+  const input = document.getElementById('message-input');
+  input.value = currentText;
+  input.focus();
+  autoResize(input);
+  input.selectionStart = input.selectionEnd = input.value.length;
+
+  showEditBanner(currentText);
+}
+
+function showEditBanner(previewText) {
+  let banner = document.getElementById('edit-message-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'edit-message-banner';
+    banner.className = 'mb-2 flex items-center gap-2 rounded-lg border-l-4 border-[#0077FF] bg-[#EAF3FF] px-3 py-1.5 dark:bg-zinc-800';
+
+    const iconWrap = document.createElement('div');
+    iconWrap.className = 'flex-shrink-0 text-[#0077FF]';
+    iconWrap.innerHTML = `
+      <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+      </svg>
+    `;
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'min-w-0 flex-1';
+    textWrap.innerHTML = `<div class="text-xs font-medium text-[#0077FF]">Редактирование сообщения</div>`;
+    const previewEl = document.createElement('div');
+    previewEl.id = 'edit-message-preview';
+    previewEl.className = 'truncate text-xs text-gray-500 dark:text-gray-400';
+    textWrap.appendChild(previewEl);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'flex-shrink-0 rounded-lg p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200';
+    cancelBtn.innerHTML = `
+      <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    `;
+    cancelBtn.addEventListener('click', cancelEditingMessage);
+
+    banner.appendChild(iconWrap);
+    banner.appendChild(textWrap);
+    banner.appendChild(cancelBtn);
+
+    document.getElementById('message-input').closest('.flex-shrink-0').prepend(banner);
+  }
+
+  document.getElementById('edit-message-preview').textContent = previewText;
+  banner.classList.remove('hidden');
+}
+
+function cancelEditingMessage() {
+  editingMessageEl = null;
+  const banner = document.getElementById('edit-message-banner');
+  if (banner) banner.classList.add('hidden');
+
+  const input = document.getElementById('message-input');
+  input.value = '';
+  input.style.height = 'auto';
+}
+
+async function saveEditedMessage(messageEl, newText) {
+  const messageId = messageEl.dataset.messageId;
+
+  try {
+    const response = await fetch(`/edit-message/${messageId}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `text=${encodeURIComponent(newText)}`,
+    });
+
+    if (!response.ok) throw new Error('Request failed');
+
+    messageEl.dataset.text = newText;
+    const textEl = messageEl.querySelector('.msg-text');
+    if (textEl && textEl.childNodes[0]) {
+      textEl.childNodes[0].textContent = newText;
+    }
+  } catch (error) {
+    console.error('❌ Ошибка редактирования сообщения:', error);
+    alert('Не удалось изменить сообщение');
+  }
+}
+
+async function deleteMessage(messageEl) {
+  const messageId = messageEl.dataset.messageId;
+  if (!confirm('Удалить сообщение?')) return;
+
+  try {
+    const response = await fetch(`/delete-message/${messageId}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+    });
+
+    if (!response.ok) throw new Error('Request failed');
+
+    messageEl.remove();
+  } catch (error) {
+    console.error('❌ Ошибка удаления сообщения:', error);
+    alert('Не удалось удалить сообщение');
+  }
+}
 </script>
 {% endblock %}

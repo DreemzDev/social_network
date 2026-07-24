@@ -62,19 +62,21 @@
         {% endfor %}
     </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const currentUserPk = "{{ request.user.pk }}";
-    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-    const chatSocket = new WebSocket(`${wsScheme}://${window.location.host}/chat_ws`);
     const dialogsList = document.getElementById("dialogs-list");
+    const wsManager = window.globalWsManager;
 
-    chatSocket.onopen = () => console.log("WebSocket connected");
+    if (!wsManager) {
+        console.error('❌ Global WebSocket Manager не найден!');
+        return;
+    }
 
-    chatSocket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-
+    function handleDialogsWebSocketMessage(data) {
         // 🔔 Обновление счётчика непрочитанных сообщений
         if (data.msg_type === 9) { // NewUnreadCount
             const dialogEl = document.querySelector(`[data-user-id="${data.sender}"]`);
@@ -91,9 +93,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // 📝 Обновление последнего сообщения и времени, перемещение наверх
         if (data.msg_type === 3) { // TextMessage
-            const senderId = data.sender;
-            const isSender = senderId === currentUserPk;
-            const dialogEl = document.querySelector(`[data-user-id="${senderId}"]`);
+            const isSender = data.sender === currentUserPk;
+            const otherUserId = isSender ? data.receiver : data.sender;
+            const dialogEl = document.querySelector(`[data-user-id="${otherUserId}"]`);
             if (dialogEl) {
                 const lastMessageEl = dialogEl.querySelector(".last-message");
                 const lastMessageTimeEl = dialogEl.querySelector(".last-message-time");
@@ -110,9 +112,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 setTimeout(() => dialogEl.classList.remove("animate-pulse"), 500);
             }
         }
-    };
+    }
 
-    chatSocket.onclose = () => console.warn("WebSocket closed");
+    wsManager.addListener(handleDialogsWebSocketMessage);
+    window.addEventListener('beforeunload', () => {
+        wsManager.removeListener(handleDialogsWebSocketMessage);
+    });
 });
 </script>
 {% endblock %}

@@ -1,4 +1,5 @@
 from typing import Any
+from django.templatetags.static import static
 from django.urls import reverse_lazy
 from django.core.cache import cache
 from django.db.models import Count, Q
@@ -22,10 +23,13 @@ from category.models import Category
 from phonebook.models import Phonebook
 from phonebook.forms import UpdateBookForm
 from django_private_chat2.models import MessageModel, DialogsModel
+from .models import MessageReaction
 from datetime import date
 from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 
 class AddProfile(UpdateView):
@@ -153,7 +157,7 @@ class DialogMessagesView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
         return MessageModel.objects.filter(
             Q(sender=self.request.user, recipient=self.other_user) |
             Q(sender=self.other_user, recipient=self.request.user)
-        ).select_related('sender', 'recipient').order_by('-created')[:self.paginate_by]
+        ).select_related('sender', 'recipient').prefetch_related('reactions').order_by('-created')[:self.paginate_by]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -167,6 +171,7 @@ class DialogMessagesView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
         
         # Для правильного отображения в шаблоне (от старых к новым)
         context['messages'] = list(reversed(context['messages']))
+        context['reaction_emojis'] = ALLOWED_REACTION_EMOJIS
 
         return context
 
@@ -306,8 +311,113 @@ class MarkMessagesReadView(LoginRequiredMixin, View):
         # Очищаем кеш текущего пользователя
         if updated_count > 0:
             clear_user_cache(request.user.pk)
-        
+
+            # Уведомляем отправителя, что все его сообщения в этом диалоге прочитаны
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(str(other_user.pk), {
+                'type': 'message_read',
+                'message_id': 0,
+                'sender': str(request.user.pk),
+                'receiver': str(other_user.pk),
+            })
+
         return JsonResponse({
-            'success': True, 
+            'success': True,
             'marked_read': updated_count
         })
+
+
+class EditMessageView(LoginRequiredMixin, View):
+    """API endpoint для редактирования собственного сообщения"""
+
+    def post(self, request, message_id):
+        message = get_object_or_404(MessageModel, pk=message_id, sender=request.user)
+        text = request.POST.get('text', '').strip()
+
+        if not text:
+            return JsonResponse({'success': False, 'error': 'Текст не может быть пустым'}, status=400)
+
+        message.text = text
+        message.save(update_fields=['text'])
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(str(message.recipient_id), {
+            'type': 'message_edited',
+            'message_id': message.id,
+            'text': text,
+            'sender': str(request.user.pk),
+            'receiver': str(message.recipient_id),
+        })
+
+        return JsonResponse({'success': True, 'text': text})
+
+
+class DeleteMessageView(LoginRequiredMixin, View):
+    """API endpoint для удаления собственного сообщения"""
+
+    def post(self, request, message_id):
+        message = get_object_or_404(MessageModel, pk=message_id, sender=request.user)
+        recipient_id = message.recipient_id
+        message.delete()
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(str(recipient_id), {
+            'type': 'message_deleted',
+            'message_id': message_id,
+            'sender': str(request.user.pk),
+            'receiver': str(recipient_id),
+        })
+
+        return JsonResponse({'success': True})
+
+
+ALLOWED_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡']
+
+
+class ToggleMessageReactionView(LoginRequiredMixin, View):
+    """API endpoint для установки/снятия реакции на сообщение (своё или собеседника)"""
+
+    def post(self, request, message_id):
+        message = get_object_or_404(
+            MessageModel.objects.filter(Q(sender=request.user) | Q(recipient=request.user)),
+            pk=message_id
+        )
+        emoji = request.POST.get('emoji', '')
+
+        if emoji not in ALLOWED_REACTION_EMOJIS:
+            return JsonResponse({'success': False, 'error': 'Недопустимый эмодзи'}, status=400)
+
+        existing = MessageReaction.objects.filter(message=message, user=request.user).first()
+        if existing and existing.emoji == emoji:
+            existing.delete()
+        elif existing:
+            existing.emoji = emoji
+            existing.save(update_fields=['emoji'])
+        else:
+            MessageReaction.objects.create(message=message, user=request.user, emoji=emoji)
+
+        reactions_qs = MessageReaction.objects.filter(message=message).select_related('user').order_by('emoji', 'created')
+        reactions_by_emoji = {}
+        for reaction in reactions_qs:
+            reactions_by_emoji.setdefault(reaction.emoji, []).append({
+                'avatar': reaction.user.avatar.url if reaction.user.avatar else static('img/avatar7.png'),
+                'username': reaction.user.username,
+            })
+
+        reactions = [
+            {'emoji': emoji, 'count': len(users), 'users': users[:3]}
+            for emoji, users in sorted(reactions_by_emoji.items(), key=lambda kv: -len(kv[1]))
+        ]
+
+        other_user_id = message.recipient_id if message.sender_id == request.user.pk else message.sender_id
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(str(other_user_id), {
+            'type': 'message_reaction',
+            'message_id': message.id,
+            'reactions': reactions,
+            'sender': str(request.user.pk),
+            'receiver': str(other_user_id),
+        })
+
+        return JsonResponse({'success': True, 'reactions': reactions})

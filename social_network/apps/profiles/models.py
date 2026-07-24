@@ -71,6 +71,22 @@ class User(AbstractUser):
         verbose_name = 'Личный кабинет'
         verbose_name_plural = 'Личные кабинеты'
 
+class MessageReaction(models.Model):
+    message = models.ForeignKey('django_private_chat2.MessageModel', on_delete=models.CASCADE, related_name='reactions', verbose_name="Сообщение")
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, verbose_name="Пользователь")
+    emoji = models.CharField(max_length=8, verbose_name="Эмодзи")
+    created = models.DateTimeField(auto_now_add=True, verbose_name="Время создания")
+
+    class Meta:
+        unique_together = ('message', 'user')
+        ordering = ('emoji',)
+        verbose_name = 'Реакция на сообщение'
+        verbose_name_plural = 'Реакции на сообщения'
+
+    def __str__(self):
+        return f"{self.user} {self.emoji} on message {self.message_id}"
+
+
 @receiver(user_logged_in)
 def user_logged_in_callback(sender, request, user, **kwargs):
     """Обновляем время активности при входе"""

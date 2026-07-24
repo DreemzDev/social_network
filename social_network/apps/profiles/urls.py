@@ -24,4 +24,11 @@ urlpatterns = [
     
     # API для пометки сообщений как прочитанных
     path('mark-messages-read/<int:user_id>/', MarkMessagesReadView.as_view(), name='mark_messages_read'),
+
+    # Редактирование и удаление своих сообщений
+    path('edit-message/<int:message_id>/', EditMessageView.as_view(), name='edit_message'),
+    path('delete-message/<int:message_id>/', DeleteMessageView.as_view(), name='delete_message'),
+
+    # Реакции на сообщения
+    path('toggle-reaction/<int:message_id>/', ToggleMessageReactionView.as_view(), name='toggle_reaction'),
 ]
