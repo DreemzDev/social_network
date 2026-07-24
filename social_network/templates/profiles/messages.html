@@ -2,8 +2,13 @@
 {% load static %}
 {% load chat_extras %}
 
+{% block footer %}{% endblock footer %}
+
 {% block content %}
-<div class="flex w-full min-w-0 overflow-hidden rounded-xl border border-gray-100 dark:border-zinc-800" style="height: calc(100vh - 96px);">
+<style>
+  body { overflow: hidden; }
+</style>
+<div class="flex w-full min-w-0 overflow-hidden rounded-xl border border-gray-100 dark:border-zinc-800" style="height: calc(100vh - 80px);">
 <div class="hidden w-full flex-shrink-0 flex-col border-r border-gray-100 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:flex md:w-80">
     <!-- Поиск диалогов -->
     <div class="border-b border-gray-100 p-3 dark:border-zinc-800">
