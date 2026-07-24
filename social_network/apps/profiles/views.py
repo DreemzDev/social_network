@@ -339,17 +339,18 @@ class EditMessageView(LoginRequiredMixin, View):
 
         message.text = text
         message.save(update_fields=['text'])
+        message.refresh_from_db(fields=['text'])
 
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(str(message.recipient_id), {
             'type': 'message_edited',
             'message_id': message.id,
-            'text': text,
+            'text': message.text,
             'sender': str(request.user.pk),
             'receiver': str(message.recipient_id),
         })
 
-        return JsonResponse({'success': True, 'text': text})
+        return JsonResponse({'success': True, 'text': message.text})
 
 
 class DeleteMessageView(LoginRequiredMixin, View):
