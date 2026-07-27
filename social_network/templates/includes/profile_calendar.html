@@ -1,0 +1,71 @@
+{% load static %}
+<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="calendar" draggable="true">
+  <div class="sidebar-panel__header flex cursor-grab items-center justify-between p-4 active:cursor-grabbing">
+    <div class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+      <i data-feather="move" class="h-4 w-4 text-gray-300 dark:text-zinc-600"></i>
+      <i data-feather="calendar" class="h-4 w-4"></i> Календарь и напоминания
+    </div>
+    <button type="button" class="sidebar-panel__toggle p-1 text-gray-400 hover:text-gray-600">
+      <i data-feather="chevron-down" class="h-4 w-4 transition-transform"></i>
+    </button>
+  </div>
+  <div class="sidebar-panel__content px-4 pb-4">
+    <form action="{% url 'event_create' %}" method="post" class="mb-3 flex gap-2">
+      {% csrf_token %}
+      <input type="text" name="title" placeholder="Название события" required
+             class="min-w-0 flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      <input type="date" name="date" required
+             class="w-36 flex-shrink-0 rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-sm text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      <button type="submit" class="flex-shrink-0 rounded-lg bg-[#0077FF] px-3 py-2 text-xs font-medium text-white hover:bg-[#3391FF]">+</button>
+    </form>
+
+    <div class="mb-3 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
+      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#1C3FAA"></span> Личное</span>
+      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#0077FF"></span> Корпоративное</span>
+      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#F78B00"></span> День рождения</span>
+    </div>
+
+    <div id="profile-calendar" class="profile-calendar-dark"></div>
+  </div>
+</div>
+
+<style>
+  #profile-calendar { font-size: 0.8rem; }
+  .dark #profile-calendar .fc-toolbar-title,
+  .dark #profile-calendar .fc-col-header-cell-cushion,
+  .dark #profile-calendar .fc-daygrid-day-number { color: #e4e4e7; }
+  .dark #profile-calendar .fc-scrollgrid,
+  .dark #profile-calendar td,
+  .dark #profile-calendar th { border-color: #3f3f46; }
+  .dark #profile-calendar .fc-button-primary { background-color: #27272a; border-color: #3f3f46; }
+</style>
+
+<script src="{% static 'vendor/fullcalendar/index.global.min.js' %}"></script>
+<script src="{% static 'vendor/fullcalendar/locale-ru.global.min.js' %}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const calendarEl = document.getElementById('profile-calendar');
+    if (!calendarEl || typeof FullCalendar === 'undefined') return;
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      height: 'auto',
+      locale: 'ru',
+      firstDay: 1,
+      headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
+      buttonText: { today: 'Сегодня' },
+      events: '{% url "calendar_events_feed" %}',
+      eventClick: function (info) {
+        if (info.event.extendedProps.deletable) {
+          if (confirm('Удалить событие «' + info.event.title + '»?')) {
+            fetch('/event/' + info.event.id + '/delete/', {
+              method: 'POST',
+              headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+            }).then(() => calendar.refetchEvents());
+          }
+        }
+      },
+    });
+    calendar.render();
+  });
+</script>

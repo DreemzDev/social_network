@@ -16,6 +16,8 @@ from comments.forms import CommentForm
 from comments.models import Comment
 from .forms import *
 from .models import Post, PostImage, PostFile
+from profiles.models import Task, Note
+from profiles.forms import TaskForm, NoteForm, EventForm
 from django.core.paginator import Paginator
 from django.views.generic.detail import SingleObjectMixin
 # from dateutil.relativedelta import relativedelta
@@ -132,6 +134,25 @@ class AddPost(FormView, TemplateView):
         context['user'] = user
         context['profile_user'] = user
         context['online_count'] = online_count  # Добавляем в контекст!
+
+        user_posts = Post.objects.filter(author=user)
+        context['stats'] = {
+            'posts_count': user_posts.count(),
+            'comments_count': Comment.objects.filter(comment_author=user).count(),
+            'likes_count': user_posts.aggregate(total=Count('likes'))['total'] or 0,
+            'views_count': user_posts.aggregate(total=Count('viewers'))['total'] or 0,
+        }
+        context['is_owner'] = self.request.user == user
+
+        if context['is_owner']:
+            context['pending_tasks'] = Task.objects.filter(user=user, is_completed=False)
+            context['completed_tasks'] = Task.objects.filter(user=user, is_completed=True)
+            context['task_form'] = TaskForm()
+
+            note, _ = Note.objects.get_or_create(user=user)
+            context['note_form'] = NoteForm(instance=note)
+
+            context['event_form'] = EventForm()
 
         return context
   

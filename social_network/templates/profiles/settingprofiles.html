@@ -2,6 +2,7 @@
 {% load static %}
 {% block content %}
 
+<div class="mx-auto w-full xl:w-2/3">
 <div class="flex flex-1 flex-col gap-4 sm:flex-row" x-data="{ tab: 'personal' }">
 
   <!-- Форма -->
@@ -103,7 +104,7 @@
           </div>
         </div>
 
-        <div class="border-t border-gray-100 p-4 dark:border-zinc-800">
+        <div x-show="tab !== 'security'" class="border-t border-gray-100 p-4 dark:border-zinc-800">
           <button
             type="submit"
             class="rounded-lg bg-[#0077FF] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
@@ -112,6 +113,83 @@
           </button>
         </div>
       </form>
+
+      <!-- Безопасность -->
+      <div x-cloak x-show="tab === 'security'" class="space-y-6 p-4">
+
+        {% if password_form.non_field_errors or password_form.old_password.errors or password_form.new_password1.errors %}
+        <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+          {% for error in password_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+          {% for error in password_form.old_password.errors %}<p>{{ error }}</p>{% endfor %}
+          {% for error in password_form.new_password1.errors %}<p>{{ error }}</p>{% endfor %}
+        </div>
+        {% endif %}
+
+        <form action="{% url 'settingprofile' user.id %}" method="post">
+          {% csrf_token %}
+          <div class="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Смена пароля</div>
+          <div class="space-y-4">
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Текущий пароль</label>
+              <div class="relative">
+                {{ password_form.old_password }}
+                <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="{{ password_form.old_password.id_for_label }}" tabindex="-1">
+                  <i data-feather="eye" class="h-4 w-4"></i>
+                </button>
+              </div>
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Новый пароль</label>
+              <div class="relative">
+                {{ password_form.new_password1 }}
+                <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="setting-password-input" tabindex="-1">
+                  <i data-feather="eye" class="h-4 w-4"></i>
+                </button>
+              </div>
+              <!-- Индикатор сложности пароля -->
+              <div class="mt-3 grid w-full grid-cols-12 gap-1 h-1" id="setting-password-strength">
+                <div class="col-span-3 h-full rounded bg-gray-200" data-bar></div>
+                <div class="col-span-3 h-full rounded bg-gray-200" data-bar></div>
+                <div class="col-span-3 h-full rounded bg-gray-200" data-bar></div>
+                <div class="col-span-3 h-full rounded bg-gray-200" data-bar></div>
+              </div>
+              <div class="mt-2 text-xs text-gray-500 dark:text-gray-400" id="setting-password-strength-label">Минимум 8 символов</div>
+            </div>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Повторите новый пароль</label>
+              <div class="relative">
+                {{ password_form.new_password2 }}
+                <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="{{ password_form.new_password2.id_for_label }}" tabindex="-1">
+                  <i data-feather="eye" class="h-4 w-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <button type="submit" name="change_password"
+            class="mt-4 rounded-lg bg-[#0077FF] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
+            Сменить пароль
+          </button>
+        </form>
+
+        <div class="border-t border-gray-100 pt-6 dark:border-zinc-800">
+          {% if security_form.security_answer.errors %}
+          <div class="mb-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+            {% for error in security_form.security_answer.errors %}<p>{{ error }}</p>{% endfor %}
+          </div>
+          {% endif %}
+          <form action="{% url 'settingprofile' user.id %}" method="post">
+            {% csrf_token %}
+            <div class="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Проверочное слово</div>
+            <div class="mb-3 text-xs text-gray-500 dark:text-gray-400">Используется для восстановления доступа без электронной почты.</div>
+            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Проверочное слово</label>
+            {{ security_form.security_answer }}
+            <button type="submit" name="change_security_answer"
+              class="mt-4 rounded-lg bg-[#0077FF] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
+              Сохранить
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -134,8 +212,14 @@
         :class="tab === 'service' ? 'bg-[#EAF3FF] text-[#0077FF] font-medium dark:bg-zinc-800' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800'">
         Служебная информация
       </button>
+      <button type="button" x-on:click="tab = 'security'"
+        class="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm"
+        :class="tab === 'security' ? 'bg-[#EAF3FF] text-[#0077FF] font-medium dark:bg-zinc-800' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800'">
+        Безопасность
+      </button>
     </div>
   </div>
+</div>
 </div>
 
 <script>
@@ -151,6 +235,55 @@
       },
     };
   }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.password-toggle').forEach(function (toggle) {
+      toggle.addEventListener('click', function () {
+        var target = document.getElementById(toggle.dataset.target);
+        if (!target) return;
+        var isHidden = target.type === 'password';
+        target.type = isHidden ? 'text' : 'password';
+        toggle.innerHTML = isHidden
+          ? '<i data-feather="eye-off" class="h-4 w-4"></i>'
+          : '<i data-feather="eye" class="h-4 w-4"></i>';
+        if (window.feather) feather.replace();
+      });
+    });
+
+    var passwordInput = document.getElementById('setting-password-input');
+    var bars = document.querySelectorAll('#setting-password-strength [data-bar]');
+    var label = document.getElementById('setting-password-strength-label');
+    if (!passwordInput) return;
+
+    function scorePassword(value) {
+      var score = 0;
+      if (value.length >= 8) score++;
+      if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
+      if (/\d/.test(value)) score++;
+      if (/[^A-Za-z0-9]/.test(value)) score++;
+      return score;
+    }
+
+    var levels = [
+      { color: 'bg-gray-200', text: 'Минимум 8 символов' },
+      { color: 'bg-theme-6', text: 'Слабый пароль' },
+      { color: 'bg-theme-12', text: 'Средний пароль' },
+      { color: 'bg-theme-11', text: 'Хороший пароль' },
+      { color: 'bg-theme-9', text: 'Надёжный пароль' },
+    ];
+
+    passwordInput.addEventListener('input', function () {
+      var score = passwordInput.value ? scorePassword(passwordInput.value) : 0;
+      var level = levels[score];
+
+      bars.forEach(function (bar, index) {
+        bar.classList.remove('bg-gray-200', 'bg-theme-6', 'bg-theme-12', 'bg-theme-11', 'bg-theme-9');
+        bar.classList.add(index < score ? level.color : 'bg-gray-200');
+      });
+
+      label.textContent = passwordInput.value ? level.text : 'Минимум 8 символов';
+    });
+  });
 </script>
 
 {% endblock content %}

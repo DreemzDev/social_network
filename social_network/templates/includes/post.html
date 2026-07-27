@@ -3,19 +3,19 @@
 {%endif%}
 <div class="space-y-6  flex flex-1 flex-col mx-auto">
   {% for post in posts %}
-  <article id="post-{{ post.id }}" class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800 px-4 py-3">
+  <article id="post-{{ post.id }}" class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800 px-5 py-4">
     <div class="pb-4">
       <div class="flex justify-between items-start">
         <!-- Автор и дата -->
         <div class="flex items-center space-x-3">
           <a href="{% if post.author.username %}{% url 'addpost' post.author.username %}{% else %}#{% endif %}">
             <img src="{% if post.author.avatar %}{{ post.author.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
-                 class="w-10 h-10 rounded-full avatar-ring" alt="Аватар" />
+                 class="w-12 h-12 rounded-full avatar-ring" alt="Аватар" />
           </a>
           <div class="flex-1 min-w-0">
             <div class="flex items-center space-x-2">
               <a href="{% if post.author.username %}{% url 'addpost' post.author.username %}{% else %}#{% endif %}"
-                 class="text-sm font-semibold text-gray-900 dark:text-white hover:underline">
+                 class="text-base font-semibold text-gray-900 dark:text-white hover:underline">
                 {{ post.author.first_name|default:"Имя" }} {{ post.author.last_name|default:"Фамилия" }}
               </a>
               <span class="text-gray-500 text-xs">•</span>
@@ -68,8 +68,8 @@
     </div>
 
     <!-- Контент -->
-    <div class="px-4 pb-3">
-      <div class="text-gray-800 dark:text-gray-200 leading-relaxed post-content">
+    <div class="px-5 pb-3">
+      <div class="text-base text-gray-800 dark:text-gray-200 leading-relaxed post-content">
         {{ post.content|linebreaks|truncatewords:40 }}
         {% if post.content|wordcount > 40 %}
         <br>

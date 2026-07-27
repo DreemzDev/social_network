@@ -1,0 +1,67 @@
+{% load static %}
+<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="todo" draggable="true">
+  <div class="sidebar-panel__header flex cursor-grab items-center justify-between p-4 active:cursor-grabbing">
+    <div class="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
+      <i data-feather="move" class="h-4 w-4 text-gray-300 dark:text-zinc-600"></i>
+      <i data-feather="check-square" class="h-5 w-5"></i> Мои задачи
+    </div>
+    <button type="button" class="sidebar-panel__toggle p-1 text-gray-400 hover:text-gray-600">
+      <i data-feather="chevron-down" class="h-4 w-4 transition-transform"></i>
+    </button>
+  </div>
+  <div class="sidebar-panel__content px-4 pb-4" x-data="{ showCompleted: false }">
+    {% if completed_tasks %}
+    <div class="mb-2 flex justify-end">
+      <button type="button" x-on:click="showCompleted = !showCompleted" class="text-sm text-gray-400 hover:text-gray-600">
+        <span x-text="showCompleted ? 'Скрыть выполненные' : 'Показать выполненные (' + {{ completed_tasks|length }} + ')'"></span>
+      </button>
+    </div>
+    {% endif %}
+
+    <form action="{% url 'task_create' %}" method="post" class="mb-3 flex gap-2">
+      {% csrf_token %}
+      <input type="text" name="title" placeholder="Новая задача" required
+             class="min-w-0 flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      <input type="date" name="due_date"
+             class="w-36 flex-shrink-0 rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      <button type="submit" class="flex-shrink-0 rounded-lg bg-[#0077FF] px-3 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">+</button>
+    </form>
+
+    <div class="space-y-1.5">
+      {% for task in pending_tasks %}
+      <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-base hover:bg-gray-50 dark:hover:bg-zinc-800">
+        <input type="checkbox"
+               class="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-[#0077FF] focus:ring-[#0077FF]"
+               x-on:change="fetch('{% url 'task_toggle' task.id %}', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(() => $el.closest('div').remove())">
+        <span class="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-100">{{ task.title }}</span>
+        {% if task.due_date %}<span class="flex-shrink-0 text-xs text-gray-400">{{ task.due_date|date:"d.m" }}</span>{% endif %}
+        <form action="{% url 'task_delete' task.id %}" method="post" class="flex-shrink-0">
+          {% csrf_token %}
+          <button type="submit" class="text-gray-300 hover:text-red-500">
+            <i data-feather="x" class="h-3.5 w-3.5"></i>
+          </button>
+        </form>
+      </div>
+      {% empty %}
+      <div class="py-2 text-xs text-gray-400">Нет активных задач</div>
+      {% endfor %}
+
+      <div x-cloak x-show="showCompleted" class="space-y-1.5 border-t border-gray-100 pt-1.5 dark:border-zinc-800">
+        {% for task in completed_tasks %}
+        <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-base">
+          <input type="checkbox" checked
+                 class="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-[#0077FF] focus:ring-[#0077FF]"
+                 x-on:change="fetch('{% url 'task_toggle' task.id %}', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(() => $el.closest('div').remove())">
+          <span class="min-w-0 flex-1 truncate text-gray-400 line-through">{{ task.title }}</span>
+          <form action="{% url 'task_delete' task.id %}" method="post" class="flex-shrink-0">
+            {% csrf_token %}
+            <button type="submit" class="text-gray-300 hover:text-red-500">
+              <i data-feather="x" class="h-3.5 w-3.5"></i>
+            </button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>

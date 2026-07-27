@@ -1,0 +1,19 @@
+{% load static %}
+<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="notes" draggable="true">
+  <div class="sidebar-panel__header flex cursor-grab items-center justify-between p-4 active:cursor-grabbing">
+    <div class="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
+      <i data-feather="move" class="h-4 w-4 text-gray-300 dark:text-zinc-600"></i>
+      <i data-feather="edit-3" class="h-5 w-5"></i> Заметки
+    </div>
+    <button type="button" class="sidebar-panel__toggle p-1 text-gray-400 hover:text-gray-600">
+      <i data-feather="chevron-down" class="h-4 w-4 transition-transform"></i>
+    </button>
+  </div>
+  <div class="sidebar-panel__content px-4 pb-4">
+    <form action="{% url 'note_save' %}" method="post">
+      {% csrf_token %}
+      {{ note_form.content }}
+      <button type="submit" class="mt-2 rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">Сохранить</button>
+    </form>
+  </div>
+</div>

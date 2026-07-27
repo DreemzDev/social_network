@@ -1,0 +1,48 @@
+{% load static %}
+<div class="relative inline-block" x-data="{ open: false }">
+  <button
+    type="button"
+    {% if request.user == user %}x-on:click="open = !open"{% endif %}
+    class="inline-flex items-center gap-1.5 text-sm
+      {% if request.user == user %}cursor-pointer hover:opacity-80{% else %}cursor-default{% endif %}"
+  >
+    <span class="h-2 w-2 flex-shrink-0 rounded-full
+      {% if user.employee_status == 'at_work' %}bg-green-500
+      {% elif user.employee_status == 'sick_leave' %}bg-yellow-500
+      {% elif user.employee_status == 'business_trip' %}bg-blue-500
+      {% else %}bg-gray-400{% endif %}"></span>
+    <span id="employee-status-label" class="text-gray-500 dark:text-gray-400">{{ user.get_employee_status_display }}</span>
+    {% if request.user == user %}
+    <i data-feather="chevron-down" class="h-3 w-3 text-gray-400"></i>
+    {% endif %}
+  </button>
+
+  {% if request.user == user %}
+  <div
+    x-cloak
+    x-show="open"
+    x-on:click.outside="open = false"
+    class="box absolute left-0 top-full z-20 mt-1 w-44 overflow-hidden py-1 dark:bg-zinc-800"
+  >
+    {% for value, label in user.EmployeeStatus.choices %}
+    <button
+      type="button"
+      class="flex w-full items-center px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700"
+      x-on:click="
+        open = false;
+        fetch('{% url 'employee_status_update' %}', {
+          method: 'POST',
+          headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'status={{ value }}'
+        }).then(r => r.json()).then(data => {
+          document.getElementById('employee-status-label').textContent = data.label;
+          location.reload();
+        });
+      "
+    >
+      {{ label }}
+    </button>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

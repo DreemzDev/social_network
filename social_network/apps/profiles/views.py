@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import (
     DetailView, ListView, CreateView, UpdateView, TemplateView, View, FormView
 )
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.views.generic.edit import FormMixin
@@ -18,12 +18,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from posts.models import Post
 from posts.forms import AddPostForm
 from posts.views import AddPost
-from profiles.forms import AddProfileForm, SettingProfileForm
+from profiles.forms import AddProfileForm, SettingProfileForm, ChangePasswordForm, SecurityAnswerForm
 from category.models import Category
 from phonebook.models import Phonebook
 from phonebook.forms import UpdateBookForm
 from django_private_chat2.models import MessageModel, DialogsModel
-from .models import MessageReaction
+from .models import MessageReaction, Task, Note, Event
+from .forms import TaskForm, NoteForm, EventForm
 from datetime import date
 from django.http import JsonResponse
 from django.utils import timezone
@@ -51,9 +52,33 @@ class SettingProfile(UpdateView, DetailView):
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
-
-
+        context.setdefault('password_form', ChangePasswordForm(self.request.user))
+        context.setdefault('security_form', SecurityAnswerForm(instance=self.request.user))
         return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+
+        if 'change_password' in request.POST:
+            password_form = ChangePasswordForm(request.user, request.POST)
+            if password_form.is_valid():
+                password_form.save()
+                update_session_auth_hash(request, request.user)
+                return redirect(self.get_success_url())
+            context = self.get_context_data(form=self.get_form_class()(instance=self.object))
+            context['password_form'] = password_form
+            return self.render_to_response(context)
+
+        if 'change_security_answer' in request.POST:
+            security_form = SecurityAnswerForm(request.POST, instance=self.object)
+            if security_form.is_valid():
+                security_form.save()
+                return redirect(self.get_success_url())
+            context = self.get_context_data(form=self.get_form_class()(instance=self.object))
+            context['security_form'] = security_form
+            return self.render_to_response(context)
+
+        return super().post(request, *args, **kwargs)
 
 class ShowUsers(ListView):
     model = get_user_model()
@@ -420,5 +445,106 @@ class ToggleMessageReactionView(LoginRequiredMixin, View):
             'sender': str(request.user.pk),
             'receiver': str(other_user_id),
         })
+
+
+# --- Личные задачи ---
+
+class TaskCreateView(LoginRequiredMixin, View):
+    def post(self, request):
+        form = TaskForm(request.POST)
+        if form.is_valid():
+            task = form.save(commit=False)
+            task.user = request.user
+            task.save()
+        return redirect('addpost', username=request.user.username)
+
+
+class TaskToggleView(LoginRequiredMixin, View):
+    def post(self, request, task_id):
+        task = get_object_or_404(Task, pk=task_id, user=request.user)
+        task.is_completed = not task.is_completed
+        task.save(update_fields=['is_completed'])
+        return JsonResponse({'success': True, 'is_completed': task.is_completed})
+
+
+class TaskDeleteView(LoginRequiredMixin, View):
+    def post(self, request, task_id):
+        get_object_or_404(Task, pk=task_id, user=request.user).delete()
+        return redirect('addpost', username=request.user.username)
+
+
+# --- Личные заметки ---
+
+class NoteSaveView(LoginRequiredMixin, View):
+    def post(self, request):
+        note, _ = Note.objects.get_or_create(user=request.user)
+        form = NoteForm(request.POST, instance=note)
+        if form.is_valid():
+            form.save()
+        return redirect('addpost', username=request.user.username)
+
+
+# --- Календарь ---
+
+class EventCreateView(LoginRequiredMixin, View):
+    def post(self, request):
+        form = EventForm(request.POST)
+        if form.is_valid():
+            event = form.save(commit=False)
+            event.user = request.user
+            event.event_type = Event.EventType.PERSONAL
+            event.save()
+        return redirect('addpost', username=request.user.username)
+
+
+class EventDeleteView(LoginRequiredMixin, View):
+    def post(self, request, event_id):
+        get_object_or_404(Event, pk=event_id, user=request.user, event_type=Event.EventType.PERSONAL).delete()
+        return redirect('addpost', username=request.user.username)
+
+
+class CalendarEventsFeedView(LoginRequiredMixin, View):
+    """JSON-фид событий для FullCalendar: личные события пользователя + корпоративные + дни рождения."""
+
+    def get(self, request):
+        user = request.user
+        events = Event.objects.filter(
+            Q(user=user, event_type=Event.EventType.PERSONAL) | Q(event_type=Event.EventType.CORPORATE)
+        )
+        items = [
+            {
+                'id': e.id,
+                'title': e.title,
+                'start': e.date.isoformat(),
+                'allDay': True,
+                'color': '#0077FF' if e.event_type == Event.EventType.CORPORATE else '#1C3FAA',
+                'extendedProps': {'type': e.event_type, 'deletable': e.user_id == user.id},
+            }
+            for e in events
+        ]
+
+        # Дни рождения — виртуальные события без Event-записи, повторяются каждый год
+        for u in get_user_model().objects.exclude(birthday__isnull=True):
+            items.append({
+                'title': f'🎂 {u.first_name} {u.last_name}',
+                'start': f'{date.today().year}-{u.birthday.month:02d}-{u.birthday.day:02d}',
+                'allDay': True,
+                'color': '#F78B00',
+                'extendedProps': {'type': 'birthday', 'deletable': False},
+            })
+
+        return JsonResponse(items, safe=False)
+
+
+# --- Статус сотрудника ---
+
+class EmployeeStatusUpdateView(LoginRequiredMixin, View):
+    def post(self, request):
+        User = get_user_model()
+        status = request.POST.get('status')
+        if status in dict(User.EmployeeStatus.choices):
+            request.user.employee_status = status
+            request.user.save(update_fields=['employee_status'])
+        return JsonResponse({'success': True, 'status': status, 'label': request.user.get_employee_status_display()})
 
         return JsonResponse({'success': True, 'reactions': reactions})

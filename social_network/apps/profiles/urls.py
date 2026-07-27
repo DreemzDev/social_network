@@ -31,4 +31,20 @@ urlpatterns = [
 
     # Реакции на сообщения
     path('toggle-reaction/<int:message_id>/', ToggleMessageReactionView.as_view(), name='toggle_reaction'),
+
+    # Личные задачи
+    path('task/create/', TaskCreateView.as_view(), name='task_create'),
+    path('task/<int:task_id>/toggle/', TaskToggleView.as_view(), name='task_toggle'),
+    path('task/<int:task_id>/delete/', TaskDeleteView.as_view(), name='task_delete'),
+
+    # Личные заметки
+    path('note/save/', NoteSaveView.as_view(), name='note_save'),
+
+    # Календарь
+    path('event/create/', EventCreateView.as_view(), name='event_create'),
+    path('event/<int:event_id>/delete/', EventDeleteView.as_view(), name='event_delete'),
+    path('calendar/events/', CalendarEventsFeedView.as_view(), name='calendar_events_feed'),
+
+    # Статус сотрудника
+    path('employee-status/update/', EmployeeStatusUpdateView.as_view(), name='employee_status_update'),
 ]
