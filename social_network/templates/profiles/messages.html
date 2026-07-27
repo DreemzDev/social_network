@@ -34,7 +34,7 @@
     <div class="flex-1 overflow-y-auto" id="dialogs-list">
         {% for dialog in dialogs %}
         <a href="{% url 'dialog_messages' user_id=dialog.other_user.pk %}"
-           data-search-text="{{ dialog.other_user.get_full_name|default:dialog.other_user.username }} {{ dialog.last_message.text|default:'' }}"
+           data-search-text="{{ dialog.other_user.get_full_name|default:dialog.other_user.username }} {{ dialog.last_message.text|default:''|striptags }}"
            class="chat-item flex items-center gap-3 border-b border-gray-50 p-3 hover:bg-gray-50 dark:border-zinc-800 dark:hover:bg-zinc-800 {% if dialog.other_user.pk == active_user_id %}bg-[#EAF3FF] dark:bg-zinc-800{% endif %}">
                 <div class="relative flex-shrink-0">
                     {% if dialog.other_user.avatar %}
@@ -60,9 +60,9 @@
                     <p class="truncate text-sm text-gray-500 dark:text-gray-400">
                         {% if dialog.last_message %}
                             {% if dialog.last_message.sender == request.user %}
-                                Вы: {{ dialog.last_message.text|truncatechars:30 }}
+                                Вы: {{ dialog.last_message.text|striptags|truncatechars:30 }}
                             {% else %}
-                                {{ dialog.last_message.text|truncatechars:30 }}
+                                {{ dialog.last_message.text|striptags|truncatechars:30 }}
                             {% endif %}
                         {% else %}
                             Нет сообщений

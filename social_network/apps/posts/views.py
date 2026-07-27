@@ -15,7 +15,7 @@ from category.models import Category
 from comments.forms import CommentForm
 from comments.models import Comment
 from .forms import *
-from .models import Post
+from .models import Post, PostImage, PostFile
 from django.core.paginator import Paginator
 from django.views.generic.detail import SingleObjectMixin
 # from dateutil.relativedelta import relativedelta
@@ -35,7 +35,7 @@ class PortalHome(LoginRequiredMixin, ListView):
     
 
     def get_queryset(self):
-        return Post.objects.annotate(num_comments=Count('post_comments')).order_by('-time_create')
+        return Post.objects.annotate(num_comments=Count('post_comments')).prefetch_related('images', 'files').order_by('-time_create')
     
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -55,6 +55,9 @@ class ShowPost(FormMixin, DetailView):
     context_object_name = 'post'
     pk_url_kwarg = 'post_id'
     form_class = CommentForm
+
+    def get_queryset(self):
+        return Post.objects.prefetch_related('images', 'files')
     
   
     def get_success_url(self, **kwargs):
@@ -97,9 +100,16 @@ class AddPost(FormView, TemplateView):
     def form_valid(self, form):
         post = form.save(commit=False)
         post.author = self.request.user
-        form.save()
+        post.save()
+
+        for order, image_file in enumerate(self.request.FILES.getlist('images')):
+            PostImage.objects.create(post=post, image=image_file, order=order)
+
+        for uploaded_file in self.request.FILES.getlist('attachments'):
+            PostFile.objects.create(post=post, file=uploaded_file, original_name=uploaded_file.name)
+
         return super().form_valid(form)
-    
+
     def get_online_users(self):
         """Возвращает пользователей, которые были активны в последние 5 минут"""
         User = get_user_model()
@@ -118,7 +128,7 @@ class AddPost(FormView, TemplateView):
 
         context['user_list'] = user_list  # Используем уже созданный user_list
         context["sh_online"] = self.get_online_users()
-        context['posts'] = Post.objects.annotate(num_comments=Count('post_comments')).filter(author=user).order_by('-time_create')
+        context['posts'] = Post.objects.annotate(num_comments=Count('post_comments')).prefetch_related('images', 'files').filter(author=user).order_by('-time_create')
         context['user'] = user
         context['profile_user'] = user
         context['online_count'] = online_count  # Добавляем в контекст!
@@ -146,11 +156,32 @@ class HelpView(TemplateView):
 class SettingPost( LoginRequiredMixin, UpdateView):
     form_class = AddPostForm
     model = Post
- 
+
     template_name = 'post/setting_post.html'
     pk_url_kwarg = 'post_id'
-    success_url = reverse_lazy('home') 
+    success_url = reverse_lazy('home')
     context_object_name = 'post'
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        post = self.object
+
+        remove_image_ids = self.request.POST.getlist('remove_image_ids')
+        if remove_image_ids:
+            PostImage.objects.filter(post=post, id__in=remove_image_ids).delete()
+
+        remove_file_ids = self.request.POST.getlist('remove_file_ids')
+        if remove_file_ids:
+            PostFile.objects.filter(post=post, id__in=remove_file_ids).delete()
+
+        existing_count = post.images.count()
+        for order, image_file in enumerate(self.request.FILES.getlist('images')):
+            PostImage.objects.create(post=post, image=image_file, order=existing_count + order)
+
+        for uploaded_file in self.request.FILES.getlist('attachments'):
+            PostFile.objects.create(post=post, file=uploaded_file, original_name=uploaded_file.name)
+
+        return response
     # def get_context_data(self, *, object_list=None, **kwargs):
     #     context = super().get_context_data(**kwargs)
     #     context['cats'] = Category.objects.all()

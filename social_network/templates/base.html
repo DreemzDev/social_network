@@ -224,11 +224,12 @@
                 {% endblock Profiles %}
                 <!-- Контент -->
 
-                <div class="min-w-0 flex-1">
-                    {% block sidebar %}
-                    {% endblock sidebar %}
-                    {% block content %}
-                    {% endblock content %}
+                <div class="flex min-w-0 flex-1 flex-col gap-4{% block content_layout %}{% endblock content_layout %}">
+                    {% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
+                    <div class="min-w-0 flex-1">
+                        {% block content %}
+                        {% endblock content %}
+                    </div>
                 </div>
 
             </div>

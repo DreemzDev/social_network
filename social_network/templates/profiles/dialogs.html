@@ -31,9 +31,9 @@
                 <p class="last-message truncate text-sm text-gray-500 dark:text-gray-400">
                     {% if dialog.last_message %}
                         {% if dialog.last_message.sender == request.user %}
-                            Вы: {{ dialog.last_message.text|truncatechars:30 }}
+                            Вы: {{ dialog.last_message.text|striptags|truncatechars:30 }}
                         {% else %}
-                            {{ dialog.last_message.text|truncatechars:30 }}
+                            {{ dialog.last_message.text|striptags|truncatechars:30 }}
                         {% endif %}
                     {% else %}
                         Нет сообщений
@@ -76,6 +76,12 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
     }
 
+    function stripHtmlTags(html) {
+        const tempEl = document.createElement("div");
+        tempEl.innerHTML = html || "";
+        return tempEl.textContent || "";
+    }
+
     function handleDialogsWebSocketMessage(data) {
         // 🔔 Обновление счётчика непрочитанных сообщений
         if (data.msg_type === 9) { // NewUnreadCount
@@ -100,7 +106,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const lastMessageEl = dialogEl.querySelector(".last-message");
                 const lastMessageTimeEl = dialogEl.querySelector(".last-message-time");
 
-                lastMessageEl.textContent = (isSender ? "Вы: " : data.sender_username + ": ") + data.text;
+                lastMessageEl.textContent = (isSender ? "Вы: " : data.sender_username + ": ") + stripHtmlTags(data.text);
                 const created = new Date(data.created || Date.now());
                 lastMessageTimeEl.textContent = created.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' }) + ' ' +
                                                created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

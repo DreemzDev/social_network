@@ -12,9 +12,9 @@ class AddPostForm(forms.ModelForm):
     class Meta:
         model = Post #связь формы с моделью post
         # fields = '__all__' #fieds (какие поля нужно отобразить), __all__ (все поля кроме автомат. заполняемых)
-        fields = [ 'content','photo']
+        fields = ['content']
         widgets = {
-            
+
             'content': forms.Textarea(attrs={ 'rows':1, 'placeholder': "Что у вас нового?",'class': 'text-base pl-3 w-full rounded py-3 resize-none border-none outline-none focus:outline-none','oninput':"autoResize(this)"}),
         }
 

@@ -1,14 +1,20 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block sidebar %}
-<div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-    {% include "includes/filterPosts.html" %}
-    {% if request.user.is_authenticated %}
-    {% include "includes/widget_online.html" %}
-    {% endif %}
+{% block content_layout %} md:flex-row-reverse{% endblock content_layout %}
+
+{% block sidebar_wrapper %}
+<div class="w-full flex-shrink-0 md:w-72">
+    {% block sidebar %}
+    <div class="flex flex-col gap-4">
+        {% include "includes/filterPosts.html" %}
+        {% if request.user.is_authenticated %}
+        {% include "includes/widget_online.html" %}
+        {% endif %}
+    </div>
+    {% endblock sidebar %}
 </div>
-{% endblock sidebar %}
+{% endblock sidebar_wrapper %}
 
 {% block content %}
 

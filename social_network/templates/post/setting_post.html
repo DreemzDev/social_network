@@ -66,33 +66,31 @@
       <!-- Photo Field -->
       <div class="mb-6">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Изображение
+          Изображения
         </label>
-        
-        <!-- Current Photo Preview -->
-        {% if post.photo %}
-        <div class="mb-4" id="current-photo-container">
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Текущее изображение:</p>
-          <div class="relative inline-block">
-            <img src="{{ post.photo.url }}" alt="Текущее изображение" class="w-32 h-32 object-cover rounded-xl border border-gray-200 dark:border-zinc-600">
-            <button 
-              type="button" 
-              id="remove-photo-btn"
-              class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
-            >
-              ×
-            </button>
-          </div>
-          <!-- Скрытые стандартные поля Django -->
-          <div class="hidden">
-            На данный момент: <a href="{{ post.photo.url }}">{{ post.photo.name }}</a><br>
-            <input type="checkbox" name="photo-clear" id="photo-clear_id">
-            <label for="photo-clear_id">Очистить</label>
+
+        <!-- Current Images Preview -->
+        {% if post.images.all %}
+        <div class="mb-4" id="current-images-container">
+          <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Текущие изображения:</p>
+          <div class="grid grid-cols-4 gap-2">
+            {% for image in post.images.all %}
+            <div class="relative" data-existing-image-id="{{ image.id }}">
+              <img src="{{ image.image.url }}" alt="Изображение" class="w-full aspect-square object-cover rounded-xl border border-gray-200 dark:border-zinc-600">
+              <button
+                type="button"
+                class="remove-existing-image-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                data-image-id="{{ image.id }}"
+              >
+                ×
+              </button>
+            </div>
+            {% endfor %}
           </div>
         </div>
         {% endif %}
 
-        <!-- File Upload -->
+        <!-- New images upload -->
         <div class="flex items-center justify-center w-full">
           <label for="custom-photo-upload" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-zinc-800 hover:bg-gray-100 dark:border-zinc-600 dark:hover:border-zinc-500 dark:hover:bg-zinc-700 transition-colors">
             <div class="flex flex-col items-center justify-center pt-5 pb-6">
@@ -102,42 +100,54 @@
               <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
                 <span class="font-semibold">Нажмите для загрузки</span> или перетащите
               </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">PNG, JPG, GIF (MAX. 10MB)</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Можно выбрать несколько изображений</p>
             </div>
-            <!-- Кастомный input file -->
-            <input type="file" name="photo" accept="image/*" id="custom-photo-upload" class="hidden">
+            <input type="file" name="images" accept="image/*" multiple id="custom-photo-upload" class="hidden">
           </label>
         </div>
-        
-        <!-- File Preview -->
-        <div id="file-preview" class="mt-3 hidden">
-          <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Новое изображение:</p>
-          <div class="relative inline-block">
-            <img id="preview-image" class="w-32 h-32 object-cover rounded-xl border border-gray-200 dark:border-zinc-600">
-            <button 
-              type="button" 
-              onclick="clearFileInput()"
-              class="absolute -top-2 -right-2 bg-gray-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-gray-600 transition-colors"
-            >
-              ×
-            </button>
-          </div>
-        </div>
 
-        <!-- Скрытый стандартный input file Django -->
-        <div class="hidden">
-          {{ form.photo }}
-        </div>
-
-        {% if form.photo.errors %}
-          <div class="mt-1 text-sm text-red-600 dark:text-red-400">
-            {{ form.photo.errors }}
-          </div>
-        {% endif %}
+        <!-- New Images Preview -->
+        <div id="images-preview" class="hidden grid grid-cols-4 gap-2 mt-3"></div>
       </div>
 
-      <!-- Hidden field for photo-clear -->
-      <input type="hidden" name="photo-clear" id="photo-clear" value="">
+      <!-- Attachments Field -->
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Прикреплённые файлы
+        </label>
+
+        {% if post.files.all %}
+        <div class="mb-3 space-y-1.5" id="current-files-container">
+          {% for f in post.files.all %}
+          <div class="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800" data-existing-file-id="{{ f.id }}">
+            <div class="flex min-w-0 items-center gap-2">
+              <svg class="w-5 h-5 flex-shrink-0 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+              </svg>
+              <span class="truncate text-gray-700 dark:text-gray-200">{{ f.original_name }}</span>
+            </div>
+            <button type="button" class="remove-existing-file-btn flex-shrink-0 text-gray-400 hover:text-red-500" data-file-id="{{ f.id }}">
+              <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <label for="custom-attachments-upload" class="flex items-center justify-center gap-2 w-full rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-500 cursor-pointer hover:bg-gray-100 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700 transition-colors">
+          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+          </svg>
+          <span>Прикрепить файлы</span>
+          <input type="file" name="attachments" multiple id="custom-attachments-upload" class="hidden">
+        </label>
+
+        <div id="attachments-preview" class="hidden flex-col gap-1.5 mt-3"></div>
+      </div>
+
+      <!-- Hidden fields for removal of existing images/files -->
+      <div id="remove-image-ids-container"></div>
+      <div id="remove-file-ids-container"></div>
 
       <!-- Actions -->
       <div class="flex flex-col-reverse gap-3 pt-6 border-t border-gray-100 dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
@@ -202,15 +212,19 @@
   document.addEventListener('DOMContentLoaded', function() {
     const contentTextarea = document.getElementById('id_content');
     const charCount = document.getElementById('char-count');
-    const customFileInput = document.getElementById('custom-photo-upload');
-    const djangoFileInput = document.getElementById('{{ form.photo.id_for_label }}');
-    const filePreview = document.getElementById('file-preview');
-    const previewImage = document.getElementById('preview-image');
-    const removePhotoBtn = document.getElementById('remove-photo-btn');
-    const photoClearInput = document.getElementById('photo-clear');
+    const imagesInput = document.getElementById('custom-photo-upload');
+    const attachmentsInput = document.getElementById('custom-attachments-upload');
+    const imagesPreview = document.getElementById('images-preview');
+    const attachmentsPreview = document.getElementById('attachments-preview');
     const previewContent = document.getElementById('preview-content');
     const previewImageContainer = document.getElementById('preview-image-container');
-    const currentPhotoContainer = document.getElementById('current-photo-container');
+    const removeImageIdsContainer = document.getElementById('remove-image-ids-container');
+    const removeFileIdsContainer = document.getElementById('remove-file-ids-container');
+
+    let selectedImages = [];
+    let selectedAttachments = [];
+    const removedImageIds = new Set();
+    const removedFileIds = new Set();
 
     // Авто-ресайз при загрузке
     if (contentTextarea) {
@@ -221,7 +235,7 @@
     function updateCharCount() {
       const length = contentTextarea.value.length;
       charCount.textContent = `${length}/5000`;
-      
+
       if (length > 4500) {
         charCount.classList.add('text-red-500');
       } else {
@@ -232,84 +246,147 @@
     contentTextarea.addEventListener('input', updateCharCount);
     updateCharCount(); // Инициализация
 
-    // Предпросмотр изображения для кастомного input
-    customFileInput.addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (file) {
-        // Синхронизируем с Django input
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        djangoFileInput.files = dataTransfer.files;
-        
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          previewImage.src = e.target.result;
-          filePreview.classList.remove('hidden');
-        }
-        reader.readAsDataURL(file);
-      }
-    });
+    function syncFileInput(input, files) {
+      const dataTransfer = new DataTransfer();
+      files.forEach((file) => dataTransfer.items.add(file));
+      input.files = dataTransfer.files;
+    }
 
-    // Удаление текущего изображения
-    if (removePhotoBtn) {
-      removePhotoBtn.addEventListener('click', function() {
-        photoClearInput.value = '1';
-        if (currentPhotoContainer) {
-          currentPhotoContainer.style.display = 'none';
-        }
-        // Также очищаем файловые inputs
-        customFileInput.value = '';
-        djangoFileInput.value = '';
-        filePreview.classList.add('hidden');
+    function renderImagesPreview() {
+      imagesPreview.innerHTML = '';
+      imagesPreview.classList.toggle('hidden', selectedImages.length === 0);
+
+      selectedImages.forEach((file, index) => {
+        const reader = new FileReader();
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative group aspect-square';
+
+        const img = document.createElement('img');
+        img.className = 'w-full h-full object-cover rounded-xl border border-gray-200 dark:border-zinc-600';
+        wrapper.appendChild(img);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'absolute -top-2 -right-2 bg-gray-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-gray-600 transition-colors';
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          selectedImages.splice(index, 1);
+          syncFileInput(imagesInput, selectedImages);
+          renderImagesPreview();
+        });
+        wrapper.appendChild(removeBtn);
+
+        reader.onload = (e) => { img.src = e.target.result; };
+        reader.readAsDataURL(file);
+
+        imagesPreview.appendChild(wrapper);
       });
     }
 
-    // Очистка выбранного файла
-    window.clearFileInput = function() {
-      customFileInput.value = '';
-      djangoFileInput.value = '';
-      filePreview.classList.add('hidden');
+    function formatSize(bytes) {
+      if (bytes < 1024) return `${bytes} Б`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
     }
+
+    function renderAttachmentsPreview() {
+      attachmentsPreview.innerHTML = '';
+      attachmentsPreview.classList.toggle('hidden', selectedAttachments.length === 0);
+      attachmentsPreview.classList.toggle('flex', selectedAttachments.length > 0);
+
+      selectedAttachments.forEach((file, index) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-800';
+
+        const info = document.createElement('div');
+        info.className = 'flex min-w-0 items-center gap-2';
+        info.innerHTML = `
+          <svg class="w-5 h-5 flex-shrink-0 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+          <span class="truncate text-gray-700 dark:text-gray-200">${file.name}</span>
+          <span class="flex-shrink-0 text-xs text-gray-400">${formatSize(file.size)}</span>
+        `;
+        row.appendChild(info);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'flex-shrink-0 text-gray-400 hover:text-red-500';
+        removeBtn.innerHTML = '<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>';
+        removeBtn.addEventListener('click', () => {
+          selectedAttachments.splice(index, 1);
+          syncFileInput(attachmentsInput, selectedAttachments);
+          renderAttachmentsPreview();
+        });
+        row.appendChild(removeBtn);
+
+        attachmentsPreview.appendChild(row);
+      });
+    }
+
+    imagesInput.addEventListener('change', (event) => {
+      selectedImages = selectedImages.concat(Array.from(event.target.files));
+      syncFileInput(imagesInput, selectedImages);
+      renderImagesPreview();
+    });
+
+    attachmentsInput.addEventListener('change', (event) => {
+      selectedAttachments = selectedAttachments.concat(Array.from(event.target.files));
+      syncFileInput(attachmentsInput, selectedAttachments);
+      renderAttachmentsPreview();
+    });
+
+    // Удаление существующих изображений
+    document.querySelectorAll('.remove-existing-image-btn').forEach((btn) => {
+      btn.addEventListener('click', function() {
+        const imageId = this.dataset.imageId;
+        removedImageIds.add(imageId);
+        this.closest('[data-existing-image-id]').style.display = 'none';
+
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'remove_image_ids';
+        hiddenInput.value = imageId;
+        removeImageIdsContainer.appendChild(hiddenInput);
+      });
+    });
+
+    // Удаление существующих файлов
+    document.querySelectorAll('.remove-existing-file-btn').forEach((btn) => {
+      btn.addEventListener('click', function() {
+        const fileId = this.dataset.fileId;
+        removedFileIds.add(fileId);
+        this.closest('[data-existing-file-id]').style.display = 'none';
+
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'remove_file_ids';
+        hiddenInput.value = fileId;
+        removeFileIdsContainer.appendChild(hiddenInput);
+      });
+    });
 
     // Предпросмотр в модальном окне
     const previewModal = document.getElementById('preview-modal');
     if (previewModal) {
-      // Используем обработчик для кнопки предпросмотра
       document.querySelector('[data-modal-target="preview-modal"]').addEventListener('click', function() {
-        // Сохраняем переносы строк с помощью whitespace-pre-wrap
         previewContent.textContent = contentTextarea.value || 'Текст записи...';
-        
-        // Показ изображения в предпросмотре
         previewImageContainer.innerHTML = '';
-        
-        // Проверяем новое изображение
-        if (customFileInput.files[0]) {
+
+        selectedImages.forEach((file) => {
           const reader = new FileReader();
           reader.onload = function(e) {
             const img = document.createElement('img');
             img.src = e.target.result;
-            img.className = 'max-w-full h-auto rounded-lg max-h-64 object-contain';
+            img.className = 'max-w-full h-auto rounded-lg max-h-64 object-contain mb-2';
             previewImageContainer.appendChild(img);
           }
-          reader.readAsDataURL(customFileInput.files[0]);
-        } 
-        // Проверяем текущее изображение (только если оно есть и не удалено)
-        else if (photoClearInput.value !== '1' && currentPhotoContainer && currentPhotoContainer.style.display !== 'none') {
-          // Если есть текущее фото и оно не скрыто, показываем его
-          const currentImg = currentPhotoContainer.querySelector('img');
-          if (currentImg) {
-            const img = document.createElement('img');
-            img.src = currentImg.src;
-            img.className = 'max-w-full h-auto rounded-lg max-h-64 object-contain';
-            previewImageContainer.appendChild(img);
-          }
-        }
+          reader.readAsDataURL(file);
+        });
       });
     }
 
-    // Drag and drop для файлов
-    const dropArea = customFileInput.parentElement;
-    
+    // Drag and drop для изображений
+    const dropArea = imagesInput.closest('label');
+
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       dropArea.addEventListener(eventName, preventDefaults, false);
     });
@@ -338,22 +415,11 @@
     dropArea.addEventListener('drop', handleDrop, false);
 
     function handleDrop(e) {
-      const dt = e.dataTransfer;
-      const files = dt.files;
-      
+      const files = Array.from(e.dataTransfer.files);
       if (files.length > 0) {
-        customFileInput.files = files;
-        
-        // Синхронизируем с Django input
-        const dataTransfer = new DataTransfer();
-        for (let file of files) {
-          dataTransfer.items.add(file);
-        }
-        djangoFileInput.files = dataTransfer.files;
-        
-        // Триггерим change event
-        const event = new Event('change');
-        customFileInput.dispatchEvent(event);
+        selectedImages = selectedImages.concat(files);
+        syncFileInput(imagesInput, selectedImages);
+        renderImagesPreview();
       }
     }
   });
