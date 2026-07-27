@@ -29,6 +29,7 @@ class User(AbstractUser):
     phone_9 = models.CharField(max_length=20, blank=True, verbose_name="Номер телефона 4" )
     phone_hc = models.CharField(max_length=20, blank=True, verbose_name="Номер телефона 5" )
     last_activity = models.DateTimeField(default=timezone.now, verbose_name="Последняя активность")
+    security_answer = models.CharField(max_length=255, blank=True, verbose_name="Проверочное слово для сброса пароля")
 
     def get_absolute_url(self):
         return reverse('profile', kwargs={'username': self.username})

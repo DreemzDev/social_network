@@ -1,0 +1,80 @@
+{% load static %} {% if request.user.is_authenticated %}
+<ul>
+  <li>
+    <a href="{% url 'addpost' request.user.username %}" class="side-menu {% if request.resolver_match.url_name == 'addpost' %}side-menu--active{% endif %}">
+      <div class="side-menu__icon"> <i data-feather="user"></i> </div>
+      <div class="side-menu__title">Моя страница</div>
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'home' %}" class="side-menu {% if request.resolver_match.url_name == 'home' %}side-menu--active{% endif %}">
+      <div class="side-menu__icon"> <i data-feather="home"></i> </div>
+      <div class="side-menu__title">Новости</div>
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'django_private_chat2:dialogs_list' %}" class="side-menu {% if 'dialogs' in request.path or 'chat' in request.path %}side-menu--active{% endif %}">
+      <div class="side-menu__icon"> <i data-feather="message-square"></i> </div>
+      <div class="side-menu__title">
+        Мессенджер
+        <span class="global-unread-badge bg-white text-[#1C3FAA] rounded-full w-5 h-5 flex-shrink-0 flex justify-center items-center text-xs font-semibold ml-auto" style="display: none;"></span>
+      </div>
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'show_users' %}" class="side-menu {% if request.resolver_match.url_name == 'show_users' %}side-menu--active{% endif %}">
+      <div class="side-menu__icon"> <i data-feather="users"></i> </div>
+      <div class="side-menu__title">Коллеги</div>
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'gallery' %}" class="side-menu {% if request.resolver_match.url_name == 'gallery' %}side-menu--active{% endif %}">
+      <div class="side-menu__icon"> <i data-feather="image"></i> </div>
+      <div class="side-menu__title">Галерея</div>
+    </a>
+  </li>
+  <li>
+    <a href="{% url 'show_phones' %}" class="side-menu {% if request.resolver_match.url_name == 'show_phones' %}side-menu--active{% endif %}">
+      <div class="side-menu__icon"> <i data-feather="book-open"></i> </div>
+      <div class="side-menu__title">Справочник</div>
+    </a>
+  </li>
+  <li class="side-nav__devider my-6"></li>
+  <li>
+    <span class="side-menu" style="opacity: .4; cursor: not-allowed;">
+      <div class="side-menu__icon"> <i data-feather="file-text"></i> </div>
+      <div class="side-menu__title">
+        Номенклатура дел
+        <span class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] ml-auto">скоро</span>
+      </div>
+    </span>
+  </li>
+  <li>
+    <span class="side-menu" style="opacity: .4; cursor: not-allowed;">
+      <div class="side-menu__icon"> <i data-feather="list"></i> </div>
+      <div class="side-menu__title">
+        Список МНИ
+        <span class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] ml-auto">скоро</span>
+      </div>
+    </span>
+  </li>
+  <li>
+    <span class="side-menu" style="opacity: .4; cursor: not-allowed;">
+      <div class="side-menu__icon"> <i data-feather="calendar"></i> </div>
+      <div class="side-menu__title">
+        График учёбы
+        <span class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] ml-auto">скоро</span>
+      </div>
+    </span>
+  </li>
+  <li>
+    <span class="side-menu" style="opacity: .4; cursor: not-allowed;">
+      <div class="side-menu__icon"> <i data-feather="check-circle"></i> </div>
+      <div class="side-menu__title">
+        График СБП
+        <span class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] ml-auto">скоро</span>
+      </div>
+    </span>
+  </li>
+</ul>
+{% endif %}

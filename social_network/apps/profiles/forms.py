@@ -3,11 +3,8 @@ from django import forms
 from posts.models import Post
 from.models import *
 
-ADDPROFILE_INPUT_CLASSES = (
-    'block w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-base '
-    'text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 '
-    'dark:border-zinc-600 dark:bg-zinc-700 dark:text-white dark:placeholder-gray-400'
-)
+ADDPROFILE_INPUT_CLASSES = 'intro-x login__input input input--lg border border-gray-300 block mt-4'
+ADDPROFILE_FIRST_INPUT_CLASSES = 'intro-x login__input input input--lg border border-gray-300 block'
 
 
 class AddProfileForm(forms.ModelForm):
@@ -17,7 +14,7 @@ class AddProfileForm(forms.ModelForm):
         # fields = '__all__' #fieds (какие поля нужно отобразить), __all__ (все поля кроме автоматю заполняемых)
         fields = ('last_name', 'first_name','patronymic')
         widgets = {
-            'last_name': forms.TextInput(attrs={'placeholder': "Введите свою фамилию", 'class': ADDPROFILE_INPUT_CLASSES, 'autofocus': True}),
+            'last_name': forms.TextInput(attrs={'placeholder': "Введите свою фамилию", 'class': ADDPROFILE_FIRST_INPUT_CLASSES, 'autofocus': True}),
             'first_name': forms.TextInput(attrs={'placeholder': "Введите своё имя", 'class': ADDPROFILE_INPUT_CLASSES}),
             'patronymic': forms.TextInput(attrs={'placeholder': "Введите своё отчество", 'class': ADDPROFILE_INPUT_CLASSES}),
 

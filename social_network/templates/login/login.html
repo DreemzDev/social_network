@@ -1,45 +1,62 @@
-{% extends 'base.html' %}
+{% extends 'includes/auth_base.html' %}
 {% load static %}
-{% block content %}
-<div class="flex w-full items-center justify-center py-10">
-    <div class="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm dark:border-zinc-700 dark:bg-zinc-800">
-        <div class="mb-6 text-center">
-            <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Добро пожаловать!</h1>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Войдите, чтобы продолжить</p>
-        </div>
 
-        {% if form.non_field_errors %}
-        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            {% for error in form.non_field_errors %}
-            <p>{{ error }}</p>
-            {% endfor %}
-        </div>
-        {% endif %}
+{% block auth_title %}Ещё пара кликов<br>для входа в аккаунт.{% endblock auth_title %}
+{% block auth_subtitle %}Внутренняя социальная сеть организации{% endblock auth_subtitle %}
 
-        <form method="post" class="space-y-4" novalidate>
-            {% csrf_token %}
+{% block auth_content %}
+<h2 class="intro-x font-bold text-2xl xl:text-3xl text-center xl:text-left">
+    Вход
+</h2>
+<div class="intro-x mt-2 text-gray-500 xl:hidden text-center">Войдите, чтобы продолжить</div>
 
-            <div>
-                <label for="{{ form.username.id_for_label }}" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Логин</label>
-                {{ form.username }}
-                {% include "includes/field_errors.html" with field=form.username %}
-            </div>
-
-            <div>
-                <label for="{{ form.password.id_for_label }}" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Пароль</label>
-                {{ form.password }}
-                {% include "includes/field_errors.html" with field=form.password %}
-            </div>
-
-            <button type="submit" class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-                Войти
-            </button>
-        </form>
-
-        <p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            Впервые здесь?
-            <a href="{% url 'register' %}" class="font-medium text-blue-600 hover:underline dark:text-blue-400">Создать аккаунт</a>
-        </p>
+{% if form.non_field_errors %}
+<div class="intro-x rounded-md flex items-center px-5 py-4 mt-4 bg-theme-6 text-white">
+    <i data-feather="alert-octagon" class="w-5 h-5 mr-2 flex-shrink-0"></i>
+    <div>
+        {% for error in form.non_field_errors %}
+        <p>{{ error }}</p>
+        {% endfor %}
     </div>
 </div>
-{% endblock content %}
+{% endif %}
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    <div class="intro-x mt-8">
+        {{ form.username }}
+        {% include "includes/field_errors.html" with field=form.username %}
+        <div class="relative mt-4">
+            {{ form.password }}
+            <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="{{ form.password.id_for_label }}" tabindex="-1">
+                <i data-feather="eye" class="w-4 h-4"></i>
+            </button>
+        </div>
+        {% include "includes/field_errors.html" with field=form.password %}
+        <div class="intro-x mt-3 text-right">
+            <a href="{% url 'password_reset_request' %}" class="text-xs sm:text-sm text-gray-500 hover:text-theme-1">Забыли пароль?</a>
+        </div>
+    </div>
+    <div class="intro-x mt-5 xl:mt-8 flex flex-col xl:flex-row text-center xl:text-left">
+        <button type="submit" class="button button--lg w-full xl:w-auto xl:px-8 text-white bg-theme-1 xl:mr-3">Войти</button>
+        <a href="{% url 'register' %}" class="button button--lg w-full xl:w-auto xl:px-8 text-gray-700 border border-gray-300 mt-3 xl:mt-0">Создать аккаунт</a>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.password-toggle').forEach(function (toggle) {
+        toggle.addEventListener('click', function () {
+            var target = document.getElementById(toggle.dataset.target);
+            if (!target) return;
+            var isHidden = target.type === 'password';
+            target.type = isHidden ? 'text' : 'password';
+            toggle.innerHTML = isHidden
+                ? '<i data-feather="eye-off" class="w-4 h-4"></i>'
+                : '<i data-feather="eye" class="w-4 h-4"></i>';
+            if (window.feather) feather.replace();
+        });
+    });
+});
+</script>
+{% endblock auth_content %}

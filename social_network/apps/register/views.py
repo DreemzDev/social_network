@@ -13,13 +13,12 @@ from register.forms import RegisterUserForm
 class RegisterUser(CreateView):
     form_class = RegisterUserForm
     template_name = 'register/register.html'
-    success_url = reverse_lazy('login')
-    # pk_url_kwarg = 'user_id'
+    success_url = reverse_lazy('home')
 
     def form_valid(self, form):
-        user =form.save()
+        user = form.save()
         login(self.request, user)
-        return redirect('addprofile', user.id)
+        return redirect('home')
    
 
     

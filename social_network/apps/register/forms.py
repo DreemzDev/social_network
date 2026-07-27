@@ -2,28 +2,46 @@ from django.contrib.auth.forms import UserCreationForm
 from django import forms
 from profiles.models import *
 
-INPUT_CLASSES = (
-    'block w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm '
-    'text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 '
-    'dark:border-zinc-600 dark:bg-zinc-700 dark:text-white dark:placeholder-gray-400'
-)
+INPUT_CLASSES = 'intro-x login__input input input--lg border border-gray-300 block mt-4'
+FIRST_INPUT_CLASSES = 'intro-x login__input input input--lg border border-gray-300 block'
+PASSWORD_INPUT_CLASSES = 'intro-x login__input input input--lg border border-gray-300 block pr-12'
 
 
 class RegisterUserForm(UserCreationForm):
     username = forms.CharField(widget=forms.TextInput(attrs={
-        'class': INPUT_CLASSES,
+        'class': FIRST_INPUT_CLASSES,
         'placeholder': 'Придумайте логин',
         'autofocus': True,
     }))
-    password1 = forms.CharField(widget=forms.PasswordInput(attrs={
+    last_name = forms.CharField(widget=forms.TextInput(attrs={
         'class': INPUT_CLASSES,
+        'placeholder': 'Фамилия',
+    }))
+    first_name = forms.CharField(widget=forms.TextInput(attrs={
+        'class': INPUT_CLASSES,
+        'placeholder': 'Имя',
+    }))
+    patronymic = forms.CharField(required=False, widget=forms.TextInput(attrs={
+        'class': INPUT_CLASSES,
+        'placeholder': 'Отчество (необязательно)',
+    }))
+    password1 = forms.CharField(widget=forms.PasswordInput(attrs={
+        'class': PASSWORD_INPUT_CLASSES,
         'placeholder': 'Минимум 8 символов',
+        'id': 'password-input',
     }))
     password2 = forms.CharField(widget=forms.PasswordInput(attrs={
-        'class': INPUT_CLASSES,
+        'class': PASSWORD_INPUT_CLASSES,
         'placeholder': 'Повторите пароль',
     }))
+    security_answer = forms.CharField(widget=forms.TextInput(attrs={
+        'class': INPUT_CLASSES,
+        'placeholder': 'Например: имя первого питомца',
+    }), help_text='Понадобится для восстановления доступа, если забудете пароль')
 
     class Meta:
         model = get_user_model()
-        fields = ('username', 'password1', 'password2')
+        fields = ('username', 'last_name', 'first_name', 'patronymic', 'password1', 'password2', 'security_answer')
+
+    def clean_security_answer(self):
+        return self.cleaned_data['security_answer'].strip()

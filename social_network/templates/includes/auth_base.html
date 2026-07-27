@@ -1,0 +1,48 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ site_settings.site_name }}</title>
+    <script src="{% static 'js/tailwinds.js' %}"></script>
+    <link href="{% static 'midone/css/app.css' %}" rel="stylesheet" />
+</head>
+<body class="login">
+    <div class="container sm:px-10">
+        <div class="block xl:grid grid-cols-2 gap-4">
+            <!-- BEGIN: Info -->
+            <div class="hidden xl:flex flex-col min-h-screen">
+                <a href="{% url 'home' %}" class="-intro-x flex items-center pt-5">
+                    <img class="w-6" src="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static '/img/logo.png' %}{% endif %}" alt="{{ site_settings.site_name }}">
+                    <span class="text-white text-lg ml-3">{{ site_settings.site_name }}</span>
+                </a>
+                <div class="my-auto">
+                    <img class="-intro-x w-1/2 -mt-16" src="{% static 'midone/images/illustration.svg' %}" alt="">
+                    <div class="-intro-x text-white font-medium text-4xl leading-tight mt-10">
+                        {% block auth_title %}{% endblock auth_title %}
+                    </div>
+                    <div class="-intro-x mt-5 text-lg text-white">{% block auth_subtitle %}{% endblock auth_subtitle %}</div>
+                </div>
+            </div>
+            <!-- END: Info -->
+            <!-- BEGIN: Form -->
+            <div class="h-screen xl:h-auto flex py-5 xl:py-0 my-10 xl:my-0">
+                <div class="my-auto mx-auto xl:ml-20 bg-white xl:bg-transparent px-5 sm:px-8 py-8 xl:p-0 rounded-md shadow-md xl:shadow-none w-full sm:w-3/4 lg:w-2/4 xl:w-auto">
+                    {% if messages %}
+                    {% for message in messages %}
+                    <div class="intro-x rounded-md flex items-center px-5 py-4 mb-4 {% if message.tags == 'error' %}bg-theme-6{% else %}bg-theme-9{% endif %} text-white">
+                        <i data-feather="{% if message.tags == 'error' %}alert-octagon{% else %}check-circle{% endif %}" class="w-5 h-5 mr-2 flex-shrink-0"></i>
+                        <div>{{ message }}</div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    {% block auth_content %}{% endblock auth_content %}
+                </div>
+            </div>
+            <!-- END: Form -->
+        </div>
+    </div>
+    <script src="{% static 'midone/js/app.js' %}"></script>
+</body>
+</html>
