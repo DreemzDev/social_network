@@ -1,9 +1,10 @@
 import nh3
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 
 from django_private_chat2.models import MessageModel
 
+from .models import Task, Event
 from .views import clear_user_cache
 
 ALLOWED_MESSAGE_TAGS = {'b', 'i', 'u', 's'}
@@ -18,3 +19,7 @@ def clear_recipient_unread_cache(sender, instance, **kwargs):
 def sanitize_message_text(sender, instance, **kwargs):
     if instance.text:
         instance.text = nh3.clean(instance.text, tags=ALLOWED_MESSAGE_TAGS, attributes={})
+
+
+# Задачи с дедлайном отображаются в календаре напрямую через
+# CalendarEventsFeedView (без создания дублирующей записи Event).
