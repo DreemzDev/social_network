@@ -39,6 +39,14 @@
     <!-- Midone (Left4Code) — оригинальные стили для sidebar/header/content-обёртки -->
     <link href="{% static 'midone/css/app.css' %}" rel="stylesheet" />
 
+    <style>
+        /* Боковое меню не должно сжиматься, даже если контент справа требует
+           больше пространства, чем есть на экране — иначе flexbox распределяет
+           дефицит ширины на .side-nav вместо того, чтобы .content сам ужимался. */
+        .side-nav { flex-shrink: 0; }
+        .content { min-width: 0; }
+    </style>
+
 </head>
 <body class="app text-sm" x-data="{ mobileMenuOpen: false }">
 <div class="flex">
@@ -164,7 +172,7 @@
     </div>
 
     <div class="mt-6">
-        <div class="flex flex-col items-start gap-4 md:flex-row">
+        <div class="flex min-w-0 flex-col items-start gap-4 md:flex-row">
 
             {% block Profiles %}
             {% endblock Profiles %}

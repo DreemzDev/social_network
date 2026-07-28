@@ -1,71 +1,736 @@
 {% load static %}
-<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="calendar" draggable="true">
+<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="calendar">
   <div class="sidebar-panel__header flex cursor-grab items-center justify-between p-4 active:cursor-grabbing">
-    <div class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
+    <div class="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
       <i data-feather="move" class="h-4 w-4 text-gray-300 dark:text-zinc-600"></i>
-      <i data-feather="calendar" class="h-4 w-4"></i> Календарь и напоминания
+      <i data-feather="calendar" class="h-5 w-5"></i> Календарь и напоминания
     </div>
     <button type="button" class="sidebar-panel__toggle p-1 text-gray-400 hover:text-gray-600">
       <i data-feather="chevron-down" class="h-4 w-4 transition-transform"></i>
     </button>
   </div>
-  <div class="sidebar-panel__content px-4 pb-4">
-    <form action="{% url 'event_create' %}" method="post" class="mb-3 flex gap-2">
-      {% csrf_token %}
-      <input type="text" name="title" placeholder="Название события" required
-             class="min-w-0 flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
-      <input type="date" name="date" required
-             class="w-36 flex-shrink-0 rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-sm text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
-      <button type="submit" class="flex-shrink-0 rounded-lg bg-[#0077FF] px-3 py-2 text-xs font-medium text-white hover:bg-[#3391FF]">+</button>
-    </form>
-
-    <div class="mb-3 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
-      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#1C3FAA"></span> Личное</span>
-      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#0077FF"></span> Корпоративное</span>
-      <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#F78B00"></span> День рождения</span>
+  <div class="sidebar-panel__content">
+    <div class="flex items-center gap-2 px-4 pt-4">
+      <button type="button" id="task-plan-add-btn" class="inline-flex items-center gap-1.5 rounded-lg bg-[#0077FF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#3391FF]">
+        <i data-feather="plus" class="h-3.5 w-3.5"></i> Задача / напоминание
+      </button>
     </div>
 
-    <div id="profile-calendar" class="profile-calendar-dark"></div>
+    <div class="p-5 pt-3">
+      <!-- Навигация в стиле Midone -->
+      <div class="flex">
+        <button type="button" id="profile-calendar-prev" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+          <i data-feather="chevron-left" class="h-5 w-5"></i>
+        </button>
+        <div id="profile-calendar-title" class="font-medium mx-auto text-gray-900 dark:text-white"></div>
+        <button type="button" id="profile-calendar-next" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+          <i data-feather="chevron-right" class="h-5 w-5"></i>
+        </button>
+      </div>
+
+      <div id="profile-calendar-grid" class="grid grid-cols-7 gap-4 mt-5 text-center text-gray-900 dark:text-white"></div>
+
+      <div class="mt-4 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
+        <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#0077FF"></span> Моя задача</span>
+        <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#F78B00"></span> Поставлена мне</span>
+        <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#22c55e"></span> Выполнено</span>
+        <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full" style="background:#1C3FAA"></span> Напоминание</span>
+      </div>
+    </div>
+
+    <!-- Задачи и события текущего дня -->
+    <div class="border-t border-gray-100 p-5 dark:border-zinc-800">
+      <div class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">Сегодня</div>
+      <div id="profile-calendar-today"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Модалка постановки задачи / напоминания -->
+<div id="task-plan-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-md rounded-xl bg-white p-5 dark:bg-zinc-900">
+    <div class="mb-4 flex items-center justify-between">
+      <div class="text-base font-semibold text-gray-900 dark:text-white">Задача / напоминание</div>
+      <button type="button" id="task-plan-modal-close" class="text-gray-400 hover:text-gray-600">
+        <i data-feather="x" class="h-5 w-5"></i>
+      </button>
+    </div>
+    <div id="task-plan-modal-error" class="mb-3 hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"></div>
+    <form id="task-plan-modal-form" class="space-y-3">
+      <div>
+        <div class="flex gap-2">
+          <button type="button" data-mode="self" class="task-plan-mode-btn flex-1 rounded-lg border px-3 py-2 text-sm font-medium">Напоминание</button>
+          <button type="button" data-mode="other" class="task-plan-mode-btn flex-1 rounded-lg border px-3 py-2 text-sm font-medium">Задача сотруднику</button>
+        </div>
+      </div>
+
+      <div id="task-plan-recipient-wrap" class="relative hidden">
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Кому</label>
+        <input type="text" id="task-plan-recipient-search" placeholder="Начните вводить имя..." autocomplete="off"
+               class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+        <input type="hidden" id="task-plan-recipient-id">
+        <div id="task-plan-recipient-list" class="absolute left-0 right-0 z-10 mt-1 hidden max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800"></div>
+        <div id="task-plan-recipient-chip" class="mt-2 hidden items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-sm text-[#0077FF] dark:bg-zinc-800">
+          <span id="task-plan-recipient-name"></span>
+          <button type="button" id="task-plan-recipient-clear" class="text-[#0077FF] hover:text-blue-700">
+            <i data-feather="x" class="h-3 w-3"></i>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Название</label>
+        <input type="text" id="task-plan-title" required
+               class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Описание</label>
+        <textarea id="task-plan-description" rows="3"
+                  class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"></textarea>
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Дата</label>
+        <input type="date" id="task-plan-date" required
+               class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      </div>
+      <div id="task-plan-recurrence-wrap">
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Повтор</label>
+        <select id="task-plan-recurrence"
+                class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+          <option value="none">Не повторять</option>
+          <option value="weekly">Каждую неделю</option>
+          <option value="monthly">Каждый месяц</option>
+          <option value="yearly">Каждый год</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" id="task-plan-modal-cancel" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-600 dark:text-gray-200 dark:hover:bg-zinc-800">Отмена</button>
+        <button type="submit" class="rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">Создать</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Модалка редактирования поставленной задачи (доступна только постановщику) -->
+<div id="task-edit-plan-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-md rounded-xl bg-white p-5 dark:bg-zinc-900">
+    <div class="mb-4 flex items-center justify-between">
+      <div class="text-base font-semibold text-gray-900 dark:text-white">Редактировать задачу</div>
+      <button type="button" id="task-edit-plan-modal-close" class="text-gray-400 hover:text-gray-600">
+        <i data-feather="x" class="h-5 w-5"></i>
+      </button>
+    </div>
+    <div id="task-edit-plan-modal-error" class="mb-3 hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"></div>
+    <form id="task-edit-plan-modal-form" class="space-y-3">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Название</label>
+        <input type="text" id="task-edit-plan-title" required
+               class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Описание</label>
+        <textarea id="task-edit-plan-description" rows="3"
+                  class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"></textarea>
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Дата</label>
+        <input type="date" id="task-edit-plan-date" required
+               class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" id="task-edit-plan-modal-cancel" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-600 dark:text-gray-200 dark:hover:bg-zinc-800">Отмена</button>
+        <button type="submit" class="rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Полноэкранная модалка календаря -->
+<div id="calendar-full-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+  <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white dark:bg-zinc-900">
+    <div class="flex items-center justify-between border-b border-gray-100 p-5 dark:border-zinc-800">
+      <div class="text-lg font-semibold text-gray-900 dark:text-white">Календарь</div>
+      <button type="button" id="calendar-full-close" class="text-gray-400 hover:text-gray-600">
+        <i data-feather="x" class="h-5 w-5"></i>
+      </button>
+    </div>
+    <div class="overflow-y-auto p-5">
+      <div class="flex">
+        <button type="button" id="calendar-full-prev" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+          <i data-feather="chevron-left" class="h-6 w-6"></i>
+        </button>
+        <div id="calendar-full-title" class="mx-auto text-lg font-medium text-gray-900 dark:text-white"></div>
+        <button type="button" id="calendar-full-next" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+          <i data-feather="chevron-right" class="h-6 w-6"></i>
+        </button>
+      </div>
+
+      <div id="calendar-full-grid" class="grid grid-cols-7 gap-2 mt-5 text-center text-gray-900 dark:text-white"></div>
+
+      <div class="mt-6 border-t border-gray-100 pt-5 dark:border-zinc-800">
+        <div id="calendar-full-day-title" class="mb-3 text-sm font-semibold text-gray-900 dark:text-white"></div>
+        <div id="calendar-full-day-list"></div>
+      </div>
+    </div>
   </div>
 </div>
 
 <style>
-  #profile-calendar { font-size: 0.8rem; }
-  .dark #profile-calendar .fc-toolbar-title,
-  .dark #profile-calendar .fc-col-header-cell-cushion,
-  .dark #profile-calendar .fc-daygrid-day-number { color: #e4e4e7; }
-  .dark #profile-calendar .fc-scrollgrid,
-  .dark #profile-calendar td,
-  .dark #profile-calendar th { border-color: #3f3f46; }
-  .dark #profile-calendar .fc-button-primary { background-color: #27272a; border-color: #3f3f46; }
+  .task-plan-mode-btn { border-color: #d1d5db; color: #374151; }
+  .dark .task-plan-mode-btn { border-color: #52525b; color: #d1d5db; }
+  .task-plan-mode-btn.active { border-color: #0077FF; background: #EAF3FF; color: #0077FF; }
+  .dark .task-plan-mode-btn.active { background: rgba(0,119,255,0.15); }
+  .day-events-arrow.rotated { transform: rotate(180deg); }
 </style>
 
-<script src="{% static 'vendor/fullcalendar/index.global.min.js' %}"></script>
-<script src="{% static 'vendor/fullcalendar/locale-ru.global.min.js' %}"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const calendarEl = document.getElementById('profile-calendar');
-    if (!calendarEl || typeof FullCalendar === 'undefined') return;
+  (function () {
+    const gridEl = document.getElementById('profile-calendar-grid');
+    if (!gridEl) return;
 
-    const calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'dayGridMonth',
-      height: 'auto',
-      locale: 'ru',
-      firstDay: 1,
-      headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
-      buttonText: { today: 'Сегодня' },
-      events: '{% url "calendar_events_feed" %}',
-      eventClick: function (info) {
-        if (info.event.extendedProps.deletable) {
-          if (confirm('Удалить событие «' + info.event.title + '»?')) {
-            fetch('/event/' + info.event.id + '/delete/', {
-              method: 'POST',
-              headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-            }).then(() => calendar.refetchEvents());
-          }
+    const csrfToken = '{{ csrf_token }}';
+    const titleEl = document.getElementById('profile-calendar-title');
+    const todayListEl = document.getElementById('profile-calendar-today');
+    const prevBtn = document.getElementById('profile-calendar-prev');
+    const nextBtn = document.getElementById('profile-calendar-next');
+
+    const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let viewYear = today.getFullYear();
+    let viewMonth = today.getMonth();
+    let items = []; // { id, isTask, title, description, date, color, deletable, isCompleted, assignerName, toggleUrl }
+
+    function isoDate(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function sameDay(a, b) {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+
+    function loadEvents() {
+      return fetch('{% url "calendar_events_feed" %}')
+        .then((r) => r.json())
+        .then((data) => {
+          items = data.map(function (item) {
+            const [y, m, d] = item.start.split('-').map(Number);
+            const props = item.extendedProps || {};
+            return {
+              id: item.id,
+              isTask: !!item.is_task,
+              title: item.title,
+              description: item.description || '',
+              date: new Date(y, m - 1, d),
+              color: item.color || '#0077FF',
+              deletable: props.deletable,
+              isCompleted: props.isCompleted,
+              isAssignment: !!props.isAssignment,
+              status: props.status || 'not_started',
+              statusLabel: props.statusLabel || '',
+              isEdited: !!props.isEdited,
+              assignerName: props.assignerName || '',
+              assigneeName: props.assigneeName || '',
+              toggleUrl: props.toggleUrl || '',
+              statusUrl: props.statusUrl || '',
+              editUrl: props.editUrl || '',
+              canEdit: !!props.canEdit,
+            };
+          });
+        });
+    }
+
+    function buildGridCells(gridYear, gridMonth) {
+      const cells = WEEKDAYS.map((w) => '<div class="font-medium">' + w + '</div>');
+
+      const firstOfMonth = new Date(gridYear, gridMonth, 1);
+      const leadingOffset = (firstOfMonth.getDay() + 6) % 7;
+      const gridStart = new Date(gridYear, gridMonth, 1 - leadingOffset);
+
+      for (let i = 0; i < 42; i++) {
+        const cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+        const isOtherMonth = cellDate.getMonth() !== gridMonth;
+        const isToday = sameDay(cellDate, today);
+        const dayItems = items.filter((e) => sameDay(e.date, cellDate));
+
+        let classes = 'py-1 rounded relative cursor-pointer';
+        let style = '';
+
+        if (isOtherMonth) classes += ' text-gray-400 dark:text-zinc-600';
+        if (isToday) {
+          classes += ' text-white';
+          style = ' style="background:#0077FF"';
+        } else if (dayItems.length) {
+          classes += ' text-white';
+          style = ' style="background:' + dayItems[0].color + '"';
         }
-      },
+
+        cells.push('<div class="' + classes + '"' + style + ' data-date="' + isoDate(cellDate) + '">' + cellDate.getDate() + '</div>');
+      }
+
+      return cells.join('');
+    }
+
+    function renderGrid() {
+      if (titleEl) titleEl.textContent = MONTHS[viewMonth] + ' ' + viewYear;
+      gridEl.innerHTML = buildGridCells(viewYear, viewMonth);
+      gridEl.querySelectorAll('[data-date]').forEach(function (cell) {
+        cell.addEventListener('click', function () {
+          openFullCalendar(cell.dataset.date);
+        });
+      });
+    }
+
+    const STATUS_BADGE_CLASSES = {
+      not_started: 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-300',
+      in_progress: 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400',
+      done: 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400',
+    };
+
+    function buildItemRow(item, index) {
+      const marginClass = index === 0 ? '' : 'mt-2';
+      const hasDesc = !!item.description;
+
+      let marker = '';
+      let statusControl = '';
+
+      marker = '<div class="h-2 w-2 flex-shrink-0 rounded-full" style="background:' + item.color + '"></div>';
+
+      if (item.isTask && item.isAssignment) {
+        statusControl =
+          '<select class="day-item-status-select flex-shrink-0 rounded-md border-0 py-1 pl-1.5 pr-6 text-xs font-medium focus:ring-1 focus:ring-[#0077FF] ' + (STATUS_BADGE_CLASSES[item.status] || STATUS_BADGE_CLASSES.not_started) + '" data-status-url="' + item.statusUrl + '">' +
+            '<option value="not_started"' + (item.status === 'not_started' ? ' selected' : '') + '>Не начата</option>' +
+            '<option value="in_progress"' + (item.status === 'in_progress' ? ' selected' : '') + '>В работе</option>' +
+            '<option value="done"' + (item.status === 'done' ? ' selected' : '') + '>Выполнена</option>' +
+          '</select>';
+      }
+
+      const editedBadge = item.isEdited ? '<span class="flex-shrink-0 rounded-full bg-yellow-50 px-2 py-0.5 text-xs text-yellow-600 dark:bg-yellow-900/20 dark:text-yellow-400">изменено</span>' : '';
+      const deleteBtn = item.deletable ? '<button type="button" class="day-item-delete-btn flex-shrink-0 text-gray-300 hover:text-red-500" data-event-id="' + item.id + '" data-event-title="' + item.title + '"><i data-feather="x" class="h-3.5 w-3.5"></i></button>' : '';
+      const editBtn = item.canEdit ? '<button type="button" class="day-item-edit-btn flex-shrink-0 text-gray-300 hover:text-[#0077FF]" data-event-id="' + item.id + '"><i data-feather="edit-2" class="h-3.5 w-3.5"></i></button>' : '';
+
+      let assignmentLabel = '';
+      if (item.assigneeName) {
+        assignmentLabel = '<div class="pl-6 text-xs text-gray-400">кому: ' + item.assigneeName + '</div>';
+      } else if (item.assignerName) {
+        assignmentLabel = '<div class="pl-6 text-xs text-gray-400">от ' + item.assignerName + '</div>';
+      }
+
+      return (
+        '<div class="' + marginClass + (hasDesc ? ' accordion' : '') + '">' +
+          '<div class="' + (hasDesc ? 'accordion__pane' : '') + '">' +
+            '<div class="flex flex-wrap items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-zinc-800">' +
+              marker +
+              '<span class="min-w-0 flex-1 truncate text-sm ' + (item.isCompleted ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-100') + (hasDesc ? ' accordion__pane__toggle cursor-pointer' : '') + '">' +
+                item.title +
+                (hasDesc ? ' <i data-feather="chevron-down" class="ml-1 inline-block h-3 w-3 text-gray-400 transition-transform"></i>' : '') +
+              '</span>' +
+              editedBadge +
+              statusControl +
+              editBtn +
+              deleteBtn +
+            '</div>' +
+            (hasDesc ? '<div class="accordion__pane__content px-2 pb-2 pl-6 text-sm text-gray-500 dark:text-gray-400">' + item.description + '</div>' : '') +
+            assignmentLabel +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+    function bindItemActions(container, onChange) {
+      container.querySelectorAll('.day-item-status-select').forEach(function (select) {
+        select.addEventListener('change', function () {
+          fetch(select.dataset.statusUrl, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': csrfToken,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'status=' + select.value,
+          }).then(function () {
+            refresh().then(onChange);
+            document.dispatchEvent(new CustomEvent('calendar-task:changed'));
+          });
+        });
+      });
+
+      container.querySelectorAll('.day-item-delete-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const item = items.find((i) => i.id == btn.dataset.eventId);
+          const deleteUrl = (item && item.isTask) ? '/task/' + btn.dataset.eventId + '/delete/' : '/event/' + btn.dataset.eventId + '/delete/';
+          if (confirm('Удалить «' + btn.dataset.eventTitle + '»?')) {
+            fetch(deleteUrl, {
+              method: 'POST',
+              headers: { 'X-CSRFToken': csrfToken },
+            }).then(function () {
+              refresh().then(onChange);
+              document.dispatchEvent(new CustomEvent('calendar-task:changed'));
+            });
+          }
+        });
+      });
+
+      container.querySelectorAll('.day-item-edit-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const item = items.find((i) => i.id == btn.dataset.eventId);
+          if (item) openEditTaskModal(item);
+        });
+      });
+
+      if (window.feather) feather.replace({ width: '14', height: '14' });
+    }
+
+    function renderToday() {
+      const todayItems = items.filter((e) => sameDay(e.date, today));
+
+      if (!todayItems.length) {
+        todayListEl.innerHTML = '<div class="text-sm text-gray-400">На сегодня ничего не запланировано</div>';
+        return;
+      }
+
+      todayListEl.innerHTML = todayItems.map(buildItemRow).join('');
+      bindItemActions(todayListEl, renderToday);
+    }
+
+    function refresh() {
+      return loadEvents().then(function () {
+        renderGrid();
+        renderToday();
+      });
+    }
+
+    prevBtn.addEventListener('click', function () {
+      viewMonth -= 1;
+      if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+      renderGrid();
     });
-    calendar.render();
-  });
+
+    nextBtn.addEventListener('click', function () {
+      viewMonth += 1;
+      if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+      renderGrid();
+    });
+
+    // --- Модалка постановки задачи/напоминания ---
+    const planModal = document.getElementById('task-plan-modal');
+    const planForm = document.getElementById('task-plan-modal-form');
+    const planTitle = document.getElementById('task-plan-title');
+    const planDescription = document.getElementById('task-plan-description');
+    const planDate = document.getElementById('task-plan-date');
+    const planError = document.getElementById('task-plan-modal-error');
+    const modeButtons = document.querySelectorAll('.task-plan-mode-btn');
+    const recipientWrap = document.getElementById('task-plan-recipient-wrap');
+    const recipientSearch = document.getElementById('task-plan-recipient-search');
+    const recipientId = document.getElementById('task-plan-recipient-id');
+    const recipientList = document.getElementById('task-plan-recipient-list');
+    const recipientChip = document.getElementById('task-plan-recipient-chip');
+    const recipientName = document.getElementById('task-plan-recipient-name');
+    const recipientClear = document.getElementById('task-plan-recipient-clear');
+    const recurrenceWrap = document.getElementById('task-plan-recurrence-wrap');
+    const recurrenceSelect = document.getElementById('task-plan-recurrence');
+    let planMode = 'self';
+    let prefillDate = null;
+
+    function setPlanMode(mode) {
+      planMode = mode;
+      modeButtons.forEach(function (btn) {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+      recipientWrap.classList.toggle('hidden', mode === 'self');
+      // Повтор имеет смысл только для личных напоминаний — поручение
+      // сотруднику это разовое конкретное задание с дедлайном.
+      recurrenceWrap.classList.toggle('hidden', mode !== 'self');
+    }
+
+    modeButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () { setPlanMode(btn.dataset.mode); });
+    });
+
+    function openPlanModal(dateStr) {
+      planTitle.value = '';
+      planDescription.value = '';
+      planDate.value = dateStr || isoDate(today);
+      recurrenceSelect.value = 'none';
+      recipientSearch.value = '';
+      recipientId.value = '';
+      recipientList.classList.add('hidden');
+      recipientChip.classList.add('hidden');
+      recipientChip.classList.remove('flex');
+      recipientSearch.classList.remove('hidden');
+      planError.classList.add('hidden');
+      setPlanMode('self');
+      planModal.classList.remove('hidden');
+      planModal.classList.add('flex');
+      planTitle.focus();
+    }
+
+    function closePlanModal() {
+      planModal.classList.add('hidden');
+      planModal.classList.remove('flex');
+    }
+
+    document.getElementById('task-plan-add-btn').addEventListener('click', function () { openPlanModal(); });
+    document.getElementById('task-plan-modal-close').addEventListener('click', closePlanModal);
+    document.getElementById('task-plan-modal-cancel').addEventListener('click', closePlanModal);
+    planModal.addEventListener('click', function (event) { if (event.target === planModal) closePlanModal(); });
+
+    let searchTimer = null;
+    recipientSearch.addEventListener('input', function () {
+      recipientId.value = '';
+      clearTimeout(searchTimer);
+      const query = recipientSearch.value.trim();
+      if (!query) { recipientList.classList.add('hidden'); return; }
+      searchTimer = setTimeout(function () {
+        fetch('{% url "calendar_users_list" %}?q=' + encodeURIComponent(query))
+          .then((r) => r.json())
+          .then((data) => {
+            if (!data.users.length) { recipientList.classList.add('hidden'); return; }
+            recipientList.innerHTML = data.users.map(function (u) {
+              return '<button type="button" class="task-plan-recipient-option block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700" data-id="' + u.id + '" data-name="' + u.name + '">' + u.name + '</button>';
+            }).join('');
+            recipientList.classList.remove('hidden');
+          });
+      }, 250);
+    });
+
+    recipientList.addEventListener('click', function (event) {
+      const option = event.target.closest('.task-plan-recipient-option');
+      if (!option) return;
+      recipientId.value = option.dataset.id;
+      recipientName.textContent = option.dataset.name;
+      recipientList.classList.add('hidden');
+      recipientSearch.classList.add('hidden');
+      recipientChip.classList.remove('hidden');
+      recipientChip.classList.add('flex');
+    });
+
+    recipientClear.addEventListener('click', function () {
+      recipientId.value = '';
+      recipientSearch.value = '';
+      recipientChip.classList.add('hidden');
+      recipientChip.classList.remove('flex');
+      recipientSearch.classList.remove('hidden');
+    });
+
+    planForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+
+      const isSelf = planMode === 'self';
+      const url = isSelf ? '{% url "event_create" %}' : '{% url "calendar_task_create" %}';
+
+      const body = new URLSearchParams();
+      body.set('title', planTitle.value);
+      body.set('description', planDescription.value);
+      if (isSelf) {
+        body.set('date', planDate.value);
+        body.set('recurrence', recurrenceSelect.value);
+      } else {
+        body.set('due_date', planDate.value);
+        if (recipientId.value) body.set('assignee_id', recipientId.value);
+      }
+
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      })
+        .then((r) => r.json().then((data) => ({ status: r.status, data: data })))
+        .then(({ status, data }) => {
+          if (status !== 200 || !data.success) {
+            const messages = data.errors ? Object.values(data.errors).flat().join(' ') : 'Не удалось создать.';
+            planError.textContent = messages;
+            planError.classList.remove('hidden');
+            return;
+          }
+          closePlanModal();
+          refresh();
+          if (!isSelf) document.dispatchEvent(new CustomEvent('calendar-task:changed'));
+        });
+    });
+
+    // --- Полноэкранная модалка календаря ---
+    const fullModal = document.getElementById('calendar-full-modal');
+    const fullGridEl = document.getElementById('calendar-full-grid');
+    const fullTitleEl = document.getElementById('calendar-full-title');
+    const fullPrevBtn = document.getElementById('calendar-full-prev');
+    const fullNextBtn = document.getElementById('calendar-full-next');
+    const fullDayTitleEl = document.getElementById('calendar-full-day-title');
+    const fullDayListEl = document.getElementById('calendar-full-day-list');
+
+    let fullYear = viewYear;
+    let fullMonth = viewMonth;
+    let selectedDate = today;
+
+    const DAY_TITLE_MONTHS = MONTHS;
+
+    function renderFullGrid() {
+      fullTitleEl.textContent = MONTHS[fullMonth] + ' ' + fullYear;
+      fullGridEl.innerHTML = buildGridCells(fullYear, fullMonth);
+      fullGridEl.querySelectorAll('[data-date]').forEach(function (cell) {
+        cell.addEventListener('click', function () {
+          const [y, m, d] = cell.dataset.date.split('-').map(Number);
+          selectedDate = new Date(y, m - 1, d);
+          renderFullDay();
+        });
+      });
+    }
+
+    function renderFullDay() {
+      fullDayTitleEl.textContent = selectedDate.getDate() + ' ' + DAY_TITLE_MONTHS[selectedDate.getMonth()] + ' ' + selectedDate.getFullYear();
+      const dayItems = items.filter((e) => sameDay(e.date, selectedDate));
+
+      if (!dayItems.length) {
+        fullDayListEl.innerHTML = '<div class="text-sm text-gray-400">На этот день ничего не запланировано</div>';
+        return;
+      }
+
+      fullDayListEl.innerHTML = dayItems.map(buildItemRow).join('');
+      bindItemActions(fullDayListEl, renderFullDay);
+    }
+
+    function openFullCalendar(dateStr) {
+      fullYear = viewYear;
+      fullMonth = viewMonth;
+      if (dateStr) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        selectedDate = new Date(y, m - 1, d);
+        fullYear = y;
+        fullMonth = m - 1;
+      }
+      renderFullGrid();
+      renderFullDay();
+      fullModal.classList.remove('hidden');
+      fullModal.classList.add('flex');
+    }
+
+    function closeFullCalendar() {
+      fullModal.classList.add('hidden');
+      fullModal.classList.remove('flex');
+    }
+
+    document.getElementById('calendar-full-close').addEventListener('click', closeFullCalendar);
+    fullModal.addEventListener('click', function (event) { if (event.target === fullModal) closeFullCalendar(); });
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape') return;
+      if (!fullModal.classList.contains('hidden')) closeFullCalendar();
+      else if (!planModal.classList.contains('hidden')) closePlanModal();
+    });
+
+    fullPrevBtn.addEventListener('click', function () {
+      fullMonth -= 1;
+      if (fullMonth < 0) { fullMonth = 11; fullYear -= 1; }
+      renderFullGrid();
+    });
+
+    fullNextBtn.addEventListener('click', function () {
+      fullMonth += 1;
+      if (fullMonth > 11) { fullMonth = 0; fullYear += 1; }
+      renderFullGrid();
+    });
+
+    // --- Модалка редактирования поставленной задачи ---
+    const editPlanModal = document.getElementById('task-edit-plan-modal');
+    const editPlanForm = document.getElementById('task-edit-plan-modal-form');
+    const editPlanTitle = document.getElementById('task-edit-plan-title');
+    const editPlanDescription = document.getElementById('task-edit-plan-description');
+    const editPlanDate = document.getElementById('task-edit-plan-date');
+    const editPlanError = document.getElementById('task-edit-plan-modal-error');
+    let editingTaskId = null;
+    let reopenFullCalendarAfterEdit = false;
+
+    function openEditTaskModal(item) {
+      editingTaskId = item.id;
+      editPlanTitle.value = item.title;
+      editPlanDescription.value = item.description || '';
+      editPlanDate.value = isoDate(item.date);
+      editPlanError.classList.add('hidden');
+
+      // Обе модалки центрированы и почти одного размера — если открыть
+      // редактирование поверх полноэкранного календаря, они визуально
+      // сливаются в одну. Поэтому временно прячем календарь на время
+      // редактирования и возвращаем его обратно после закрытия/сохранения.
+      if (!fullModal.classList.contains('hidden')) {
+        reopenFullCalendarAfterEdit = true;
+        fullModal.classList.add('hidden');
+        fullModal.classList.remove('flex');
+      }
+
+      editPlanModal.classList.remove('hidden');
+      editPlanModal.classList.add('flex');
+      editPlanTitle.focus();
+    }
+
+    function closeEditTaskModal() {
+      editPlanModal.classList.add('hidden');
+      editPlanModal.classList.remove('flex');
+      editingTaskId = null;
+
+      if (reopenFullCalendarAfterEdit) {
+        reopenFullCalendarAfterEdit = false;
+        fullModal.classList.remove('hidden');
+        fullModal.classList.add('flex');
+      }
+    }
+
+    document.getElementById('task-edit-plan-modal-close').addEventListener('click', closeEditTaskModal);
+    document.getElementById('task-edit-plan-modal-cancel').addEventListener('click', closeEditTaskModal);
+    editPlanModal.addEventListener('click', function (event) { if (event.target === editPlanModal) closeEditTaskModal(); });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !editPlanModal.classList.contains('hidden')) closeEditTaskModal();
+    });
+
+    editPlanForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (!editingTaskId) return;
+
+      const body = new URLSearchParams();
+      body.set('title', editPlanTitle.value);
+      body.set('description', editPlanDescription.value);
+      body.set('due_date', editPlanDate.value);
+
+      fetch('/task/' + editingTaskId + '/edit/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      })
+        .then((r) => r.json().then((data) => ({ status: r.status, data: data })))
+        .then(({ status, data }) => {
+          if (status !== 200 || !data.success) {
+            const messages = data.errors ? Object.values(data.errors).flat().join(' ') : 'Не удалось сохранить.';
+            editPlanError.textContent = messages;
+            editPlanError.classList.remove('hidden');
+            return;
+          }
+          closeEditTaskModal();
+          refresh().then(function () {
+            renderToday();
+            if (!fullModal.classList.contains('hidden')) renderFullDay();
+          });
+          document.dispatchEvent(new CustomEvent('calendar-task:changed'));
+        });
+    });
+
+    // Синхронизация с виджетом "Мои задачи": он живёт в отдельном скрипте
+    // со своим состоянием, поэтому при изменении задач там (toggle/создание/
+    // удаление/редактирование) шлёт событие tasks:changed — здесь просто
+    // перезагружаем данные и перерисовываем то, что сейчас открыто.
+    document.addEventListener('tasks:changed', function () {
+      refresh().then(function () {
+        if (!fullModal.classList.contains('hidden')) renderFullDay();
+      });
+    });
+
+    refresh();
+  })();
 </script>

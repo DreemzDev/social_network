@@ -18,10 +18,10 @@
 
         <!-- Аватар и ID -->
         <div class="flex items-center gap-4 border-b border-gray-100 p-4 dark:border-zinc-800">
-          <label class="group relative block h-20 w-20 flex-shrink-0 cursor-pointer">
+          <label class="group relative block h-28 w-28 flex-shrink-0 cursor-pointer">
             <img
               x-ref="preview"
-              class="h-20 w-20 rounded-full object-cover"
+              class="h-28 w-28 rounded-full object-cover"
               src="{% if user.avatar %}{{ user.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}"
               alt="{{ user.username }}"
             />
@@ -34,28 +34,28 @@
             {{ form.avatar }}
           </label>
           <div class="min-w-0">
-            <div class="truncate font-medium text-gray-900 dark:text-white">{{ user.first_name }} {{ user.last_name }}</div>
-            <div class="truncate text-sm text-gray-500 dark:text-gray-400">ID: {{ user.username }}</div>
-            <div class="mt-1 text-xs text-gray-400">Наведите на фото, чтобы заменить</div>
+            <div class="truncate text-lg font-medium text-gray-900 dark:text-white">{{ user.first_name }} {{ user.last_name }}</div>
+            <div class="truncate text-base text-gray-500 dark:text-gray-400">ID: {{ user.username }}</div>
+            <div class="mt-1 text-sm text-gray-400">Наведите на фото, чтобы заменить</div>
           </div>
         </div>
 
         <!-- Личные данные -->
         <div x-show="tab === 'personal'" class="space-y-4 p-4">
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Фамилия</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Фамилия</label>
             {{ form.last_name }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Имя</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Имя</label>
             {{ form.first_name }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Отчество</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Отчество</label>
             {{ form.patronymic }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Дата рождения</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Дата рождения</label>
             {{ form.birthday }}
           </div>
         </div>
@@ -63,23 +63,23 @@
         <!-- Контакты -->
         <div x-cloak x-show="tab === 'contacts'" class="space-y-4 p-4">
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Телефон ПТС</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон ПТС</label>
             {{ form.phone_pts }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Телефон (город)</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон (город)</label>
             {{ form.phone_city }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Телефон ЗС</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон ЗС</label>
             {{ form.phone_zs }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Телефон АТС-9</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон АТС-9</label>
             {{ form.phone_9 }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Телефон HiCom</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон HiCom</label>
             {{ form.phone_hc }}
           </div>
         </div>
@@ -87,19 +87,19 @@
         <!-- Служебная информация -->
         <div x-cloak x-show="tab === 'service'" class="space-y-4 p-4">
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Номер кабинета</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Номер кабинета</label>
             {{ form.cab }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Подразделение</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Подразделение</label>
             {{ form.cat }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Должность</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Должность</label>
             {{ form.position }}
           </div>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Звание</label>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Звание</label>
             {{ form.rank }}
           </div>
         </div>
@@ -107,7 +107,7 @@
         <div x-show="tab !== 'security'" class="border-t border-gray-100 p-4 dark:border-zinc-800">
           <button
             type="submit"
-            class="rounded-lg bg-[#0077FF] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
+            class="rounded-lg bg-[#0077FF] px-6 py-3 text-base font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
           >
             Сохранить
           </button>
@@ -127,10 +127,10 @@
 
         <form action="{% url 'settingprofile' user.id %}" method="post">
           {% csrf_token %}
-          <div class="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Смена пароля</div>
+          <div class="mb-2 text-base font-semibold text-gray-900 dark:text-white">Смена пароля</div>
           <div class="space-y-4">
             <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Текущий пароль</label>
+              <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Текущий пароль</label>
               <div class="relative">
                 {{ password_form.old_password }}
                 <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="{{ password_form.old_password.id_for_label }}" tabindex="-1">
@@ -139,7 +139,7 @@
               </div>
             </div>
             <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Новый пароль</label>
+              <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Новый пароль</label>
               <div class="relative">
                 {{ password_form.new_password1 }}
                 <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="setting-password-input" tabindex="-1">
@@ -156,7 +156,7 @@
               <div class="mt-2 text-xs text-gray-500 dark:text-gray-400" id="setting-password-strength-label">Минимум 8 символов</div>
             </div>
             <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Повторите новый пароль</label>
+              <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Повторите новый пароль</label>
               <div class="relative">
                 {{ password_form.new_password2 }}
                 <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="{{ password_form.new_password2.id_for_label }}" tabindex="-1">
@@ -166,7 +166,7 @@
             </div>
           </div>
           <button type="submit" name="change_password"
-            class="mt-4 rounded-lg bg-[#0077FF] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
+            class="mt-4 rounded-lg bg-[#0077FF] px-6 py-3 text-base font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
             Сменить пароль
           </button>
         </form>
@@ -179,12 +179,12 @@
           {% endif %}
           <form action="{% url 'settingprofile' user.id %}" method="post">
             {% csrf_token %}
-            <div class="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Проверочное слово</div>
-            <div class="mb-3 text-xs text-gray-500 dark:text-gray-400">Используется для восстановления доступа без электронной почты.</div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Проверочное слово</label>
+            <div class="mb-2 text-base font-semibold text-gray-900 dark:text-white">Проверочное слово</div>
+            <div class="mb-3 text-sm text-gray-500 dark:text-gray-400">Используется для восстановления доступа без электронной почты.</div>
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Проверочное слово</label>
             {{ security_form.security_answer }}
             <button type="submit" name="change_security_answer"
-              class="mt-4 rounded-lg bg-[#0077FF] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
+              class="mt-4 rounded-lg bg-[#0077FF] px-6 py-3 text-base font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
               Сохранить
             </button>
           </form>
@@ -197,23 +197,23 @@
   <div class="w-full flex-shrink-0 sm:w-56">
     <div class="rounded-xl border border-gray-100 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
       <button type="button" x-on:click="tab = 'personal'"
-        class="flex w-full flex-col items-start rounded-lg px-3 py-2 text-left text-sm"
+        class="flex w-full flex-col items-start rounded-lg px-3 py-2.5 text-left text-base"
         :class="tab === 'personal' ? 'bg-[#EAF3FF] text-[#0077FF] font-medium dark:bg-zinc-800' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800'">
         Личные данные
         <span class="text-xs text-gray-400">Имя, фамилия, дата рождения</span>
       </button>
       <button type="button" x-on:click="tab = 'contacts'"
-        class="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm"
+        class="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-base"
         :class="tab === 'contacts' ? 'bg-[#EAF3FF] text-[#0077FF] font-medium dark:bg-zinc-800' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800'">
         Контакты
       </button>
       <button type="button" x-on:click="tab = 'service'"
-        class="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm"
+        class="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-base"
         :class="tab === 'service' ? 'bg-[#EAF3FF] text-[#0077FF] font-medium dark:bg-zinc-800' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800'">
         Служебная информация
       </button>
       <button type="button" x-on:click="tab = 'security'"
-        class="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm"
+        class="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-base"
         :class="tab === 'security' ? 'bg-[#EAF3FF] text-[#0077FF] font-medium dark:bg-zinc-800' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-800'">
         Безопасность
       </button>

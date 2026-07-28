@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block Profiles %}
-<div class="w-full">
+<div class="w-full min-w-0">
 
   <!-- Обложка -->
   <div class="box relative h-40 w-full overflow-hidden rounded-t-xl sm:h-52">
@@ -15,8 +15,8 @@
     {% endif %}
     {% if request.user == user %}
     <a href="{% url 'settingprofile' user.id %}"
-       class="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-black/40 px-3 py-1.5 text-xs font-medium text-white hover:bg-black/60">
-      <i data-feather="image" class="h-4 w-4"></i> Изменить обложку
+       class="absolute right-3 top-3 z-10 flex items-center gap-2 rounded-lg bg-black/40 px-4 py-2 text-sm font-medium text-white hover:bg-black/60">
+      <i data-feather="image" class="h-5 w-5"></i> Изменить обложку
     </a>
     {% endif %}
   </div>
@@ -90,7 +90,7 @@
   </div>
   </div>
 
-  <div class="flex flex-col gap-4 xl:flex-row xl:items-start">
+  <div class="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start">
 
 <div class="w-full min-w-0{% if is_owner %} xl:w-2/3{% else %} xl:w-2/3 xl:mx-auto{% endif %}">
   <!-- Форма для постов -->
@@ -105,54 +105,55 @@
       class="mb-4"
     >
       {% csrf_token %}
-      <div x-data="{open:false}" class="box px-5 py-4 dark:bg-zinc-900">
-        <div x-on:click="open = true" class="flex flex-shrink-0 items-center">
-          <div class="flex-shrink-0 mr-4">
-            <img
-              class="w-14 h-14 object-cover flex-shrink-0 rounded-full"
-              src="{%if user.avatar%}{{user.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
-              alt=""
-            />
-          </div>
+      <div x-data="{open:false, contentLength:0}" class="box dark:bg-zinc-900">
+        <div class="flex items-start gap-3 px-5 pt-4">
+          <img
+            class="w-12 h-12 object-cover flex-shrink-0 rounded-full"
+            src="{%if user.avatar%}{{user.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
+            alt=""
+          />
           <div class="relative w-full" x-data="{ emojiOpen: false }">
-            <div class="relative flex items-end overflow-hidden rounded-lg border border-gray-200 bg-white dark:bg-zinc-800 dark:border-zinc-700">
+            <div class="relative">
               <textarea
                 rows="1"
                 id="id_content"
                 name="content"
                 required=""
-                class="text-lg pl-4 pr-10 w-full py-3.5 resize-none border-none outline-none focus:outline-none bg-transparent dark:text-white"
+                class="no-scrollbar text-lg w-full min-h-[48px] resize-none overflow-y-auto border-none p-0 py-3 pr-10 outline-none focus:outline-none focus:ring-0 bg-transparent dark:text-white placeholder:text-gray-400"
+                style="max-height: 440px;"
                 placeholder="Что у вас нового?"
-                oninput="autoResize(this)"
+                x-on:focus="open = true"
+                x-on:input="autoResize($el); contentLength = $el.value.length"
               ></textarea>
-
-              <!-- Кнопка эмодзи -->
-              <button
-                id="emojiDropdownButton"
-                x-on:click="emojiOpen = !emojiOpen"
-                x-on:click.away="emojiOpen = false"
-                class="absolute right-2 top-1 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-[#0077FF] focus:outline-none"
-                type="button"
-              >
-                <svg
-                  class="w-6 h-6"
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.5"
-                    d="M15 9h.01M8.99 9H9m12 3a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM6.6 13a5.5 5.5 0 0 0 10.81 0H6.6Z"
-                  />
-                </svg>
-              </button>
             </div>
+
+            <!-- Кнопка эмодзи -->
+            <button
+              id="emojiDropdownButton"
+              x-on:click="emojiOpen = !emojiOpen"
+              x-on:click.away="emojiOpen = false"
+              class="absolute right-0 top-2 p-1.5 text-gray-400 hover:text-gray-600 rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-[#0077FF] focus:outline-none dark:hover:text-gray-200"
+              type="button"
+              title="Эмодзи"
+            >
+              <svg
+                class="w-6 h-6"
+                aria-hidden="true"
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.5"
+                  d="M15 9h.01M8.99 9H9m12 3a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM6.6 13a5.5 5.5 0 0 0 10.81 0H6.6Z"
+                />
+              </svg>
+            </button>
 
             <!-- Dropdown эмодзи-пикер -->
             <div
@@ -350,12 +351,10 @@
         </div>
 
         <!-- Превью выбранных изображений -->
-        <div x-cloak x-show="open" id="images-preview" class="hidden grid-cols-4 gap-2 py-2"></div>
+        <div x-cloak x-show="open" id="images-preview" class="hidden grid-cols-6 gap-2 px-5 pt-3"></div>
 
         <!-- Список прикреплённых файлов -->
-        <div x-cloak x-show="open" id="attachments-preview" class="hidden flex-col gap-1.5 py-2"></div>
-
-        <div x-cloak x-show="open" class="border-b h-px mb-4"></div>
+        <div x-cloak x-show="open" id="attachments-preview" class="hidden flex-col gap-1.5 px-5 pt-3"></div>
 
         <div class="mb-2 hidden">
           <input
@@ -374,11 +373,11 @@
           />
         </div>
 
-        <div x-cloak x-show="open" class="flex justify-between items-center my-2">
-          <div class="flex items-center gap-3">
-            <label for="id_images" class="input__file-button cursor-pointer" title="Добавить фото">
+        <div class="mt-4 flex items-center justify-between border-t border-gray-100 px-5 py-3 dark:border-zinc-800">
+          <div class="flex items-center gap-1">
+            <label for="id_images" class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-zinc-800 dark:hover:text-gray-200" title="Добавить фото">
               <svg
-                class="w-7 text-gray-500 hover:text-gray-800"
+                class="w-5 h-5"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -388,19 +387,15 @@
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                  d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z"
+                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 21h18a1.5 1.5 0 001.5-1.5V4.5A1.5 1.5 0 0021 3H3a1.5 1.5 0 00-1.5 1.5v15A1.5 1.5 0 003 21zm12.75-13.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"
                 />
               </svg>
+              <span class="hidden sm:inline">Фото</span>
             </label>
 
-            <label for="id_attachments" class="input__file-button cursor-pointer" title="Прикрепить файл">
+            <label for="id_attachments" class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-zinc-800 dark:hover:text-gray-200" title="Прикрепить файл">
               <svg
-                class="w-7 text-gray-500 hover:text-gray-800"
+                class="w-5 h-5"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -413,15 +408,20 @@
                   d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"
                 />
               </svg>
+              <span class="hidden sm:inline">Файл</span>
             </label>
           </div>
 
-          <button
-            type="submit"
-            class="text-white bg-[#0077FF] hover:bg-[#3391FF] focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-base px-6 py-3 me-2 focus:outline-none dark:focus:ring-blue-800"
-          >
-            Опубликовать
-          </button>
+          <div class="flex items-center gap-3">
+            <span x-cloak x-show="contentLength > 0" class="text-xs text-gray-400" x-text="contentLength + ' симв.'"></span>
+            <button
+              type="submit"
+              x-bind:disabled="contentLength === 0"
+              class="rounded-lg bg-[#0077FF] px-5 py-2 text-sm font-medium text-white transition-opacity hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-40 dark:focus:ring-blue-800"
+            >
+              Опубликовать
+            </button>
+          </div>
         </div>
       </div>
     </form>
@@ -541,7 +541,7 @@
   </div>
 
   {% if is_owner %}
-  <div id="sidebar-panels" class="w-full min-w-0 space-y-4 xl:sticky xl:top-4 xl:ml-1 xl:w-1/3">
+  <div id="sidebar-panels" class="flex w-full min-w-0 flex-col gap-4 xl:ml-1 xl:w-1/3">
     {% include "includes/profile_todo.html" %}
     {% include "includes/profile_notes.html" %}
     {% include "includes/profile_calendar.html" %}
@@ -552,10 +552,12 @@
     .sidebar-panel.is-collapsed .sidebar-panel__content { display: none; }
     .sidebar-panel.is-collapsed .sidebar-panel__toggle i { transform: rotate(-90deg); }
     .sidebar-panel__header { user-select: none; }
-    .sidebar-panel.is-dragging { opacity: 0.4; }
-    .sidebar-panel.is-drop-target { box-shadow: 0 0 0 2px #0077FF inset; }
+    .sidebar-panel.sortable-ghost { opacity: 0.4; }
+    .sidebar-panel.sortable-chosen,
+    .sidebar-panel.sortable-drag { margin: 0 !important; box-shadow: 0 0 0 2px #0077FF inset; }
   </style>
 
+  <script src="{% static 'vendor/sortablejs/Sortable.min.js' %}"></script>
   <script>
     (function () {
       const container = document.getElementById('sidebar-panels');
@@ -584,55 +586,40 @@
         });
       } catch (e) {}
 
-      function saveOrder() {
-        const order = Array.from(container.querySelectorAll('.sidebar-panel')).map((p) => p.dataset.panelId);
-        localStorage.setItem(STORAGE_ORDER, JSON.stringify(order));
-      }
-
       function saveCollapsed() {
         const collapsed = Array.from(container.querySelectorAll('.sidebar-panel.is-collapsed')).map((p) => p.dataset.panelId);
         localStorage.setItem(STORAGE_COLLAPSED, JSON.stringify(collapsed));
       }
 
-      // Сворачивание/разворачивание
+      // Сворачивание/разворачивание (клик по всему заголовку)
+      let suppressToggle = false;
+
       container.addEventListener('click', function (event) {
-        const toggle = event.target.closest('.sidebar-panel__toggle');
-        if (!toggle) return;
-        const panel = toggle.closest('.sidebar-panel');
+        if (suppressToggle) return;
+        const header = event.target.closest('.sidebar-panel__header');
+        if (!header) return;
+        const panel = header.closest('.sidebar-panel');
         panel.classList.toggle('is-collapsed');
         saveCollapsed();
       });
 
-      // Перетаскивание блоков (native HTML5 drag-and-drop)
-      let dragged = null;
-
-      container.addEventListener('dragstart', function (event) {
-        const panel = event.target.closest('.sidebar-panel');
-        if (!panel) return;
-        dragged = panel;
-        panel.classList.add('is-dragging');
-        event.dataTransfer.effectAllowed = 'move';
-      });
-
-      container.addEventListener('dragend', function () {
-        if (dragged) dragged.classList.remove('is-dragging');
-        container.querySelectorAll('.is-drop-target').forEach((p) => p.classList.remove('is-drop-target'));
-        dragged = null;
-        saveOrder();
-      });
-
-      container.addEventListener('dragover', function (event) {
-        event.preventDefault();
-        const target = event.target.closest('.sidebar-panel');
-        if (!target || target === dragged) return;
-
-        container.querySelectorAll('.is-drop-target').forEach((p) => p.classList.remove('is-drop-target'));
-        target.classList.add('is-drop-target');
-
-        const rect = target.getBoundingClientRect();
-        const before = (event.clientY - rect.top) < rect.height / 2;
-        container.insertBefore(dragged, before ? target : target.nextSibling);
-      });
+      // Перетаскивание блоков (SortableJS)
+      if (typeof Sortable !== 'undefined') {
+        Sortable.create(container, {
+          handle: '.sidebar-panel__header',
+          animation: 150,
+          ghostClass: 'sortable-ghost',
+          chosenClass: 'sortable-chosen',
+          onStart: function () {
+            suppressToggle = true;
+          },
+          onEnd: function () {
+            const order = Array.from(container.querySelectorAll('.sidebar-panel')).map((p) => p.dataset.panelId);
+            localStorage.setItem(STORAGE_ORDER, JSON.stringify(order));
+            setTimeout(function () { suppressToggle = false; }, 0);
+          },
+        });
+      }
     })();
   </script>
   {% endif %}
