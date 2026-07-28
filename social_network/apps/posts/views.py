@@ -1,4 +1,4 @@
-from django.db.models import Count, F
+from django.db.models import Count, F, Q
 from typing import Any
 from django.contrib import messages
 from datetime import date, timedelta
@@ -145,8 +145,9 @@ class AddPost(FormView, TemplateView):
         context['is_owner'] = self.request.user == user
 
         if context['is_owner']:
-            context['pending_tasks'] = Task.objects.filter(user=user, is_completed=False)
-            context['completed_tasks'] = Task.objects.filter(user=user, is_completed=True)
+            own_tasks = Task.objects.filter(user=user).filter(Q(assigned_by__isnull=True) | Q(assigned_by=user))
+            context['pending_tasks'] = own_tasks.filter(is_completed=False)
+            context['completed_tasks'] = own_tasks.filter(is_completed=True)
             context['task_form'] = TaskForm()
 
             note, _ = Note.objects.get_or_create(user=user)

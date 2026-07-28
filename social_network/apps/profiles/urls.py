@@ -33,9 +33,13 @@ urlpatterns = [
     path('toggle-reaction/<int:message_id>/', ToggleMessageReactionView.as_view(), name='toggle_reaction'),
 
     # Личные задачи
+    path('task/list/', TaskListFeedView.as_view(), name='task_list_feed'),
     path('task/create/', TaskCreateView.as_view(), name='task_create'),
+    path('task/quick-create/', TaskQuickCreateView.as_view(), name='task_quick_create'),
     path('task/<int:task_id>/toggle/', TaskToggleView.as_view(), name='task_toggle'),
+    path('task/<int:task_id>/status/', TaskStatusUpdateView.as_view(), name='task_status_update'),
     path('task/<int:task_id>/delete/', TaskDeleteView.as_view(), name='task_delete'),
+    path('task/<int:task_id>/edit/', TaskEditView.as_view(), name='task_edit'),
 
     # Личные заметки
     path('note/save/', NoteSaveView.as_view(), name='note_save'),
@@ -43,6 +47,8 @@ urlpatterns = [
     # Календарь
     path('event/create/', EventCreateView.as_view(), name='event_create'),
     path('event/<int:event_id>/delete/', EventDeleteView.as_view(), name='event_delete'),
+    path('calendar/users/', CalendarUsersListView.as_view(), name='calendar_users_list'),
+    path('calendar/task-create/', CalendarTaskCreateView.as_view(), name='calendar_task_create'),
     path('calendar/events/', CalendarEventsFeedView.as_view(), name='calendar_events_feed'),
 
     # Статус сотрудника

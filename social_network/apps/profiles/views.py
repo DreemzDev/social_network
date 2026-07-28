@@ -1,6 +1,6 @@
 from typing import Any
 from django.templatetags.static import static
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.core.cache import cache
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -24,13 +24,14 @@ from phonebook.models import Phonebook
 from phonebook.forms import UpdateBookForm
 from django_private_chat2.models import MessageModel, DialogsModel
 from .models import MessageReaction, Task, Note, Event
-from .forms import TaskForm, NoteForm, EventForm
-from datetime import date
+from .forms import TaskForm, TaskEditForm, NoteForm, EventForm
+from datetime import date, timedelta
 from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import uuid
 
 
 class AddProfile(UpdateView):
@@ -449,28 +450,168 @@ class ToggleMessageReactionView(LoginRequiredMixin, View):
 
 # --- Личные задачи ---
 
+class TaskListFeedView(LoginRequiredMixin, View):
+    """Возвращает актуальный список собственных задач пользователя (без
+    поручений от других) — используется для точечного обновления виджета
+    «Мои задачи», когда задача была изменена из другого места (например,
+    из виджета календаря)."""
+
+    def _serialize(self, task):
+        return {
+            'id': task.id,
+            'title': task.title,
+            'description': task.description,
+            'due_date': task.due_date.strftime('%d.%m') if task.due_date else None,
+            'due_date_iso': task.due_date.isoformat() if task.due_date else '',
+            'is_completed': task.is_completed,
+            'status': task.status,
+            'status_label': task.get_status_display(),
+        }
+
+    def get(self, request):
+        own_tasks = Task.objects.filter(user=request.user).filter(Q(assigned_by__isnull=True) | Q(assigned_by=request.user))
+        return JsonResponse({
+            'pending': [self._serialize(t) for t in own_tasks.filter(is_completed=False)],
+            'completed': [self._serialize(t) for t in own_tasks.filter(is_completed=True)],
+        })
+
+
 class TaskCreateView(LoginRequiredMixin, View):
     def post(self, request):
         form = TaskForm(request.POST)
-        if form.is_valid():
-            task = form.save(commit=False)
-            task.user = request.user
-            task.save()
-        return redirect('addpost', username=request.user.username)
+        if not form.is_valid():
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+        task = form.save(commit=False)
+        task.user = request.user
+        task.save()
+        return JsonResponse({
+            'success': True,
+            'task': {
+                'id': task.id,
+                'title': task.title,
+                'description': task.description,
+                'due_date': task.due_date.strftime('%d.%m') if task.due_date else None,
+                'due_date_iso': task.due_date.isoformat() if task.due_date else '',
+                'is_completed': task.is_completed,
+                'status': task.status,
+                'status_label': task.get_status_display(),
+            },
+        })
+
+
+def _task_participant_or_404(task_id, user):
+    """Задача видна и исполнителю, и постановщику (если это разные люди)."""
+    return get_object_or_404(
+        Task.objects.filter(Q(user=user) | Q(assigned_by=user)),
+        pk=task_id,
+    )
+
+
+class TaskStatusUpdateView(LoginRequiredMixin, View):
+    """Меняет статус задачи. Доступно и исполнителю, и постановщику — оба видят
+    один и тот же статус (синхронизирован через единое поле в модели)."""
+
+    def post(self, request, task_id):
+        task = _task_participant_or_404(task_id, request.user)
+        status = request.POST.get('status')
+        if status not in dict(Task.Status.choices):
+            return JsonResponse({'success': False, 'error': 'Некорректный статус.'}, status=400)
+
+        task.status = status
+        task.save(update_fields=['status', 'is_completed'])
+        return JsonResponse({
+            'success': True,
+            'task': {
+                'id': task.id,
+                'title': task.title,
+                'description': task.description,
+                'due_date': task.due_date.strftime('%d.%m') if task.due_date else None,
+                'due_date_iso': task.due_date.isoformat() if task.due_date else '',
+                'is_completed': task.is_completed,
+                'status': task.status,
+                'status_label': task.get_status_display(),
+                'toggle_url': reverse('task_toggle', kwargs={'task_id': task.id}),
+                'delete_url': reverse('task_delete', kwargs={'task_id': task.id}),
+                'edit_url': reverse('task_edit', kwargs={'task_id': task.id}),
+            },
+        })
 
 
 class TaskToggleView(LoginRequiredMixin, View):
+    """Переключение выполнено/не выполнено (используется чекбоксом в виджете
+    «Мои задачи» для собственных задач без постановщика). Доступно и исполнителю,
+    и постановщику."""
+
     def post(self, request, task_id):
-        task = get_object_or_404(Task, pk=task_id, user=request.user)
-        task.is_completed = not task.is_completed
-        task.save(update_fields=['is_completed'])
-        return JsonResponse({'success': True, 'is_completed': task.is_completed})
+        task = _task_participant_or_404(task_id, request.user)
+        task.status = Task.Status.NOT_STARTED if task.is_completed else Task.Status.DONE
+        task.save(update_fields=['status', 'is_completed'])
+        return JsonResponse({
+            'success': True,
+            'task': {
+                'id': task.id,
+                'title': task.title,
+                'description': task.description,
+                'due_date': task.due_date.strftime('%d.%m') if task.due_date else None,
+                'due_date_iso': task.due_date.isoformat() if task.due_date else '',
+                'is_completed': task.is_completed,
+                'status': task.status,
+                'status_label': task.get_status_display(),
+                'toggle_url': reverse('task_toggle', kwargs={'task_id': task.id}),
+                'delete_url': reverse('task_delete', kwargs={'task_id': task.id}),
+                'edit_url': reverse('task_edit', kwargs={'task_id': task.id}),
+            },
+        })
 
 
 class TaskDeleteView(LoginRequiredMixin, View):
+    """Удалить задачу может только тот, кто её создал: постановщик (если задача
+    кому-то поручена) либо сам исполнитель (если задача личная, без постановщика)."""
+
     def post(self, request, task_id):
-        get_object_or_404(Task, pk=task_id, user=request.user).delete()
-        return redirect('addpost', username=request.user.username)
+        task = get_object_or_404(Task, pk=task_id)
+        creator = task.assigned_by or task.user
+        if creator != request.user:
+            raise Http404
+        task.delete()
+        return JsonResponse({'success': True})
+
+
+class TaskEditView(LoginRequiredMixin, View):
+    """Редактировать задачу может только её постановщик (или сам исполнитель для
+    личных задач без постановщика). При изменении помечает задачу как is_edited,
+    чтобы исполнитель видел, что условия поменялись."""
+
+    def post(self, request, task_id):
+        task = get_object_or_404(Task, pk=task_id)
+        creator = task.assigned_by or task.user
+        if creator != request.user:
+            raise Http404
+
+        form = TaskEditForm(request.POST, instance=task)
+        if not form.is_valid():
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+        task = form.save(commit=False)
+        if task.assigned_by_id and task.assigned_by_id != task.user_id:
+            task.is_edited = True
+        task.save()
+
+        return JsonResponse({
+            'success': True,
+            'task': {
+                'id': task.id,
+                'title': task.title,
+                'description': task.description,
+                'due_date': task.due_date.strftime('%d.%m') if task.due_date else None,
+                'due_date_iso': task.due_date.isoformat() if task.due_date else '',
+                'is_completed': task.is_completed,
+                'status': task.status,
+                'status_label': task.get_status_display(),
+                'is_edited': task.is_edited,
+            },
+        })
 
 
 # --- Личные заметки ---
@@ -484,53 +625,235 @@ class NoteSaveView(LoginRequiredMixin, View):
         return redirect('addpost', username=request.user.username)
 
 
+class TaskQuickCreateView(LoginRequiredMixin, View):
+    """Быстрое создание задачи из заметки (AJAX): название берётся из
+    выделенного в заметке текста, либо из первых 100 символов заметки."""
+
+    def post(self, request):
+        title = request.POST.get('title', '').strip()[:255]
+        if not title:
+            return JsonResponse({'success': False, 'error': 'Пустое название задачи.'}, status=400)
+
+        task = Task.objects.create(user=request.user, title=title)
+        return JsonResponse({
+            'success': True,
+            'task': {
+                'id': task.id,
+                'title': task.title,
+                'due_date': None,
+                'toggle_url': reverse('task_toggle', kwargs={'task_id': task.id}),
+                'delete_url': reverse('task_delete', kwargs={'task_id': task.id}),
+            },
+        })
+
+
 # --- Календарь ---
 
 class EventCreateView(LoginRequiredMixin, View):
+    """Создаёт личное напоминание (AJAX, JSON) — только для себя, без исполнения."""
+
     def post(self, request):
         form = EventForm(request.POST)
-        if form.is_valid():
-            event = form.save(commit=False)
-            event.user = request.user
-            event.event_type = Event.EventType.PERSONAL
-            event.save()
-        return redirect('addpost', username=request.user.username)
+        if not form.is_valid():
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+        event = form.save(commit=False)
+        event.user = request.user
+        event.created_by = request.user
+        event.event_type = Event.EventType.PERSONAL
+        event.save()
+
+        return JsonResponse({'success': True, 'event': {'id': event.id}})
 
 
 class EventDeleteView(LoginRequiredMixin, View):
     def post(self, request, event_id):
         get_object_or_404(Event, pk=event_id, user=request.user, event_type=Event.EventType.PERSONAL).delete()
-        return redirect('addpost', username=request.user.username)
+        return JsonResponse({'success': True})
+
+
+class CalendarUsersListView(LoginRequiredMixin, View):
+    """Список пользователей для выбора исполнителя задачи через календарь (AJAX)."""
+
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        qs = get_user_model().objects.exclude(pk=request.user.pk)
+        if query:
+            qs = qs.filter(Q(first_name__icontains=query) | Q(last_name__icontains=query) | Q(username__icontains=query))
+        users = [
+            {'id': u.id, 'name': f'{u.first_name} {u.last_name}'.strip() or u.username}
+            for u in qs.order_by('first_name', 'last_name')[:20]
+        ]
+        return JsonResponse({'users': users})
+
+
+class CalendarTaskCreateView(LoginRequiredMixin, View):
+    """Постановка задачи через календарь: себе (без исполнителя) или другому
+    сотруднику (с указанием исполнителя и постановщика)."""
+
+    def post(self, request):
+        assignee_id = request.POST.get('assignee_id', '').strip()
+        assignee = get_object_or_404(get_user_model(), pk=assignee_id) if assignee_id else request.user
+
+        form = TaskEditForm(request.POST)
+        if not form.is_valid():
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+        if not form.cleaned_data.get('due_date'):
+            return JsonResponse({'success': False, 'errors': {'due_date': ['Укажите дату.']}}, status=400)
+
+        task = form.save(commit=False)
+        task.user = assignee
+        task.assigned_by = request.user
+        task.save()
+
+        return JsonResponse({
+            'success': True,
+            'task': {
+                'id': task.id,
+                'title': task.title,
+                'description': task.description,
+                'due_date_iso': task.due_date.isoformat(),
+                'status': task.status,
+                'status_label': task.get_status_display(),
+                'assignee_name': f'{assignee.first_name} {assignee.last_name}'.strip() or assignee.username,
+                'is_own': assignee_id == '' or int(assignee_id) == request.user.id,
+            },
+        })
+
+
+def _expand_recurrence(event, window_start, window_end):
+    """Виртуально повторяет событие внутри окна [window_start, window_end],
+    не создавая новых записей в БД. Возвращает список дат."""
+    if event.recurrence == Event.Recurrence.NONE:
+        return [event.date] if window_start <= event.date <= window_end else []
+
+    dates = []
+    current = event.date
+    step_years = 1 if event.recurrence == Event.Recurrence.YEARLY else 0
+    step_months = 1 if event.recurrence == Event.Recurrence.MONTHLY else 0
+    step_weeks = 1 if event.recurrence == Event.Recurrence.WEEKLY else 0
+
+    # Отматываем назад до начала окна, затем идём вперёд, чтобы не пропустить повторы
+    while current > window_start:
+        current = _shift_date(current, -step_years, -step_months, -7 * step_weeks)
+
+    while current <= window_end:
+        if current >= window_start and current >= event.date:
+            dates.append(current)
+        current = _shift_date(current, step_years, step_months, 7 * step_weeks)
+
+    return dates
+
+
+def _shift_date(d, years, months, days):
+    if years:
+        try:
+            return d.replace(year=d.year + years)
+        except ValueError:
+            # 29 февраля в невисокосный год — сдвигаем на 28-е
+            return d.replace(year=d.year + years, day=28)
+    if months:
+        month = d.month - 1 + months
+        year = d.year + month // 12
+        month = month % 12 + 1
+        day = min(d.day, [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+        return d.replace(year=year, month=month, day=day)
+    if days:
+        return d + timedelta(days=days)
+    return d
 
 
 class CalendarEventsFeedView(LoginRequiredMixin, View):
-    """JSON-фид событий для FullCalendar: личные события пользователя + корпоративные + дни рождения."""
+    """JSON-фид событий для календаря: личные события пользователя + корпоративные + дни рождения."""
 
     def get(self, request):
         user = request.user
         events = Event.objects.filter(
             Q(user=user, event_type=Event.EventType.PERSONAL) | Q(event_type=Event.EventType.CORPORATE)
         )
-        items = [
-            {
-                'id': e.id,
-                'title': e.title,
-                'start': e.date.isoformat(),
+
+        window_start = date.today() - timedelta(days=365)
+        window_end = date.today() + timedelta(days=365)
+
+        items = []
+        for e in events:
+            for occurrence_date in _expand_recurrence(e, window_start, window_end):
+                items.append({
+                    'id': e.id,
+                    'is_task': False,
+                    'title': e.title,
+                    'description': e.description,
+                    'start': occurrence_date.isoformat(),
+                    'allDay': True,
+                    'color': '#0077FF' if e.event_type == Event.EventType.CORPORATE else '#1C3FAA',
+                    'extendedProps': {
+                        'type': e.event_type,
+                        'deletable': e.created_by_id == user.id,
+                        'isCompleted': False,
+                        'isRecurring': e.recurrence != Event.Recurrence.NONE,
+                    },
+                })
+
+        # Задачи с дедлайном: собственные задачи исполнителя + задачи, которые
+        # пользователь поставил другим (постановщик тоже видит их в своём календаре).
+        tasks = Task.objects.filter(
+            Q(user=user) | Q(assigned_by=user)
+        ).filter(due_date__isnull=False).select_related('user', 'assigned_by')
+
+        for t in tasks:
+            is_assignment = bool(t.assigned_by_id and t.assigned_by_id != t.user_id)
+            is_creator_view = is_assignment and t.assigned_by_id == user.id
+
+            if t.is_completed:
+                color = '#22c55e'
+            elif is_assignment and not is_creator_view:
+                color = '#F78B00'
+            else:
+                color = '#0077FF'
+
+            assigner_name = ''
+            assignee_name = ''
+            if is_assignment:
+                assigner_name = f'{t.assigned_by.first_name} {t.assigned_by.last_name}'.strip() or t.assigned_by.username
+                assignee_name = f'{t.user.first_name} {t.user.last_name}'.strip() or t.user.username
+
+            items.append({
+                'id': t.id,
+                'is_task': True,
+                'title': t.title,
+                'description': t.description,
+                'start': t.due_date.isoformat(),
                 'allDay': True,
-                'color': '#0077FF' if e.event_type == Event.EventType.CORPORATE else '#1C3FAA',
-                'extendedProps': {'type': e.event_type, 'deletable': e.user_id == user.id},
-            }
-            for e in events
-        ]
+                'color': color,
+                'extendedProps': {
+                    'type': 'task',
+                    'deletable': is_creator_view,
+                    'isCompleted': t.is_completed,
+                    'isAssignment': is_assignment,
+                    'status': t.status,
+                    'statusLabel': t.get_status_display(),
+                    'isEdited': t.is_edited,
+                    'assignerName': assigner_name,
+                    'assigneeName': assignee_name if is_creator_view else '',
+                    'toggleUrl': reverse('task_toggle', kwargs={'task_id': t.id}),
+                    'statusUrl': reverse('task_status_update', kwargs={'task_id': t.id}),
+                    'deleteUrl': reverse('task_delete', kwargs={'task_id': t.id}),
+                    'editUrl': reverse('task_edit', kwargs={'task_id': t.id}),
+                    'canEdit': is_creator_view,
+                },
+            })
 
         # Дни рождения — виртуальные события без Event-записи, повторяются каждый год
         for u in get_user_model().objects.exclude(birthday__isnull=True):
             items.append({
-                'title': f'🎂 {u.first_name} {u.last_name}',
+                'is_task': False,
+                'title': f'🎂 День рождения у {u.first_name} {u.last_name}',
+                'description': '',
                 'start': f'{date.today().year}-{u.birthday.month:02d}-{u.birthday.day:02d}',
                 'allDay': True,
                 'color': '#F78B00',
-                'extendedProps': {'type': 'birthday', 'deletable': False},
+                'extendedProps': {'type': 'birthday', 'deletable': False, 'isCompleted': False},
             })
 
         return JsonResponse(items, safe=False)
