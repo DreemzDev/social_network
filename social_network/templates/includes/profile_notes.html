@@ -1,5 +1,5 @@
 {% load static %}
-<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="notes" draggable="true">
+<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="notes">
   <div class="sidebar-panel__header flex cursor-grab items-center justify-between p-4 active:cursor-grabbing">
     <div class="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
       <i data-feather="move" class="h-4 w-4 text-gray-300 dark:text-zinc-600"></i>
@@ -13,7 +13,91 @@
     <form action="{% url 'note_save' %}" method="post">
       {% csrf_token %}
       {{ note_form.content }}
-      <button type="submit" class="mt-2 rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">Сохранить</button>
+      <div class="mt-2 flex items-center gap-2">
+        <button type="submit" class="rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">Сохранить</button>
+        <button type="button" id="note-quick-task-btn" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-600 dark:text-gray-200 dark:hover:bg-zinc-800">
+          📌 Создать задачу
+        </button>
+      </div>
+      <div id="note-quick-task-status" class="mt-2 text-xs text-gray-400"></div>
     </form>
   </div>
 </div>
+
+<script>
+  (function () {
+    const btn = document.getElementById('note-quick-task-btn');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+      const textarea = document.getElementById('{{ note_form.content.id_for_label }}');
+      const statusEl = document.getElementById('note-quick-task-status');
+      if (!textarea) return;
+
+      const selectionStart = textarea.selectionStart;
+      const selectionEnd = textarea.selectionEnd;
+      const selectedText = textarea.value.slice(selectionStart, selectionEnd).trim();
+      const title = selectedText || textarea.value.trim().slice(0, 100);
+
+      if (!title) {
+        statusEl.textContent = 'Нечего превращать в задачу — заметка пустая.';
+        return;
+      }
+
+      fetch('{% url "task_quick_create" %}', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'title=' + encodeURIComponent(title),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.success) {
+            statusEl.textContent = data.error || 'Не удалось создать задачу.';
+            return;
+          }
+
+          const placeholder = document.getElementById('no-tasks-placeholder');
+          if (placeholder) placeholder.remove();
+
+          const list = document.getElementById('pending-tasks-list');
+          if (list) {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-2 rounded-lg px-2 py-1.5 text-base hover:bg-gray-50 dark:hover:bg-zinc-800';
+            row.innerHTML =
+              '<input type="checkbox" class="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-[#0077FF] focus:ring-[#0077FF]">' +
+              '<span class="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-100"></span>' +
+              '<form method="post" class="flex-shrink-0">' +
+                '<button type="submit" class="text-gray-300 hover:text-red-500">' +
+                  '<svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>' +
+                '</button>' +
+              '</form>';
+
+            row.querySelector('span').textContent = data.task.title;
+
+            const checkbox = row.querySelector('input[type=checkbox]');
+            checkbox.addEventListener('change', function () {
+              fetch(data.task.toggle_url, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+              }).then(() => row.remove());
+            });
+
+            const deleteForm = row.querySelector('form');
+            deleteForm.action = data.task.delete_url;
+            deleteForm.innerHTML = '{% csrf_token %}' + deleteForm.innerHTML;
+
+            list.appendChild(row);
+            if (window.feather) feather.replace();
+          }
+
+          statusEl.textContent = 'Задача создана: «' + data.task.title + '»';
+        })
+        .catch(() => {
+          statusEl.textContent = 'Ошибка сети — задача не создана.';
+        });
+    });
+  })();
+</script>

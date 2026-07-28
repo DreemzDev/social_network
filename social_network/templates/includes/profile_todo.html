@@ -1,5 +1,5 @@
 {% load static %}
-<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="todo" draggable="true">
+<div class="sidebar-panel box dark:bg-zinc-900" data-panel-id="todo">
   <div class="sidebar-panel__header flex cursor-grab items-center justify-between p-4 active:cursor-grabbing">
     <div class="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
       <i data-feather="move" class="h-4 w-4 text-gray-300 dark:text-zinc-600"></i>
@@ -9,59 +9,487 @@
       <i data-feather="chevron-down" class="h-4 w-4 transition-transform"></i>
     </button>
   </div>
-  <div class="sidebar-panel__content px-4 pb-4" x-data="{ showCompleted: false }">
-    {% if completed_tasks %}
-    <div class="mb-2 flex justify-end">
-      <button type="button" x-on:click="showCompleted = !showCompleted" class="text-sm text-gray-400 hover:text-gray-600">
-        <span x-text="showCompleted ? 'Скрыть выполненные' : 'Показать выполненные (' + {{ completed_tasks|length }} + ')'"></span>
-      </button>
-    </div>
-    {% endif %}
+  <div class="sidebar-panel__content px-4 pb-4">
 
-    <form action="{% url 'task_create' %}" method="post" class="mb-3 flex gap-2">
-      {% csrf_token %}
-      <input type="text" name="title" placeholder="Новая задача" required
-             class="min-w-0 flex-1 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
-      <input type="date" name="due_date"
-             class="w-36 flex-shrink-0 rounded-lg border border-gray-300 bg-gray-50 px-2 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
-      <button type="submit" class="flex-shrink-0 rounded-lg bg-[#0077FF] px-3 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">+</button>
-    </form>
+    <!-- Прогресс выполнения -->
+    <div class="mb-3 flex items-center gap-3">
+      <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-zinc-800">
+        <div id="task-progress-bar" class="h-full rounded-full bg-[#0077FF] transition-all duration-500"></div>
+      </div>
+      <span id="task-progress-label" class="flex-shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400"></span>
+    </div>
+
+    <div class="mb-3 flex items-center justify-between">
+      <button type="button" id="task-add-btn" class="inline-flex items-center gap-1.5 rounded-lg bg-[#0077FF] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#3391FF]">
+        <i data-feather="plus" class="h-3.5 w-3.5"></i> Новая задача
+      </button>
+      <button type="button" id="task-toggle-completed-btn" class="text-sm text-gray-400 hover:text-gray-600"><span id="task-toggle-completed-label">Показать выполненные</span> (<span id="task-completed-count">0</span>)</button>
+    </div>
 
     <div class="space-y-1.5">
-      {% for task in pending_tasks %}
-      <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-base hover:bg-gray-50 dark:hover:bg-zinc-800">
-        <input type="checkbox"
-               class="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-[#0077FF] focus:ring-[#0077FF]"
-               x-on:change="fetch('{% url 'task_toggle' task.id %}', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(() => $el.closest('div').remove())">
-        <span class="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-100">{{ task.title }}</span>
-        {% if task.due_date %}<span class="flex-shrink-0 text-xs text-gray-400">{{ task.due_date|date:"d.m" }}</span>{% endif %}
-        <form action="{% url 'task_delete' task.id %}" method="post" class="flex-shrink-0">
-          {% csrf_token %}
-          <button type="submit" class="text-gray-300 hover:text-red-500">
-            <i data-feather="x" class="h-3.5 w-3.5"></i>
-          </button>
-        </form>
-      </div>
-      {% empty %}
-      <div class="py-2 text-xs text-gray-400">Нет активных задач</div>
-      {% endfor %}
-
-      <div x-cloak x-show="showCompleted" class="space-y-1.5 border-t border-gray-100 pt-1.5 dark:border-zinc-800">
-        {% for task in completed_tasks %}
-        <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-base">
-          <input type="checkbox" checked
-                 class="h-4 w-4 flex-shrink-0 rounded border-gray-300 text-[#0077FF] focus:ring-[#0077FF]"
-                 x-on:change="fetch('{% url 'task_toggle' task.id %}', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(() => $el.closest('div').remove())">
-          <span class="min-w-0 flex-1 truncate text-gray-400 line-through">{{ task.title }}</span>
-          <form action="{% url 'task_delete' task.id %}" method="post" class="flex-shrink-0">
-            {% csrf_token %}
-            <button type="submit" class="text-gray-300 hover:text-red-500">
+      <div id="pending-tasks-list" class="space-y-1.5">
+        {% for task in pending_tasks %}
+        <div class="task-row accordion rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800" data-task-id="{{ task.id }}" data-due-iso="{{ task.due_date|date:'Y-m-d' }}" data-status="{{ task.status }}">
+          <div class="accordion__pane">
+          <div class="flex items-center gap-2 px-2 py-2 text-base">
+            <label class="task-check-wrap relative flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center">
+              <input type="checkbox" class="task-checkbox peer absolute h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-gray-300 transition-colors checked:border-[#0077FF] checked:bg-[#0077FF] dark:border-zinc-600">
+              <i data-feather="check" class="pointer-events-none absolute h-3 w-3 text-white opacity-0 transition-opacity peer-checked:opacity-100"></i>
+            </label>
+            <span class="task-desc-toggle {% if task.description %}accordion__pane__toggle cursor-pointer{% endif %} min-w-0 flex-1 truncate text-gray-800 dark:text-gray-100">
+              <span class="task-title">{{ task.title }}</span>
+              {% if task.description %}<i data-feather="chevron-down" class="task-desc-arrow ml-1 inline-block h-3 w-3 flex-shrink-0 align-middle text-gray-400 transition-transform"></i>{% endif %}
+            </span>
+            {% if task.due_date %}
+            <span class="task-due flex-shrink-0 rounded-full px-2 py-0.5 text-xs {% if task.is_overdue %}bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-400{% else %}bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400{% endif %}">{{ task.due_date|date:"d.m" }}</span>
+            {% endif %}
+            <button type="button" class="task-edit-btn flex-shrink-0 text-gray-300 hover:text-[#0077FF]">
+              <i data-feather="edit-2" class="h-3.5 w-3.5"></i>
+            </button>
+            <button type="button" class="task-delete-btn flex-shrink-0 text-gray-300 hover:text-red-500">
               <i data-feather="x" class="h-3.5 w-3.5"></i>
             </button>
-          </form>
+          </div>
+          {% if task.description %}
+          <div class="task-desc-panel accordion__pane__content px-2 pb-2 pl-9 text-sm text-gray-500 dark:text-gray-400">{{ task.description }}</div>
+          {% endif %}
+          </div>
         </div>
         {% endfor %}
+      </div>
+      <div id="no-tasks-placeholder" class="flex flex-col items-center gap-2 py-6 text-center" {% if pending_tasks %}style="display:none"{% endif %}>
+        <i data-feather="check-circle" class="h-8 w-8 text-gray-200 dark:text-zinc-700"></i>
+        <span class="text-sm text-gray-400">Нет активных задач</span>
+      </div>
+
+      <div id="completed-tasks-wrap" class="hidden border-t border-gray-100 pt-1.5 dark:border-zinc-800">
+        <div id="completed-tasks-list" class="space-y-1.5">
+          {% for task in completed_tasks %}
+          <div class="task-row accordion rounded-lg" data-task-id="{{ task.id }}" data-due-iso="{{ task.due_date|date:'Y-m-d' }}" data-status="{{ task.status }}">
+            <div class="accordion__pane">
+            <div class="flex items-center gap-2 px-2 py-2 text-base">
+              <label class="task-check-wrap relative flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center">
+                <input type="checkbox" checked class="task-checkbox peer absolute h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-gray-300 transition-colors checked:border-[#0077FF] checked:bg-[#0077FF] dark:border-zinc-600">
+                <i data-feather="check" class="pointer-events-none absolute h-3 w-3 text-white opacity-100 transition-opacity"></i>
+              </label>
+              <span class="task-desc-toggle {% if task.description %}accordion__pane__toggle cursor-pointer{% endif %} min-w-0 flex-1 truncate text-gray-400 line-through">
+                <span class="task-title">{{ task.title }}</span>
+                {% if task.description %}<i data-feather="chevron-down" class="task-desc-arrow ml-1 inline-block h-3 w-3 flex-shrink-0 align-middle text-gray-400 transition-transform"></i>{% endif %}
+              </span>
+              {% if task.due_date %}<span class="task-due flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400 dark:bg-zinc-800">{{ task.due_date|date:"d.m" }}</span>{% endif %}
+              <button type="button" class="task-edit-btn flex-shrink-0 text-gray-300 hover:text-[#0077FF]">
+                <i data-feather="edit-2" class="h-3.5 w-3.5"></i>
+              </button>
+              <button type="button" class="task-delete-btn flex-shrink-0 text-gray-300 hover:text-red-500">
+                <i data-feather="x" class="h-3.5 w-3.5"></i>
+              </button>
+            </div>
+            {% if task.description %}
+            <div class="task-desc-panel accordion__pane__content px-2 pb-2 pl-9 text-sm text-gray-500 dark:text-gray-400">{{ task.description }}</div>
+            {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Модалка создания/редактирования задачи -->
+<div id="task-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-md rounded-xl bg-white p-5 dark:bg-zinc-900">
+    <div class="mb-4 flex items-center justify-between">
+      <div id="task-modal-title" class="text-base font-semibold text-gray-900 dark:text-white">Новая задача</div>
+      <button type="button" id="task-modal-close" class="text-gray-400 hover:text-gray-600">
+        <i data-feather="x" class="h-5 w-5"></i>
+      </button>
+    </div>
+    <div id="task-modal-error" class="mb-3 hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"></div>
+    <form id="task-modal-form" class="space-y-3">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Название</label>
+        <input type="text" id="task-modal-title-input" required
+               class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Описание</label>
+        <textarea id="task-modal-description" rows="4"
+                  class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"></textarea>
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Срок выполнения</label>
+        <input type="date" id="task-modal-due-date"
+               class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-base text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" id="task-modal-cancel" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-600 dark:text-gray-200 dark:hover:bg-zinc-800">Отмена</button>
+        <button type="submit" id="task-modal-submit" class="rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const csrfToken = '{{ csrf_token }}';
+    const pendingList = document.getElementById('pending-tasks-list');
+    const completedList = document.getElementById('completed-tasks-list');
+    const completedWrap = document.getElementById('completed-tasks-wrap');
+    const placeholder = document.getElementById('no-tasks-placeholder');
+    const toggleCompletedBtn = document.getElementById('task-toggle-completed-btn');
+    const toggleCompletedLabel = document.getElementById('task-toggle-completed-label');
+    const completedCountEl = document.getElementById('task-completed-count');
+    const progressBar = document.getElementById('task-progress-bar');
+    const progressLabel = document.getElementById('task-progress-label');
+
+    let showCompleted = false;
+
+    function updatePlaceholder() {
+      if (!placeholder) return;
+      placeholder.style.display = pendingList.children.length ? 'none' : '';
+    }
+
+    function updateCounters() {
+      const pendingCount = pendingList.children.length;
+      const completedCount = completedList.children.length;
+      const total = pendingCount + completedCount;
+
+      completedCountEl.textContent = completedCount;
+      toggleCompletedBtn.style.display = completedCount ? '' : 'none';
+      if (!completedCount) {
+        completedWrap.classList.add('hidden');
+        showCompleted = false;
+        toggleCompletedLabel.textContent = 'Показать выполненные';
+      }
+
+      const percent = total ? Math.round((completedCount / total) * 100) : 0;
+      progressBar.style.width = percent + '%';
+      progressLabel.textContent = total ? completedCount + ' из ' + total : 'Нет задач';
+    }
+
+    // Оповещает другие виджеты страницы (например, календарь) о том, что
+    // список задач изменился, чтобы они могли обновить своё отображение.
+    function notifyTasksChanged() {
+      document.dispatchEvent(new CustomEvent('tasks:changed'));
+    }
+
+    function buildTaskRow(task) {
+      const isCompleted = task.status === 'done';
+      const row = document.createElement('div');
+      row.className = 'task-row accordion rounded-lg' + (isCompleted ? '' : ' hover:bg-gray-50 dark:hover:bg-zinc-800');
+      row.dataset.taskId = task.id;
+      row.dataset.dueIso = task.due_date_iso || '';
+      row.dataset.status = task.status;
+
+      const pane = document.createElement('div');
+      pane.className = 'accordion__pane';
+
+      const header = document.createElement('div');
+      header.className = 'flex items-center gap-2 px-2 py-2 text-base';
+
+      const checkLabel = document.createElement('label');
+      checkLabel.className = 'task-check-wrap relative flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-checkbox peer absolute h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-gray-300 transition-colors checked:border-[#0077FF] checked:bg-[#0077FF] dark:border-zinc-600';
+      checkbox.checked = isCompleted;
+      const checkIcon = document.createElement('i');
+      checkIcon.setAttribute('data-feather', 'check');
+      checkIcon.className = 'pointer-events-none absolute h-3 w-3 text-white transition-opacity ' + (isCompleted ? 'opacity-100' : 'opacity-0 peer-checked:opacity-100');
+      checkLabel.appendChild(checkbox);
+      checkLabel.appendChild(checkIcon);
+      header.appendChild(checkLabel);
+
+      const desc = document.createElement('span');
+      desc.className = 'task-desc-toggle min-w-0 flex-1 truncate ' + (task.description ? 'accordion__pane__toggle cursor-pointer ' : '') + (isCompleted ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-100');
+      const title = document.createElement('span');
+      title.className = 'task-title';
+      title.textContent = task.title;
+      desc.appendChild(title);
+      if (task.description) {
+        const arrow = document.createElement('i');
+        arrow.setAttribute('data-feather', 'chevron-down');
+        arrow.className = 'task-desc-arrow ml-1 inline-block h-3 w-3 flex-shrink-0 align-middle text-gray-400 transition-transform';
+        desc.appendChild(arrow);
+      }
+      header.appendChild(desc);
+
+      if (task.due_date) {
+        const due = document.createElement('span');
+        due.className = 'task-due flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-zinc-800 dark:text-gray-400';
+        due.textContent = task.due_date;
+        header.appendChild(due);
+      }
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'task-edit-btn flex-shrink-0 text-gray-300 hover:text-[#0077FF]';
+      editBtn.innerHTML = '<i data-feather="edit-2" class="h-3.5 w-3.5"></i>';
+      header.appendChild(editBtn);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'task-delete-btn flex-shrink-0 text-gray-300 hover:text-red-500';
+      deleteBtn.innerHTML = '<i data-feather="x" class="h-3.5 w-3.5"></i>';
+      header.appendChild(deleteBtn);
+
+      pane.appendChild(header);
+
+      if (task.description) {
+        const panel = document.createElement('div');
+        panel.className = 'task-desc-panel accordion__pane__content px-2 pb-2 pl-9 text-sm text-gray-500 dark:text-gray-400';
+        panel.textContent = task.description;
+        pane.appendChild(panel);
+        observeAccordionPane(pane);
+      }
+
+      row.appendChild(pane);
+
+      if (window.feather) feather.replace({ width: '14', height: '14' });
+      return row;
+    }
+
+    function updateRowDescription(row, description) {
+      const pane = row.querySelector('.accordion__pane');
+      const existingPanel = row.querySelector('.task-desc-panel');
+      const descToggle = row.querySelector('.task-desc-toggle');
+      let arrow = row.querySelector('.task-desc-arrow');
+
+      if (description) {
+        descToggle.classList.add('accordion__pane__toggle', 'cursor-pointer');
+        if (!arrow) {
+          arrow = document.createElement('i');
+          arrow.setAttribute('data-feather', 'chevron-down');
+          arrow.className = 'task-desc-arrow ml-1 inline-block h-3 w-3 flex-shrink-0 align-middle text-gray-400 transition-transform';
+          descToggle.appendChild(arrow);
+          if (window.feather) feather.replace({ width: '12', height: '12' });
+        }
+        if (existingPanel) {
+          existingPanel.textContent = description;
+        } else {
+          const panel = document.createElement('div');
+          panel.className = 'task-desc-panel accordion__pane__content px-2 pb-2 pl-9 text-sm text-gray-500 dark:text-gray-400';
+          panel.textContent = description;
+          pane.appendChild(panel);
+          observeAccordionPane(pane);
+        }
+      } else {
+        descToggle.classList.remove('accordion__pane__toggle', 'cursor-pointer');
+        pane.classList.remove('active');
+        if (arrow) arrow.remove();
+        if (existingPanel) existingPanel.remove();
+      }
+    }
+
+    function toggleTask(row) {
+      const taskId = row.dataset.taskId;
+      fetch('/task/' + taskId + '/toggle/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.success) return;
+          const newRow = buildTaskRow(data.task);
+          row.remove();
+          if (data.task.is_completed) {
+            completedList.appendChild(newRow);
+          } else {
+            pendingList.appendChild(newRow);
+          }
+          updatePlaceholder();
+          updateCounters();
+          notifyTasksChanged();
+        });
+    }
+
+    function deleteTask(row) {
+      const taskId = row.dataset.taskId;
+      fetch('/task/' + taskId + '/delete/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken },
+      }).then(() => {
+        row.remove();
+        updatePlaceholder();
+        updateCounters();
+        notifyTasksChanged();
+      });
+    }
+
+    // Делегирование событий на весь виджет
+    document.addEventListener('change', function (event) {
+      const checkbox = event.target.closest('.task-checkbox');
+      if (!checkbox) return;
+      const row = checkbox.closest('.task-row');
+      if (row && (pendingList.contains(row) || completedList.contains(row))) {
+        toggleTask(row);
+      }
+    });
+
+    document.addEventListener('click', function (event) {
+      const deleteBtn = event.target.closest('.task-delete-btn');
+      if (deleteBtn) {
+        const row = deleteBtn.closest('.task-row');
+        if (row && (pendingList.contains(row) || completedList.contains(row))) deleteTask(row);
+        return;
+      }
+
+      const editBtn = event.target.closest('.task-edit-btn');
+      if (editBtn) {
+        const row = editBtn.closest('.task-row');
+        if (row && (pendingList.contains(row) || completedList.contains(row))) openTaskModal(row);
+        return;
+      }
+      // Раскрытие/скрытие описания задачи обрабатывается нативным
+      // Midone-аккордеоном (.accordion__pane__toggle, см. static/midone/js/app.js)
+    });
+
+    toggleCompletedBtn.addEventListener('click', function () {
+      showCompleted = !showCompleted;
+      completedWrap.classList.toggle('hidden', !showCompleted);
+      toggleCompletedLabel.textContent = showCompleted ? 'Скрыть выполненные' : 'Показать выполненные';
+    });
+
+    // Поворот стрелки синхронно с состоянием аккордеона Midone.
+    function observeAccordionPane(pane) {
+      const observer = new MutationObserver(function () {
+        const arrow = pane.querySelector('.task-desc-arrow');
+        if (arrow) arrow.style.transform = pane.classList.contains('active') ? 'rotate(180deg)' : '';
+      });
+      observer.observe(pane, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    document.querySelectorAll('#pending-tasks-list .accordion__pane, #completed-tasks-list .accordion__pane').forEach(observeAccordionPane);
+
+    // --- Модалка создания / редактирования ---
+    const modal = document.getElementById('task-modal');
+    const modalTitleLabel = document.getElementById('task-modal-title');
+    const modalForm = document.getElementById('task-modal-form');
+    const modalTitleInput = document.getElementById('task-modal-title-input');
+    const modalDescription = document.getElementById('task-modal-description');
+    const modalDueDate = document.getElementById('task-modal-due-date');
+    const modalError = document.getElementById('task-modal-error');
+    let editingRow = null;
+
+    function openCreateModal() {
+      editingRow = null;
+      modalTitleLabel.textContent = 'Новая задача';
+      modalTitleInput.value = '';
+      modalDescription.value = '';
+      modalDueDate.value = '';
+      modalError.classList.add('hidden');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      modalTitleInput.focus();
+    }
+
+    function openTaskModal(row) {
+      editingRow = row;
+      modalTitleLabel.textContent = 'Редактировать задачу';
+      modalTitleInput.value = row.querySelector('.task-title').textContent.trim();
+      const panel = row.querySelector('.task-desc-panel');
+      modalDescription.value = panel ? panel.textContent.trim() : '';
+      modalDueDate.value = row.dataset.dueIso || '';
+      modalError.classList.add('hidden');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      modalTitleInput.focus();
+    }
+
+    function closeTaskModal() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      editingRow = null;
+    }
+
+    document.getElementById('task-add-btn').addEventListener('click', openCreateModal);
+    document.getElementById('task-modal-close').addEventListener('click', closeTaskModal);
+    document.getElementById('task-modal-cancel').addEventListener('click', closeTaskModal);
+    modal.addEventListener('click', function (event) {
+      if (event.target === modal) closeTaskModal();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeTaskModal();
+    });
+
+    modalForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+
+      const isEdit = !!editingRow;
+      const url = isEdit ? '/task/' + editingRow.dataset.taskId + '/edit/' : '/task/create/';
+
+      const body = new URLSearchParams();
+      body.set('title', modalTitleInput.value);
+      body.set('description', modalDescription.value);
+      body.set('due_date', modalDueDate.value);
+
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      })
+        .then((r) => r.json().then((data) => ({ status: r.status, data: data })))
+        .then(({ status, data }) => {
+          if (status !== 200 || !data.success) {
+            const messages = data.errors ? Object.values(data.errors).flat().join(' ') : 'Не удалось сохранить задачу.';
+            modalError.textContent = messages;
+            modalError.classList.remove('hidden');
+            return;
+          }
+
+          if (isEdit) {
+            editingRow.querySelector('.task-title').textContent = data.task.title;
+            editingRow.dataset.dueIso = data.task.due_date_iso || '';
+            updateRowDescription(editingRow, data.task.description);
+
+            const existingDue = editingRow.querySelector('.task-due');
+            if (data.task.due_date) {
+              if (existingDue) {
+                existingDue.textContent = data.task.due_date;
+              } else {
+                const due = document.createElement('span');
+                due.className = 'task-due flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-zinc-800 dark:text-gray-400';
+                due.textContent = data.task.due_date;
+                editingRow.querySelector('.task-edit-btn').before(due);
+              }
+            } else if (existingDue) {
+              existingDue.remove();
+            }
+          } else {
+            data.task.status = data.task.status || 'not_started';
+            const newRow = buildTaskRow(data.task);
+            pendingList.appendChild(newRow);
+            updatePlaceholder();
+            updateCounters();
+          }
+
+          notifyTasksChanged();
+          closeTaskModal();
+        });
+    });
+
+    // Синхронизация с виджетом календаря: он живёт в отдельном скрипте со
+    // своим состоянием, поэтому при изменении своих задач там (создание
+    // "себе", смена статуса, редактирование, удаление) шлёт событие
+    // calendar-task:changed — здесь просто перезапрашиваем актуальный
+    // список и перерисовываем оба блока.
+    document.addEventListener('calendar-task:changed', function () {
+      fetch('{% url "task_list_feed" %}')
+        .then((r) => r.json())
+        .then((data) => {
+          pendingList.innerHTML = '';
+          completedList.innerHTML = '';
+          data.pending.forEach(function (task) { pendingList.appendChild(buildTaskRow(task)); });
+          data.completed.forEach(function (task) { completedList.appendChild(buildTaskRow(task)); });
+          updatePlaceholder();
+          updateCounters();
+        });
+    });
+
+    updateCounters();
+  })();
+</script>
