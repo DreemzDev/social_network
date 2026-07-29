@@ -2,10 +2,90 @@
 {% load static %}
 {% load chat_extras %}
 
+{% block body_class %} page-messenger{% endblock body_class %}
+
 {% block content %}
 <style>
-  body { overflow: hidden; }
-  .msg-editable { min-height: 40px; }
+  /* .content у Midone задаёт min-height: 100vh, из-за чего блок никогда не
+     схлопывается до реальной высоты контента — на странице мессенджера это
+     не нужно (внутренний список сообщений скроллится сам), поэтому убираем
+     этот min-height только здесь, через body.page-messenger. */
+  /* Вся цепочка обёрток base.html (.content > .mt-6 > .flex > ... >
+     .min-w-0.flex-1) должна дотянуть высоту 100vh от body до
+     #messenger-shell, иначе последний либо не помещается (calc(100vh-N)
+     не учитывает реальную позицию блока в потоке), либо блок пустой снизу.
+     Поэтому явно делаем всю цепочку flex-колонкой на 100% высоты. */
+  /* body у Midone (.app) имеет padding-top/bottom 0.75rem каждый — если не
+     учесть их в box-sizing, height:100vh + паддинги превышают реальный
+     вьюпорт, и низ страницы всё равно уезжает за экран несмотря на
+     overflow:hidden. border-box включает паддинги в заданную высоту. */
+  /* Важно: НЕ трогаем display/flex-direction у элементов base.html — у них
+     уже есть свои Tailwind-классы (flex, flex-col, md:flex-row и т.п.),
+     переопределение display ломает их раскладку на десктопе. Добавляем
+     только height/min-height/flex-grow, ничего больше. */
+  body.page-messenger { overflow: hidden; height: 100vh; box-sizing: border-box; }
+  body.page-messenger > .flex { height: 100%; min-height: 0; }
+  /* .content сам по себе НЕ flex-контейнер в Midone (только flex-item),
+     поэтому flex:1 у .mt-6 ниже не будет работать без display:flex тут —
+     это единственное необходимое изменение display в цепочке, и оно
+     безопасно: .top-bar и .mt-6 и так стоят друг под другом (block-flow),
+     column ничего не меняет визуально, кроме как даёт .mt-6 сжаться. */
+  body.page-messenger .content { min-height: 0; height: 100%; display: flex; flex-direction: column; }
+  body.page-messenger .content > .mt-6 { min-height: 0; flex: 1; overflow: hidden; margin-bottom: -1.5rem; border-radius: 0.75rem; }
+  body.page-messenger .content > .mt-6 > .flex { min-height: 0; height: 100%; }
+  body.page-messenger .content > .mt-6 > .flex > .flex-1 { min-height: 0; height: 100%; }
+  body.page-messenger .content > .mt-6 > .flex > .flex-1 > .min-w-0.flex-1 { min-height: 0; height: 100%; }
+  /* #messenger-shell и правая колонка чата (заголовок + список сообщений +
+     форма) — тоже flex items, и по умолчанию flex-item не может сжаться
+     меньше высоты своего содержимого (min-height: auto по умолчанию),
+     из-за чего #messages-container не может получить ограниченную высоту
+     и весь блок растягивается по контенту вместо скролла внутри себя. */
+  #messenger-shell { min-height: 0; height: 100%; }
+  #messenger-shell > .flex-col { min-height: 0; height: 100%; }
+  #messages-container { min-height: 0; }
+
+  /* Общий декоративный фон-паттерн для обеих колонок мессенджера: рисуем
+     его один раз на #messenger-shell (общем родителе), а не отдельно в
+     каждой колонке — иначе паттерн не совпадёт на стыке колонок. Колонки
+     остаются непрозрачными (bg-white/dark:bg-zinc-900), поэтому паттерн
+     просвечивает только там, где у них есть прозрачные/полупрозрачные
+     участки (сама лента сообщений использует chat-bg поверх этого слоя). */
+  #messenger-shell { position: relative; background-color: #6E9BC9; background-image: url('{% static "img/chat-bg-br-DGLujsdQ.png" %}'); background-repeat: no-repeat; background-size: cover; background-position: center; }
+  .dark #messenger-shell { background-color: #18181b; }
+  #messenger-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: .55;
+    background-image: url('{% static "img/pattern-YlWUl53U.svg" %}');
+    background-position: 50%;
+    background-repeat: repeat;
+    background-size: 430px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* Правая колонка (переписка) не должна иметь собственного сплошного
+     фона — паттерн родителя (#messenger-shell) должен просвечивать сквозь
+     неё целиком. Левая колонка (список диалогов), наоборот, белая. */
+  .msg-chat-column {
+    position: relative;
+    z-index: 1;
+    background-color: transparent !important;
+  }
+  .msg-dialogs-column {
+    position: relative;
+    z-index: 1;
+    background-color: #fff !important;
+    margin: 0.75rem 0 0.75rem 0.75rem;
+    height: calc(100% - 1.5rem) !important;
+  }
+  .dark .msg-dialogs-column {
+    background-color: #18181b !important;
+  }
+  .msg-dialogs-column #dialogs-list, .msg-dialogs-column #dialogs-list * {
+    font-size: 1rem;
+  }
+  .msg-editable { min-height: 24px; }
   .msg-editable:empty:before {
     content: attr(data-placeholder);
     color: #9ca3af;
@@ -13,13 +93,92 @@
   }
   .msg-editable b, .msg-editable strong { font-weight: 700; }
   .msg-editable i, .msg-editable em { font-style: italic; }
+
+  /* Овальная форма ввода в стиле Telegram: фокус подсвечивает всю пилюлю
+     рамкой, а не отдельное текстовое поле внутри неё. */
+  .msg-input-pill:focus-within { border-color: #0077FF; box-shadow: 0 0 0 1px #0077FF; }
+
+  /* .chat-bg больше не рисует собственный фон (ни цвет, ни точки) — лента
+     сообщений должна показывать паттерн общего родителя (#messenger-shell)
+     без каких-либо перекрывающих слоёв поверх него. */
+
+  /* Время+галочки в конце сообщения: если текст умещается в одну строку —
+     стоят сразу после него на той же строке; если сообщение длиннее одной
+     строки — уезжают в правый нижний угол облачка (Telegram-style). Это
+     классический CSS-приём float-right внутри текстового параграфа — но он
+     требует, чтобы <p> сам был "по содержимому" (inline/inline-block), а не
+     stretch-растянут родителем flex-col на всю ширину bubble. */
+  .msg-bubble > .msg-text { align-self: flex-start; width: fit-content; max-width: 100%; }
+
+  /* Цитата ответа внутри пузыря сообщения — кликабельна, ведёт к оригиналу. */
+  .msg-reply-quote:hover { opacity: 1; }
+  @keyframes msg-highlight-flash {
+    0%, 100% { background-color: transparent; }
+    30% { background-color: rgba(0, 119, 255, 0.15); }
+  }
+  .msg-highlight { animation: msg-highlight-flash 1.2s ease; border-radius: 16px; }
+
+  /* Пузыри сообщений с "хвостиком": более плотное скругление (в духе
+     Telegram) + треугольный хвостик у первого сообщения в группе,
+     направленный к аватару/краю в зависимости от отправителя. */
+  .msg-bubble { border-radius: 16px; position: relative; }
+  .msg-bubble--own { border-bottom-right-radius: 4px; }
+  .msg-bubble--other { border-bottom-left-radius: 4px; }
+  .msg-bubble--own::after {
+    content: "";
+    position: absolute;
+    right: -7px;
+    bottom: 0;
+    width: 12px;
+    height: 14px;
+    background: #0077FF;
+    clip-path: polygon(0 0, 0% 100%, 100% 100%);
+  }
+  .msg-bubble--other::after {
+    content: "";
+    position: absolute;
+    left: -7px;
+    bottom: 0;
+    width: 12px;
+    height: 14px;
+    background: #fff;
+    clip-path: polygon(100% 0, 0% 100%, 100% 100%);
+  }
+  .dark .msg-bubble--other::after { background: #27272a; }
+
+  /* Ширина колонок мессенджера: значения заданы в vw, чтобы пропорционально
+     масштабироваться на разных мониторах (расчёт от экрана ~1920px):
+     левая колонка (список диалогов) — 384px = 20vw, правая панель
+     переписки занимает всё оставшееся место, но содержимое внутри неё
+     (лента сообщений + пилюли) ограничено 726px = 37.8vw и центрировано. */
+  :root { --left-column-width: 20vw; --chat-content-max-width: 37.8vw; }
+  .msg-dialogs-column { width: var(--left-column-width); flex-shrink: 0; }
+  .msg-chat-column { width: calc(100% - var(--left-column-width) - 0.75rem); }
+  /* Шапка и форма отправки — центрированные плавающие пилюли шириной
+     --chat-content-max-width, даже если панель справа шире экрана. */
+  .msg-chat-inner { width: calc(var(--chat-content-max-width) - 1.5rem); max-width: calc(100% - 1.5rem); left: 50%; transform: translateX(-50%); }
+  /* Сама лента сообщений остаётся на всю ширину панели (фон/скролл), а
+     каждое сообщение внутри центрируется и не шире --chat-content-max-width
+     через прямых детей #messages-container. */
+  #messages-container > * { max-width: var(--chat-content-max-width); margin-left: auto; margin-right: auto; }
+  @media (max-width: 767px) {
+    .msg-chat-column { width: 100%; }
+    .msg-chat-inner { width: calc(100% - 1.5rem); }
+    #messages-container > * { max-width: 100%; }
+  }
+
+  /* Заголовок диалога — фиксированная высота 48px (h-12), поэтому вместо
+     двух строк (статус + "печатает") показываем только одну: индикатор
+     печати перекрывает строку статуса, когда он не пуст. */
+  #typing-indicator:empty + #status-line { display: block; }
+  #typing-indicator:not(:empty) + #status-line { display: none; }
 </style>
-<div class="flex w-full min-w-0 overflow-hidden rounded-xl border border-gray-100 dark:border-zinc-800" style="height: calc(100vh - 80px);">
-<div class="hidden w-full flex-shrink-0 flex-col border-r border-gray-100 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:flex md:w-80">
+<div id="messenger-shell" class="flex w-full min-w-0 flex-1 gap-3" style="min-height: 0;">
+<div class="msg-dialogs-column hidden flex-shrink-0 flex-col overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-zinc-800 dark:bg-zinc-900 md:flex">
     <!-- Поиск диалогов -->
-    <div class="border-b border-gray-100 p-3 dark:border-zinc-800">
+    <div class="flex-shrink-0 border-b border-gray-100 p-3 dark:border-zinc-800">
         <div class="relative">
-            <input type="text" id="search-chats" class="block w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white" placeholder="Поиск диалогов...">
+            <input type="text" id="search-chats" class="block w-full rounded-full border border-gray-300 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white" placeholder="Поиск диалогов...">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
@@ -29,20 +188,20 @@
     </div>
 
     <!-- Список диалогов -->
-    <div class="flex-1 overflow-y-auto" id="dialogs-list">
+    <div class="no-scrollbar min-h-0 flex-1 overflow-y-auto" id="dialogs-list">
         {% for dialog in dialogs %}
         <a href="{% url 'dialog_messages' user_id=dialog.other_user.pk %}"
            data-search-text="{{ dialog.other_user.get_full_name|default:dialog.other_user.username }} {{ dialog.last_message.text|default:''|striptags }}"
-           class="chat-item flex items-center gap-3 border-b border-gray-50 p-3 hover:bg-gray-50 dark:border-zinc-800 dark:hover:bg-zinc-800 {% if dialog.other_user.pk == active_user_id %}bg-[#EAF3FF] dark:bg-zinc-800{% endif %}">
+           class="chat-item mx-1.5 my-0.5 flex items-center gap-2.5 rounded-xl p-2 hover:bg-gray-50 dark:hover:bg-zinc-800 {% if dialog.other_user.pk == active_user_id %}bg-[#EAF3FF] dark:bg-zinc-800{% endif %}">
                 <div class="relative flex-shrink-0">
                     {% if dialog.other_user.avatar %}
-                        <img class="h-10 w-10 rounded-full object-cover" src="{{ dialog.other_user.avatar.url }}" alt="{{ dialog.other_user.get_full_name }}">
+                        <img class="rounded-full object-cover" style="height: 54px; width: 54px;" src="{{ dialog.other_user.avatar.url }}" alt="{{ dialog.other_user.get_full_name }}">
                     {% else %}
-                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#EAF3FF] font-semibold text-[#0077FF] dark:bg-zinc-700">
+                        <div class="flex items-center justify-center rounded-full bg-[#EAF3FF] font-semibold text-[#0077FF] dark:bg-zinc-700" style="height: 54px; width: 54px;">
                             {{ dialog.other_user.username|first|upper }}
                         </div>
                     {% endif %}
-                    <span class="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-white {% if dialog.other_user.is_online %}bg-green-400{% else %}bg-gray-300{% endif %} dark:border-zinc-900"></span>
+                    <span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border-2 border-white {% if dialog.other_user.is_online %}bg-green-400{% else %}bg-gray-300{% endif %} dark:border-zinc-900"></span>
                 </div>
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center justify-between gap-2">
@@ -85,9 +244,9 @@
     </div>
 </div>
 
-<div class="flex min-w-0 flex-1 flex-col bg-white dark:bg-zinc-900">
-    <!-- Заголовок -->
-    <div class="flex-shrink-0 border-b border-gray-100 p-3 dark:border-zinc-800">
+<div class="msg-chat-column relative min-w-0 overflow-hidden rounded-xl" style="min-height: 0;">
+    <!-- Заголовок — плавающая пилюля поверх ленты сообщений -->
+    <div class="msg-header-pill msg-chat-inner absolute top-3 z-10 flex h-12 flex-shrink-0 items-center rounded-full border border-gray-100 bg-white/90 px-3 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90">
         <div class="flex min-w-0 items-center">
             <a href="{% url 'dialogs_list' %}" class="mr-2 flex-shrink-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 md:hidden">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -95,25 +254,25 @@
                 </svg>
             </a>
 
-            <img class="mr-3 h-12 w-12 flex-shrink-0 rounded-full object-cover"
+            <img class="mr-2.5 -ml-2.5 h-10 w-10 flex-shrink-0 rounded-full object-cover"
                  src="{% if other_user.avatar %}{{ other_user.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
                  alt="{{ other_user.first_name }} {{ other_user.last_name }}">
 
             <div class="min-w-0">
-                <h3 class="truncate text-lg font-medium text-gray-900 dark:text-white">
+                <h3 class="truncate text-sm font-medium leading-tight text-gray-900 dark:text-white">
                     {{ other_user.last_name }} {{ other_user.first_name }}
                 </h3>
-                <p class="text-xs {% if other_user.is_online %}text-green-600{% else %}text-gray-400{% endif %}">
+                <div id="typing-indicator" class="truncate text-xs italic leading-tight text-gray-400"></div>
+                <p id="status-line" class="truncate text-xs leading-tight {% if other_user.is_online %}text-green-600{% else %}text-gray-400{% endif %}">
                     {% if other_user.is_online %}Онлайн{% else %}Офлайн{% endif %}
                 </p>
-                <div id="typing-indicator" class="h-4 truncate text-xs italic text-gray-400"></div>
             </div>
         </div>
     </div>
 
     <!-- Контейнер сообщений -->
     <div id="messages-container"
-         class="no-scrollbar flex-1 space-y-4 overflow-y-auto bg-[#EDEEF0] p-4 dark:bg-zinc-950">
+         class="chat-bg no-scrollbar absolute inset-0 space-y-4 overflow-y-auto px-4" style="padding-top: 72px; padding-bottom: 84px;">
 
         <div id="loading-indicator" class="hidden py-2 text-center">
             <div class="inline-block h-6 w-6 animate-spin rounded-full border-b-2 border-[#0077FF]"></div>
@@ -129,7 +288,13 @@
         </div>
         {% endifchanged %}
         <div class="flex {% if message.sender == request.user %}justify-end{% else %}justify-start{% endif %}" data-message-id="{{ message.id }}" data-own="{% if message.sender == request.user %}true{% else %}false{% endif %}" data-html="{{ message.text }}">
-            <div class="flex w-full max-w-[75%] flex-col rounded-xl px-4 py-2 leading-1.5 sm:max-w-[380px] {% if message.sender == request.user %}bg-[#0077FF] text-white{% else %}bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100{% endif %}">
+            <div class="msg-bubble {% if message.sender == request.user %}msg-bubble--own{% else %}msg-bubble--other{% endif %} flex w-fit flex-col px-4 py-2 leading-1.5 {% if message.sender == request.user %}bg-[#0077FF] text-white{% else %}bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100{% endif %}" style="max-width: 480px;">
+                {% if message.reply_info %}
+                <div class="msg-reply-quote mb-1 cursor-pointer rounded-md border-l-2 border-current px-2 py-1 text-xs opacity-80" data-goto-message-id="{{ message.reply_info.reply_to_id }}">
+                    <div class="font-semibold">{{ message.reply_info.reply_to.sender.get_full_name|default:message.reply_info.reply_to.sender.username }}</div>
+                    <div class="truncate">{{ message.reply_info.reply_to.text|striptags|truncatechars:60 }}</div>
+                </div>
+                {% endif %}
                 <p class="msg-text whitespace-pre-wrap break-words py-0.5 text-base font-normal">{{ message.text|safe }}<span class="msg-meta float-right ml-2 mt-1.5 inline-flex items-center gap-1" data-read="{{ message.read|yesno:'true,false' }}"><span class="text-xs font-normal opacity-60">{{ message.created|time:"H:i" }}</span>{% if message.sender == request.user %}<span class="msg-status inline-flex">{% if message.read %}<svg class="h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none"><path d="M1 8.5L4.5 12L10 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 8.5L9 12L14.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% else %}<svg class="h-4 w-4 text-white/70" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none"><path d="M2 8.5L5.5 12L11 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endif %}</span>{% endif %}</span></p>
 
                 {% if message.file %}
@@ -142,7 +307,7 @@
                 {% endif %}
 
                 {% if message.reactions.all %}
-                <div class="msg-reactions mt-1.5 flex flex-wrap gap-2">
+                <div class="msg-reactions mt-1.5 flex flex-wrap items-center gap-2">
                     {% regroup message.reactions.all by emoji as reaction_groups %}
                     {% for group in reaction_groups %}
                     <button type="button" class="reaction-pill flex items-center rounded-full bg-black/10 py-1 pl-1 pr-2.5 hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20" data-emoji="{{ group.grouper }}">
@@ -170,6 +335,10 @@
             <button type="button" class="reaction-pick rounded-lg p-1 text-2xl transition-transform hover:scale-125" data-emoji="{{ emoji }}">{{ emoji }}</button>
             {% endfor %}
         </div>
+        <button type="button" id="msg-context-reply" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700">
+            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
+            Ответить
+        </button>
         <button type="button" id="msg-context-copy" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700">
             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" /></svg>
             Копировать
@@ -184,10 +353,10 @@
         </button>
     </div>
 
-    <!-- Форма отправки -->
-    <div class="flex-shrink-0 border-t border-gray-100 p-3 dark:border-zinc-800">
-        <div class="flex items-end gap-2">
-            <div class="relative flex-grow" x-data="{ emojiOpen: false }" x-on:click.outside="emojiOpen = false">
+    <!-- Форма отправки — плавающая пилюля поверх ленты сообщений -->
+    <div class="msg-chat-inner absolute bottom-3 z-10 flex-shrink-0">
+        <div class="flex items-center">
+            <div class="msg-input-pill relative flex min-h-[48px] flex-grow items-center gap-1 rounded-3xl border border-gray-100 bg-white/95 py-1.5 pl-4 pr-1.5 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-800/95" x-data="{ emojiOpen: false }" x-on:click.outside="emojiOpen = false">
                 <!-- Всплывающая панель форматирования текста -->
                 <div id="msg-format-toolbar" class="fixed z-50 hidden items-center gap-0.5 rounded-lg border border-gray-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
                     <button type="button" data-cmd="bold" class="format-btn rounded-md px-2.5 py-1.5 text-sm font-bold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700">Ж</button>
@@ -199,19 +368,19 @@
                 <div
                     id="message-input"
                     contenteditable="true"
-                    data-placeholder="Напишите сообщение..."
+                    data-placeholder="Сообщение..."
                     oninput="autoResize(this)"
                     style="max-height: 440px;"
-                    class="no-scrollbar msg-editable w-full overflow-y-auto rounded-lg border border-gray-300 bg-gray-50 py-2 pl-4 pr-10 text-base outline-none focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+                    class="no-scrollbar msg-editable w-full flex-1 overflow-y-auto bg-transparent text-base outline-none dark:text-white"
                 ></div>
 
                 <button
                     type="button"
                     id="msg-emoji-button"
                     x-on:click="emojiOpen = !emojiOpen"
-                    class="absolute bottom-1.5 right-2 rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
                 >
-                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h.01M8.99 9H9m12 3a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM6.6 13a5.5 5.5 0 0 0 10.81 0H6.6Z" />
                     </svg>
                 </button>
@@ -240,11 +409,14 @@
                         <div class="grid grid-cols-10 gap-1" id="msgEmojiGrid"></div>
                     </div>
                 </div>
+
+                <button id="send-button"
+                        class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0077FF] text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
+                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6" />
+                    </svg>
+                </button>
             </div>
-            <button id="send-button"
-                    class="flex-shrink-0 rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
-                Отправить
-            </button>
         </div>
     </div>
 </div>
@@ -377,10 +549,18 @@ function createMessageElement(messageData) {
   const escapedHtmlAttr = text.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   const messageIdAttr = messageData.id || (messageData.random_id !== undefined ? `pending-${messageData.random_id}` : '');
 
+  const replyHtml = messageData.reply_to ? `
+    <div class="msg-reply-quote mb-1 cursor-pointer rounded-md border-l-2 border-current px-2 py-1 text-xs opacity-80" data-goto-message-id="${messageData.reply_to.id}">
+      <div class="font-semibold">${messageData.reply_to.sender_name}</div>
+      <div class="truncate">${(messageData.reply_to.text || '').replace(/<[^>]*>/g, '')}</div>
+    </div>
+  ` : '';
+
   return `
     <div class="flex ${isSender ? 'justify-end' : 'justify-start'}" data-message-id="${messageIdAttr}" data-own="${isSender}" data-html="${escapedHtmlAttr}">
-      <div class="flex flex-col w-full max-w-[75%] sm:max-w-[380px] leading-1.5 py-2 px-4 rounded-xl
-                  ${isSender ? 'bg-[#0077FF] text-white' : 'bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100'}">
+      <div class="msg-bubble ${isSender ? 'msg-bubble--own' : 'msg-bubble--other'} flex flex-col w-fit leading-1.5 py-2 px-4
+                  ${isSender ? 'bg-[#0077FF] text-white' : 'bg-white text-gray-800 dark:bg-zinc-800 dark:text-gray-100'}" style="max-width: 480px;">
+        ${replyHtml}
         <p class="msg-text text-base font-normal py-0.5 whitespace-pre-wrap break-words">${text}<span class="msg-meta float-right ml-2 mt-1.5 inline-flex items-center gap-1" data-read="false"><span class="text-xs font-normal opacity-60">${timeString}</span>${statusHtml}</span></p>
         ${fileHtml}
       </div>
@@ -486,6 +666,25 @@ function handleChatWebSocketMessage(data) {
     }
   }
 
+  // Сообщение-ответ (reply), отправленное через HTTP-эндпоинт
+  // send_message_reply, а не штатный WebSocket-путь библиотеки — приходит
+  // только получателю, отправитель уже вставил его в UI сам (см. sendMessageWithReply)
+  if (data.msg_type === 104) {
+    const isRecipient = data.receiver === currentUserPk;
+    const isRelevantMessage = isRecipient && data.sender === recipientPk;
+
+    if (!isRelevantMessage) {
+      setTimeout(updateUnreadCounts, 300);
+      return;
+    }
+
+    if (lastMessageId && data.id === lastMessageId) return;
+    lastMessageId = data.id;
+
+    addMessageToUI(data);
+    setTimeout(() => markMessagesAsRead(), 500);
+  }
+
   // Сервер подтвердил сохранение сообщения - подставляем реальный id
   if (data.msg_type === 8) { // MessageIdCreated
     const pendingEl = document.querySelector(`[data-message-id="pending-${data.random_id}"]`);
@@ -580,6 +779,17 @@ function sendMessage() {
     return;
   }
 
+  // Ответ на сообщение — отправляем через HTTP-эндпоинт (send_message_reply),
+  // т.к. штатный WebSocket-путь библиотеки django_private_chat2 не знает про
+  // reply_to и его валидатор отклонит незнакомое поле.
+  if (replyingToMessageEl) {
+    sendMessageWithReply(text, replyingToMessageEl.dataset.messageId);
+    input.innerHTML = '';
+    cancelReplyingToMessage();
+    sendTypingStopped();
+    return;
+  }
+
   if (!wsManager || !wsManager.isConnected) {
     console.error('❌ WebSocket не подключен');
     alert('Ошибка подключения. Попробуйте обновить страницу.');
@@ -607,6 +817,34 @@ function sendMessage() {
   input.innerHTML = '';
 
   sendTypingStopped();
+}
+
+async function sendMessageWithReply(text, replyToId) {
+  try {
+    const response = await fetch(`/send-message-reply/${recipientPk}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `text=${encodeURIComponent(text)}&reply_to_id=${encodeURIComponent(replyToId)}`,
+    });
+
+    if (!response.ok) throw new Error('Request failed');
+    const data = await response.json();
+    if (!data.success) throw new Error(data.error || 'Unknown error');
+
+    addMessageToUI({
+      id: data.id,
+      text: data.text,
+      sender: currentUserPk,
+      created: data.created,
+      reply_to: data.reply_to,
+    });
+  } catch (error) {
+    console.error('❌ Ошибка при отправке ответа:', error);
+    alert('Не удалось отправить сообщение. Попробуйте ещё раз.');
+  }
 }
 
 // Возвращает HTML-содержимое contenteditable-поля, очищая пустой контент до ''
@@ -691,7 +929,7 @@ function setupDialogSearch() {
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Инициализация чата');
-  
+
   scrollToBottom();
   setupDialogSearch();
   
@@ -737,6 +975,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initMessageEmojiPicker();
   setupMessageContextMenu();
   setupFormatToolbar();
+
+  // Сообщения, отрисованные сервером и уже имеющие реакции, должны сразу
+  // получить метку времени в правом нижнем углу облачка, а не рядом с текстом.
+  document.querySelectorAll('#messages-container [data-message-id]').forEach((el) => {
+    if (el.querySelector('.msg-reactions')) relocateMsgMeta(el);
+  });
 
   console.log('✅ Чат инициализирован');
 });
@@ -909,6 +1153,7 @@ let contextMenuTargetEl = null;
 function setupMessageContextMenu() {
   const messagesContainer = document.getElementById('messages-container');
   const contextMenu = document.getElementById('msg-context-menu');
+  const replyBtn = document.getElementById('msg-context-reply');
   const copyBtn = document.getElementById('msg-context-copy');
   const editBtn = document.getElementById('msg-context-edit');
   const deleteBtn = document.getElementById('msg-context-delete');
@@ -925,7 +1170,7 @@ function setupMessageContextMenu() {
     deleteBtn.style.display = isOwn ? 'flex' : 'none';
 
     const menuWidth = 208;
-    const menuHeight = isOwn ? 172 : 104;
+    const menuHeight = isOwn ? 208 : 140;
     let left = e.clientX;
     let top = e.clientY;
     if (left + menuWidth > window.innerWidth) left = window.innerWidth - menuWidth - 8;
@@ -949,6 +1194,12 @@ function setupMessageContextMenu() {
     navigator.clipboard.writeText(text).catch(() => {
       console.error('❌ Не удалось скопировать текст');
     });
+    contextMenu.classList.add('hidden');
+  });
+
+  replyBtn.addEventListener('click', () => {
+    if (!contextMenuTargetEl) return;
+    startReplyingToMessage(contextMenuTargetEl);
     contextMenu.classList.add('hidden');
   });
 
@@ -981,6 +1232,18 @@ function setupMessageContextMenu() {
     if (!messageEl) return;
     toggleReaction(messageEl, pill.dataset.emoji);
   });
+
+  // Клик по цитате ответа - прокручиваем к исходному сообщению
+  messagesContainer.addEventListener('click', (e) => {
+    const quote = e.target.closest('.msg-reply-quote');
+    if (!quote) return;
+    const targetId = quote.dataset.gotoMessageId;
+    const targetEl = messagesContainer.querySelector(`[data-message-id="${targetId}"]`);
+    if (!targetEl) return;
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetEl.classList.add('msg-highlight');
+    setTimeout(() => targetEl.classList.remove('msg-highlight'), 1200);
+  });
 }
 
 async function toggleReaction(messageEl, emoji) {
@@ -1006,18 +1269,51 @@ async function toggleReaction(messageEl, emoji) {
   }
 }
 
+// Время+галочки живут внутри <p class="msg-text"> и через float-right
+// прижимаются к концу текста (см. CSS .msg-bubble > .msg-text) — это
+// работает, только пока после текста в облачке больше ничего нет. Если у
+// сообщения есть реакции, метка должна переехать в отдельную строку под
+// реакциями, в правый нижний угол облачка целиком.
+function relocateMsgMeta(messageEl) {
+  const bubble = messageEl.querySelector('.msg-bubble');
+  if (!bubble) return;
+  const metaEl = bubble.querySelector('.msg-meta');
+  if (!metaEl) return;
+  const hasReactions = !!bubble.querySelector('.msg-reactions');
+
+  let footerEl = bubble.querySelector('.msg-meta-footer');
+
+  if (hasReactions) {
+    if (!footerEl) {
+      footerEl = document.createElement('div');
+      footerEl.className = 'msg-meta-footer mt-1 flex justify-end';
+      bubble.appendChild(footerEl);
+    }
+    metaEl.classList.remove('float-right', 'ml-2', 'mt-1.5');
+    footerEl.appendChild(metaEl);
+  } else if (footerEl) {
+    const textEl = bubble.querySelector('.msg-text');
+    if (textEl) {
+      metaEl.classList.add('float-right', 'ml-2', 'mt-1.5');
+      textEl.appendChild(metaEl);
+    }
+    footerEl.remove();
+  }
+}
+
 function renderMessageReactions(messageEl, reactions) {
   let reactionsEl = messageEl.querySelector('.msg-reactions');
 
   if (!reactions || reactions.length === 0) {
     if (reactionsEl) reactionsEl.remove();
+    relocateMsgMeta(messageEl);
     return;
   }
 
   if (!reactionsEl) {
     reactionsEl = document.createElement('div');
     reactionsEl.className = 'msg-reactions mt-1 flex flex-wrap gap-2';
-    const targetBubble = messageEl.querySelector('.rounded-xl');
+    const targetBubble = messageEl.querySelector('.msg-bubble');
     if (targetBubble) targetBubble.appendChild(reactionsEl);
   }
 
@@ -1035,11 +1331,15 @@ function renderMessageReactions(messageEl, reactions) {
     pill.innerHTML = `<span class="reaction-avatars flex items-center">${avatarsHtml}</span><span class="ml-1.5 text-base">${r.emoji}</span>`;
     reactionsEl.appendChild(pill);
   });
+
+  relocateMsgMeta(messageEl);
 }
 
 let editingMessageEl = null;
 
 function startEditingMessage(messageEl) {
+  if (replyingToMessageEl) cancelReplyingToMessage();
+
   editingMessageEl = messageEl;
   const textEl = messageEl.querySelector('.msg-text');
   const clone = textEl ? textEl.cloneNode(true) : null;
@@ -1115,6 +1415,76 @@ function cancelEditingMessage() {
 
   const input = document.getElementById('message-input');
   input.innerHTML = '';
+}
+
+let replyingToMessageEl = null;
+
+function startReplyingToMessage(messageEl) {
+  if (editingMessageEl) cancelEditingMessage();
+
+  replyingToMessageEl = messageEl;
+  const textEl = messageEl.querySelector('.msg-text');
+  const clone = textEl ? textEl.cloneNode(true) : null;
+  if (clone) clone.querySelector('.msg-meta')?.remove();
+  const previewText = clone ? clone.textContent.trim() : '';
+  const senderName = messageEl.dataset.own === 'true' ? currentUserFullName : otherUserFullName;
+
+  showReplyBanner(senderName, previewText);
+  document.getElementById('message-input').focus();
+}
+
+function showReplyBanner(senderName, previewText) {
+  let banner = document.getElementById('reply-message-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'reply-message-banner';
+    banner.className = 'mb-2 flex items-center gap-2 rounded-lg border-l-4 border-[#0077FF] bg-[#EAF3FF] px-3 py-1.5 dark:bg-zinc-800';
+
+    const iconWrap = document.createElement('div');
+    iconWrap.className = 'flex-shrink-0 text-[#0077FF]';
+    iconWrap.innerHTML = `
+      <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+      </svg>
+    `;
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'min-w-0 flex-1';
+    const nameEl = document.createElement('div');
+    nameEl.id = 'reply-message-name';
+    nameEl.className = 'text-xs font-medium text-[#0077FF]';
+    const previewEl = document.createElement('div');
+    previewEl.id = 'reply-message-preview';
+    previewEl.className = 'truncate text-xs text-gray-500 dark:text-gray-400';
+    textWrap.appendChild(nameEl);
+    textWrap.appendChild(previewEl);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'flex-shrink-0 rounded-lg p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200';
+    cancelBtn.innerHTML = `
+      <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    `;
+    cancelBtn.addEventListener('click', cancelReplyingToMessage);
+
+    banner.appendChild(iconWrap);
+    banner.appendChild(textWrap);
+    banner.appendChild(cancelBtn);
+
+    document.getElementById('message-input').closest('.flex-shrink-0').prepend(banner);
+  }
+
+  document.getElementById('reply-message-name').textContent = `Ответ: ${senderName}`;
+  document.getElementById('reply-message-preview').textContent = previewText;
+  banner.classList.remove('hidden');
+}
+
+function cancelReplyingToMessage() {
+  replyingToMessageEl = null;
+  const banner = document.getElementById('reply-message-banner');
+  if (banner) banner.classList.add('hidden');
 }
 
 async function saveEditedMessage(messageEl, newHtml) {

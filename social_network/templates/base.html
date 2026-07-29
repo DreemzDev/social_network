@@ -48,7 +48,7 @@
     </style>
 
 </head>
-<body class="app text-sm" x-data="{ mobileMenuOpen: false }">
+<body class="app text-sm{% block body_class %}{% endblock body_class %}" x-data="{ mobileMenuOpen: false }">
 <div class="flex">
     <!-- BEGIN: Side Menu (Midone) -->
     <nav class="side-nav">
