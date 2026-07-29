@@ -42,3 +42,17 @@ class ExtendedChatConsumer(ChatConsumer):
             'notification': event['notification'],
             'unread_count': event['unread_count'],
         }))
+
+    async def new_text_message(self, event: dict):
+        """Сообщение, отправленное через SendMessageWithReplyView (HTTP, не
+        через стандартный WebSocket-путь библиотеки) — используется, когда
+        нужно приложить reply_to, которого нативный протокол не знает."""
+        await self.send(text_data=json.dumps({
+            'msg_type': 104,
+            'id': event['id'],
+            'text': event['text'],
+            'sender': event['sender'],
+            'receiver': event['receiver'],
+            'created': event['created'],
+            'reply_to': event['reply_to'],
+        }))

@@ -15,6 +15,7 @@ urlpatterns = [
     
     # Отправка сообщения
     path('send-message/<int:user_id>/', SendMessageView.as_view(), name='send_message'),
+    path('send-message-reply/<int:user_id>/', SendMessageWithReplyView.as_view(), name='send_message_reply'),
     
     # API для ленивой загрузки сообщений
     path('load-messages/<int:user_id>/', LoadMoreMessagesView.as_view(), name='load_messages'),

@@ -98,6 +98,18 @@ class MessageReaction(models.Model):
         return f"{self.user} {self.emoji} on message {self.message_id}"
 
 
+class MessageReply(models.Model):
+    """Связывает сообщение с тем, на которое оно отвечает. Отдельная
+    модель-расширение (как MessageReaction) — сама MessageModel из
+    django_private_chat2 не трогается, чтобы не форкать миграции сторонней
+    библиотеки."""
+    message = models.OneToOneField('django_private_chat2.MessageModel', on_delete=models.CASCADE, related_name='reply_info', verbose_name="Сообщение-ответ")
+    reply_to = models.ForeignKey('django_private_chat2.MessageModel', on_delete=models.CASCADE, related_name='replies', verbose_name="Исходное сообщение")
+
+    def __str__(self):
+        return f"Message {self.message_id} replies to {self.reply_to_id}"
+
+
 class Task(models.Model):
     class Status(models.TextChoices):
         NOT_STARTED = 'not_started', 'Не начата'

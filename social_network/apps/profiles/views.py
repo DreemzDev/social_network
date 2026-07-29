@@ -23,7 +23,7 @@ from category.models import Category
 from phonebook.models import Phonebook
 from phonebook.forms import UpdateBookForm
 from django_private_chat2.models import MessageModel, DialogsModel
-from .models import MessageReaction, Task, Note, Event, Notification
+from .models import MessageReaction, MessageReply, Task, Note, Event, Notification
 from .forms import TaskForm, TaskEditForm, NoteForm, EventForm
 from datetime import date, timedelta
 from django.http import JsonResponse
@@ -207,7 +207,9 @@ class DialogMessagesView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
         return MessageModel.objects.filter(
             Q(sender=self.request.user, recipient=self.other_user) |
             Q(sender=self.other_user, recipient=self.request.user)
-        ).select_related('sender', 'recipient').prefetch_related('reactions').order_by('-created')[:self.paginate_by]
+        ).select_related('sender', 'recipient').prefetch_related(
+            'reactions', 'reply_info__reply_to__sender'
+        ).order_by('-created')[:self.paginate_by]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -237,10 +239,20 @@ class LoadMoreMessagesView(LoginRequiredMixin, View):
         messages = MessageModel.objects.filter(
             Q(sender=request.user, recipient=other_user) |
             Q(sender=other_user, recipient=request.user)
-        ).select_related('sender', 'recipient').order_by('-created')[offset:offset + limit]
-        
+        ).select_related('sender', 'recipient').prefetch_related(
+            'reply_info__reply_to__sender'
+        ).order_by('-created')[offset:offset + limit]
+
         messages_data = []
         for msg in reversed(list(messages)):
+            reply_info = getattr(msg, 'reply_info', None)
+            reply_payload = None
+            if reply_info:
+                reply_payload = {
+                    'id': reply_info.reply_to_id,
+                    'text': reply_info.reply_to.text,
+                    'sender_name': reply_info.reply_to.sender.get_full_name() or reply_info.reply_to.sender.username,
+                }
             messages_data.append({
                 'id': msg.id,
                 'text': msg.text,
@@ -249,6 +261,7 @@ class LoadMoreMessagesView(LoginRequiredMixin, View):
                 'sender_avatar': msg.sender.avatar.url if msg.sender.avatar else None,
                 'created': msg.created.strftime('%H:%M'),
                 'file': msg.file.url if hasattr(msg, 'file') and msg.file else None,
+                'reply_to': reply_payload,
             })
         
         total_messages = MessageModel.objects.filter(
@@ -341,8 +354,67 @@ class SendMessageView(View):
             
             # Очищаем кеш ПОЛУЧАТЕЛЯ (не отправителя!)
             clear_user_cache(recipient.pk)
-            
+
         return redirect('dialog_messages', user_id=user_id)
+
+
+class SendMessageWithReplyView(LoginRequiredMixin, View):
+    """AJAX-эндпоинт отправки сообщения с опциональным ответом (reply_to).
+    Отдельно от SendMessageView (которая делает redirect и используется как
+    fallback-форма без JS) — этот всегда возвращает JSON и пушит созданное
+    сообщение получателю через тот же WebSocket-канал, что и остальные
+    события чата (см. apps/profiles/consumers.py), потому что сама
+    библиотека django_private_chat2 не даёт провести reply_to через
+    собственный WebSocket-путь отправки без переопределения её валидатора."""
+
+    def post(self, request, user_id):
+        recipient = get_object_or_404(get_user_model(), pk=user_id)
+        text = request.POST.get('text', '').strip()
+        reply_to_id = request.POST.get('reply_to_id')
+
+        if not text:
+            return JsonResponse({'success': False, 'error': 'Текст не может быть пустым'}, status=400)
+
+        reply_to = None
+        if reply_to_id:
+            reply_to = MessageModel.objects.filter(
+                pk=reply_to_id
+            ).filter(Q(sender=request.user) | Q(recipient=request.user)).first()
+
+        message = MessageModel.objects.create(
+            sender=request.user,
+            recipient=recipient,
+            text=text,
+        )
+        DialogsModel.create_if_not_exists(request.user, recipient)
+        clear_user_cache(recipient.pk)
+
+        reply_payload = None
+        if reply_to:
+            MessageReply.objects.create(message=message, reply_to=reply_to)
+            reply_payload = {
+                'id': reply_to.id,
+                'text': reply_to.text,
+                'sender_name': reply_to.sender.get_full_name() or reply_to.sender.username,
+                'is_own': reply_to.sender_id == request.user.pk,
+            }
+
+        payload = {
+            'id': message.id,
+            'text': message.text,
+            'sender': str(request.user.pk),
+            'receiver': str(recipient.pk),
+            'created': message.created.strftime('%H:%M'),
+            'reply_to': reply_payload,
+        }
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(str(recipient.pk), {
+            'type': 'new_text_message',
+            **payload,
+        })
+
+        return JsonResponse({'success': True, **payload})
 
 
 class MarkMessagesReadView(LoginRequiredMixin, View):
@@ -470,6 +542,8 @@ class ToggleMessageReactionView(LoginRequiredMixin, View):
             'sender': str(request.user.pk),
             'receiver': str(other_user_id),
         })
+
+        return JsonResponse({'success': True, 'reactions': reactions})
 
 
 # --- Личные задачи ---
