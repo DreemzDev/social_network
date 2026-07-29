@@ -22,3 +22,10 @@ class EventAdmin(admin.ModelAdmin):
 
 admin.site.register(Task)
 admin.site.register(Note)
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ('text', 'recipient', 'kind', 'is_read', 'created')
+    list_filter = ('kind', 'is_read')
+    search_fields = ('text',)

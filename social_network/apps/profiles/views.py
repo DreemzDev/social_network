@@ -23,7 +23,7 @@ from category.models import Category
 from phonebook.models import Phonebook
 from phonebook.forms import UpdateBookForm
 from django_private_chat2.models import MessageModel, DialogsModel
-from .models import MessageReaction, Task, Note, Event
+from .models import MessageReaction, Task, Note, Event, Notification
 from .forms import TaskForm, TaskEditForm, NoteForm, EventForm
 from datetime import date, timedelta
 from django.http import JsonResponse
@@ -32,6 +32,30 @@ from datetime import datetime
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import uuid
+
+
+def notify(recipient, kind, text, actor=None, task=None):
+    """Создаёт запись уведомления и пушит её получателю через тот же Channels-
+    канал, что уже используется чатом (группа — str(user_id), см.
+    apps/profiles/consumers.py:ExtendedChatConsumer.notification)."""
+    notification = Notification.objects.create(
+        recipient=recipient, actor=actor, kind=kind, text=text, task=task,
+    )
+    unread_count = Notification.objects.filter(recipient=recipient, is_read=False).count()
+
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(str(recipient.id), {
+        'type': 'notification',
+        'notification': {
+            'id': notification.id,
+            'kind': notification.kind,
+            'text': notification.text,
+            'created': notification.created.isoformat(),
+            'task_id': task.id if task else None,
+        },
+        'unread_count': unread_count,
+    })
+    return notification
 
 
 class AddProfile(UpdateView):
@@ -520,6 +544,17 @@ class TaskStatusUpdateView(LoginRequiredMixin, View):
 
         task.status = status
         task.save(update_fields=['status', 'is_completed'])
+
+        # Постановщика уведомляем о смене статуса только если статус меняет
+        # именно исполнитель — иначе постановщик уведомлял бы сам себя.
+        if task.assigned_by_id and task.assigned_by_id != request.user.id:
+            actor_name = f'{request.user.first_name} {request.user.last_name}'.strip() or request.user.username
+            notify(
+                task.assigned_by, Notification.Kind.TASK_STATUS_CHANGED,
+                f'{actor_name} изменил(а) статус задачи «{task.title}» на «{task.get_status_display()}»',
+                actor=request.user, task=task,
+            )
+
         return JsonResponse({
             'success': True,
             'task': {
@@ -594,9 +629,18 @@ class TaskEditView(LoginRequiredMixin, View):
             return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
         task = form.save(commit=False)
-        if task.assigned_by_id and task.assigned_by_id != task.user_id:
+        is_assignment = task.assigned_by_id and task.assigned_by_id != task.user_id
+        if is_assignment:
             task.is_edited = True
         task.save()
+
+        if is_assignment:
+            actor_name = f'{request.user.first_name} {request.user.last_name}'.strip() or request.user.username
+            notify(
+                task.user, Notification.Kind.TASK_EDITED,
+                f'{actor_name} изменил(а) задачу «{task.title}»',
+                actor=request.user, task=task,
+            )
 
         return JsonResponse({
             'success': True,
@@ -717,6 +761,21 @@ class CalendarUsersListView(LoginRequiredMixin, View):
         return JsonResponse({'users': users})
 
 
+class NotificationMarkReadView(LoginRequiredMixin, View):
+    def post(self, request, notification_id):
+        notification = get_object_or_404(Notification, pk=notification_id, recipient=request.user)
+        if not notification.is_read:
+            notification.is_read = True
+            notification.save(update_fields=['is_read'])
+        return JsonResponse({'success': True})
+
+
+class NotificationMarkAllReadView(LoginRequiredMixin, View):
+    def post(self, request):
+        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        return JsonResponse({'success': True})
+
+
 class CalendarTaskCreateView(LoginRequiredMixin, View):
     """Постановка задачи через календарь: себе (без исполнителя) или другому
     сотруднику (с указанием исполнителя и постановщика)."""
@@ -736,6 +795,14 @@ class CalendarTaskCreateView(LoginRequiredMixin, View):
         task.user = assignee
         task.assigned_by = request.user
         task.save()
+
+        if assignee.id != request.user.id:
+            actor_name = f'{request.user.first_name} {request.user.last_name}'.strip() or request.user.username
+            notify(
+                assignee, Notification.Kind.TASK_ASSIGNED,
+                f'{actor_name} поставил(а) вам задачу «{task.title}»',
+                actor=request.user, task=task,
+            )
 
         return JsonResponse({
             'success': True,

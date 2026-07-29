@@ -41,6 +41,10 @@ urlpatterns = [
     path('task/<int:task_id>/delete/', TaskDeleteView.as_view(), name='task_delete'),
     path('task/<int:task_id>/edit/', TaskEditView.as_view(), name='task_edit'),
 
+    # Уведомления
+    path('notification/<int:notification_id>/read/', NotificationMarkReadView.as_view(), name='notification_mark_read'),
+    path('notification/mark-all-read/', NotificationMarkAllReadView.as_view(), name='notification_mark_all_read'),
+
     # Личные заметки (стикеры)
     path('note/create/', NoteCreateView.as_view(), name='note_create'),
     path('note/<int:note_id>/edit/', NoteEditView.as_view(), name='note_edit'),

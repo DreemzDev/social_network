@@ -28,6 +28,67 @@ def birthday_notifications(request):
     }
 
 
+def notification_center(request):
+    """Собирает содержимое колокольчика уведомлений: сохранённые уведомления
+    о задачах (поставили/изменили/сменили статус) + дедлайны, посчитанные на
+    лету (без фонового планировщика — считаем при каждом открытии страницы),
+    + дни рождения. Хранимые уведомления читает 'own_or_recipient=True' —
+    т.е. только те, что реально для этого пользователя."""
+    if not request.user.is_authenticated:
+        return {'notification_center_items': [], 'notification_center_unread': 0}
+
+    from .models import Task, Notification
+
+    user = request.user
+    today = date.today()
+
+    # Прочитанные уведомления старше недели больше не нужны — чистим при
+    # каждом заходе, без фонового планировщика (тот же подход, что и для
+    # дедлайнов ниже).
+    Notification.objects.filter(
+        recipient=user, is_read=True, created__lt=timezone.now() - timedelta(days=7)
+    ).delete()
+
+    stored = Notification.objects.filter(recipient=user).select_related('actor', 'task').order_by('-created')[:20]
+    unread_count = Notification.objects.filter(recipient=user, is_read=False).count()
+
+    items = []
+    for n in stored:
+        items.append({
+            'kind': n.kind,
+            'text': n.text,
+            'created': n.created,
+            'is_read': n.is_read,
+            'id': n.id,
+            'url': f'/profile/{n.task.user.username}/' if n.task_id else None,
+        })
+
+    # Дедлайны считаем на лету: свои задачи (или поставленные другим) с
+    # due_date в ближайшие 2 дня или уже просроченные, ещё не выполненные.
+    soon = today + timedelta(days=2)
+    deadline_tasks = Task.objects.filter(
+        Q(user=user) | Q(assigned_by=user)
+    ).filter(due_date__isnull=False, due_date__lte=soon).exclude(status=Task.Status.DONE)
+
+    for t in deadline_tasks:
+        if t.due_date < today:
+            text = f'Просрочена задача «{t.title}» (срок был {t.due_date.strftime("%d.%m")})'
+        elif t.due_date == today:
+            text = f'Задача «{t.title}» — срок сегодня'
+        else:
+            text = f'Задача «{t.title}» — срок {t.due_date.strftime("%d.%m")}'
+        items.append({
+            'kind': 'deadline',
+            'text': text,
+            'created': None,
+            'is_read': True,  # дедлайны не хранятся и не считаются в счётчике непрочитанных
+            'id': None,
+            'url': f'/profile/{t.user.username}/',
+        })
+
+    return {'notification_center_items': items, 'notification_center_unread': unread_count}
+
+
 def online_users(request):
     """Context processor со списком онлайн-коллег для виджета в правой колонке"""
     if not request.user.is_authenticated:

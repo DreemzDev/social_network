@@ -92,39 +92,50 @@
 
             <!-- BEGIN: Notifications -->
             <div class="intro-x dropdown relative mr-auto sm:mr-6">
-                <div class="dropdown-toggle notification {% if birthday.all.count or delta_birthday.all.count %}notification--bullet{% endif %} cursor-pointer"> <i data-feather="bell" class="notification__icon"></i> </div>
-                <div class="notification-content dropdown-box mt-8 absolute top-0 left-0 sm:left-auto sm:right-0 z-20 -ml-10 sm:ml-0">
+                <div class="dropdown-toggle notification cursor-pointer" id="notification-bell">
+                    <i data-feather="bell" class="notification__icon"></i>
+                    <span id="notification-badge" class="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white {% if not notification_center_unread %}hidden{% endif %}">{{ notification_center_unread }}</span>
+                </div>
+                <div class="notification-content dropdown-box mt-8 absolute top-0 left-0 sm:left-auto sm:right-0 z-20 -ml-10 sm:ml-0" style="width: 420px; max-width: 90vw;">
                     <div class="notification-content__box dropdown-box__content box">
-                        <div class="notification-content__title">Уведомления</div>
+                        <div class="flex items-center justify-between">
+                            <div class="notification-content__title">Уведомления</div>
+                            {% if notification_center_unread %}
+                            <button type="button" id="notification-mark-all-read" class="text-xs text-[#0077FF] hover:underline">Прочитать всё</button>
+                            {% endif %}
+                        </div>
+                        <div id="notification-list">
+                        {% for item in notification_center_items %}
+                        <div class="notification-item relative flex items-start gap-2 mt-4 first:mt-3 {% if not item.is_read %}notification-item--unread{% endif %}" {% if item.id %}data-notification-id="{{ item.id }}"{% endif %}>
+                            <div class="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full {% if item.kind == 'deadline' %}bg-red-500{% elif item.kind == 'task_assigned' %}bg-[#8B5CF6]{% elif item.kind == 'task_edited' %}bg-yellow-500{% elif item.kind == 'task_status_changed' %}bg-[#0077FF]{% else %}bg-orange-400{% endif %} {% if item.is_read %}opacity-30{% endif %}"></div>
+                            <a {% if item.url %}href="{{ item.url }}"{% endif %} class="min-w-0 flex-1 cursor-pointer" title="{{ item.text }}">
+                                <div class="whitespace-normal break-words text-sm text-gray-800 dark:text-gray-100">{{ item.text }}</div>
+                                {% if item.created %}<div class="text-xs text-gray-400">{{ item.created|timesince }} назад</div>{% endif %}
+                            </a>
+                        </div>
+                        {% endfor %}
                         {% for b in birthday %}
-                        <a href="{% url 'addpost' b.username %}" class="cursor-pointer relative flex items-center mt-5 first:mt-0">
-                            <div class="w-12 h-12 flex-none image-fit mr-1">
-                                <img src="{% if b.avatar %}{{ b.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}" alt="{{ b.username }}">
-                                <div class="w-3 h-3 bg-red-500 absolute right-0 bottom-0 rounded-full border-2 border-white"></div>
+                        <a href="{% url 'addpost' b.username %}" class="cursor-pointer relative flex items-center mt-4 first:mt-3">
+                            <div class="h-10 w-10 flex-none image-fit mr-1 rounded-full">
+                                <img class="rounded-full" src="{% if b.avatar %}{{ b.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}" alt="{{ b.username }}">
                             </div>
-                            <div class="ml-2 overflow-hidden">
-                                <div class="flex items-center">
-                                    <span class="font-medium truncate mr-5">{{ b.first_name }} {{ b.last_name }}</span>
-                                </div>
-                                <div class="w-full truncate text-gray-600">Сегодня день рождения 🎉</div>
+                            <div class="ml-2 min-w-0 overflow-hidden">
+                                <div class="w-full whitespace-normal break-words text-sm text-gray-800 dark:text-gray-100">{{ b.first_name }} {{ b.last_name }} — день рождения 🎉</div>
                             </div>
                         </a>
                         {% endfor %}
                         {% for d in delta_birthday %}
-                        <a href="{% url 'addpost' d.username %}" class="cursor-pointer relative flex items-center mt-5 first:mt-0">
-                            <div class="w-12 h-12 flex-none image-fit mr-1">
-                                <img src="{% if d.avatar %}{{ d.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}" alt="{{ d.username }}">
-                                <div class="w-3 h-3 bg-indigo-400 absolute right-0 bottom-0 rounded-full border-2 border-white"></div>
+                        <a href="{% url 'addpost' d.username %}" class="cursor-pointer relative flex items-center mt-4 first:mt-3">
+                            <div class="h-10 w-10 flex-none image-fit mr-1 rounded-full">
+                                <img class="rounded-full" src="{% if d.avatar %}{{ d.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}" alt="{{ d.username }}">
                             </div>
-                            <div class="ml-2 overflow-hidden">
-                                <div class="flex items-center">
-                                    <span class="font-medium truncate mr-5">{{ d.first_name }} {{ d.last_name }}</span>
-                                </div>
-                                <div class="w-full truncate text-gray-600">Завтра день рождения</div>
+                            <div class="ml-2 min-w-0 overflow-hidden">
+                                <div class="w-full whitespace-normal break-words text-sm text-gray-800 dark:text-gray-100">{{ d.first_name }} {{ d.last_name }} — завтра день рождения</div>
                             </div>
                         </a>
                         {% endfor %}
-                        {% if not birthday and not delta_birthday %}
+                        </div>
+                        {% if not notification_center_items and not birthday and not delta_birthday %}
                         <div class="text-center text-gray-500 py-2">Нет новых уведомлений</div>
                         {% endif %}
                     </div>
@@ -298,7 +309,114 @@
       return null;
     }
   }
-  
+
+  const NOTIFICATION_KIND_DOT = {
+    deadline: 'bg-red-500',
+    task_assigned: 'bg-[#8B5CF6]',
+    task_edited: 'bg-yellow-500',
+    task_status_changed: 'bg-[#0077FF]',
+  };
+
+  function updateNotificationBadge(count) {
+    const badge = document.getElementById('notification-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  function prependNotificationItem(notification) {
+    const list = document.getElementById('notification-list');
+    if (!list) return;
+
+    const emptyState = list.parentElement.querySelector('.text-center.text-gray-500');
+    if (emptyState) emptyState.remove();
+
+    const item = document.createElement('div');
+    item.className = 'notification-item notification-item--unread relative flex items-start gap-2 mt-4 first:mt-3';
+    item.dataset.notificationId = notification.id;
+
+    const dotClass = NOTIFICATION_KIND_DOT[notification.kind] || 'bg-orange-400';
+    const url = notification.task_id ? '#' : '';
+
+    item.innerHTML =
+      '<div class="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ' + dotClass + '"></div>' +
+      '<div class="min-w-0 flex-1 cursor-pointer" title="' + notification.text.replace(/"/g, '&quot;') + '">' +
+        '<div class="whitespace-normal break-words text-sm text-gray-800 dark:text-gray-100">' + notification.text + '</div>' +
+        '<div class="text-xs text-gray-400">только что</div>' +
+      '</div>';
+
+    list.prepend(item);
+  }
+
+  // Уведомления считаем "просмотренными" (не открытыми по клику, а именно
+  // увиденными в списке), когда пользователь закрывает выпадающий список
+  // колокольчика — помечаем прочитанными все, что были видны в тот момент.
+  (function () {
+    const dropdownBox = document.querySelector('#notification-bell')?.nextElementSibling;
+    if (!dropdownBox || !dropdownBox.classList.contains('dropdown-box')) return;
+
+    let wasOpen = false;
+    const observer = new MutationObserver(function () {
+      const isOpen = dropdownBox.classList.contains('show');
+      if (wasOpen && !isOpen) {
+        const unreadIds = Array.from(document.querySelectorAll('.notification-item--unread[data-notification-id]'))
+          .map(function (el) { return el.dataset.notificationId; });
+        if (unreadIds.length) {
+          fetch('/notification/mark-all-read/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+          }).then(function () {
+            document.querySelectorAll('.notification-item--unread').forEach(function (el) {
+              el.classList.remove('notification-item--unread');
+              const dot = el.querySelector('.rounded-full');
+              if (dot) dot.classList.add('opacity-30');
+            });
+            updateNotificationBadge(0);
+            const markAllBtn = document.getElementById('notification-mark-all-read');
+            if (markAllBtn) markAllBtn.remove();
+          });
+        }
+      }
+      wasOpen = isOpen;
+    });
+    observer.observe(dropdownBox, { attributes: true, attributeFilter: ['class'] });
+  })();
+
+  document.addEventListener('click', function (event) {
+    const item = event.target.closest('.notification-item[data-notification-id]');
+    if (item && item.classList.contains('notification-item--unread')) {
+      const id = item.dataset.notificationId;
+      fetch('/notification/' + id + '/read/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      }).then(function () {
+        item.classList.remove('notification-item--unread');
+        const dot = item.querySelector('.rounded-full');
+        if (dot) dot.classList.add('opacity-30');
+      });
+    }
+
+    const markAllBtn = event.target.closest('#notification-mark-all-read');
+    if (markAllBtn) {
+      fetch('/notification/mark-all-read/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      }).then(function () {
+        document.querySelectorAll('.notification-item--unread').forEach(function (el) {
+          el.classList.remove('notification-item--unread');
+          const dot = el.querySelector('.rounded-full');
+          if (dot) dot.classList.add('opacity-30');
+        });
+        updateNotificationBadge(0);
+        markAllBtn.remove();
+      });
+    }
+  });
+
   // Добавить слушателя событий WebSocket
   wsManager.addListener = function(callback) {
     if (!wsManager.listeners.includes(callback)) {
@@ -378,7 +496,15 @@
         if (data.msg_type === 11) { // MarkAllMessagesRead
           setTimeout(updateGlobalUnreadCount, 300);
         }
-        
+
+        // Новое уведомление (задача поставлена/изменена/сменён статус) —
+        // приходит через тот же канал, что и события чата (см.
+        // apps/profiles/consumers.py:ExtendedChatConsumer.notification).
+        if (data.msg_type === 103) {
+          updateNotificationBadge(data.unread_count);
+          prependNotificationItem(data.notification);
+        }
+
         // Передаем событие всем слушателям (для messages.html и других страниц)
         wsManager.listeners.forEach(listener => {
           try {

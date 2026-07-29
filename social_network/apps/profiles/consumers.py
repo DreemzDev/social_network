@@ -35,3 +35,10 @@ class ExtendedChatConsumer(ChatConsumer):
             'sender': event['sender'],
             'receiver': event['receiver'],
         }))
+
+    async def notification(self, event: dict):
+        await self.send(text_data=json.dumps({
+            'msg_type': 103,
+            'notification': event['notification'],
+            'unread_count': event['unread_count'],
+        }))

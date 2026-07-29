@@ -101,6 +101,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'profiles.context_processors.birthday_notifications',
+                'profiles.context_processors.notification_center',
                 'profiles.context_processors.online_users',
                 'profiles.context_processors.unread_messages_count',
                 'sitesettings.context_processors.site_settings',
