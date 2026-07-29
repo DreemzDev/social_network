@@ -794,6 +794,16 @@ def _shift_date(d, years, months, days):
     return d
 
 
+# Единая палитра маркеров календаря: цвет обозначает тип пункта, а не его
+# статус (выполнено/нет) — при выполнении задачи маркер не меняет цвет.
+CALENDAR_COLORS = {
+    'my_task': '#0077FF',
+    'birthday': '#F78B00',
+    'assigned_task': '#8B5CF6',
+    'reminder': '#14B8A6',
+}
+
+
 class CalendarEventsFeedView(LoginRequiredMixin, View):
     """JSON-фид событий для календаря: личные события пользователя + корпоративные + дни рождения."""
 
@@ -816,7 +826,7 @@ class CalendarEventsFeedView(LoginRequiredMixin, View):
                     'description': e.description,
                     'start': occurrence_date.isoformat(),
                     'allDay': True,
-                    'color': '#0077FF' if e.event_type == Event.EventType.CORPORATE else '#1C3FAA',
+                    'color': CALENDAR_COLORS['reminder'],
                     'extendedProps': {
                         'type': e.event_type,
                         'deletable': e.created_by_id == user.id,
@@ -835,12 +845,10 @@ class CalendarEventsFeedView(LoginRequiredMixin, View):
             is_assignment = bool(t.assigned_by_id and t.assigned_by_id != t.user_id)
             is_creator_view = is_assignment and t.assigned_by_id == user.id
 
-            if t.is_completed:
-                color = '#22c55e'
-            elif is_assignment and not is_creator_view:
-                color = '#F78B00'
+            if is_assignment and not is_creator_view:
+                color = CALENDAR_COLORS['assigned_task']
             else:
-                color = '#0077FF'
+                color = CALENDAR_COLORS['my_task']
 
             assigner_name = ''
             assignee_name = ''
@@ -882,7 +890,7 @@ class CalendarEventsFeedView(LoginRequiredMixin, View):
                 'description': '',
                 'start': f'{date.today().year}-{u.birthday.month:02d}-{u.birthday.day:02d}',
                 'allDay': True,
-                'color': '#F78B00',
+                'color': CALENDAR_COLORS['birthday'],
                 'extendedProps': {'type': 'birthday', 'deletable': False, 'isCompleted': False},
             })
 
