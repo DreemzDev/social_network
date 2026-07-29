@@ -243,7 +243,7 @@
         });
     }
 
-    function buildGridCells(gridYear, gridMonth) {
+    function buildGridCells(gridYear, gridMonth, selectedDate) {
       const cells = WEEKDAYS.map((w) => '<div class="font-medium">' + w + '</div>');
 
       const firstOfMonth = new Date(gridYear, gridMonth, 1);
@@ -254,21 +254,32 @@
         const cellDate = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
         const isOtherMonth = cellDate.getMonth() !== gridMonth;
         const isToday = sameDay(cellDate, today);
+        const isSelected = selectedDate && sameDay(cellDate, selectedDate);
         const dayItems = items.filter((e) => sameDay(e.date, cellDate));
 
-        let classes = 'py-1 rounded relative cursor-pointer';
+        let classes = 'py-1 rounded-lg relative cursor-pointer flex flex-col items-center justify-center gap-0.5';
         let style = '';
 
         if (isOtherMonth) classes += ' text-gray-400 dark:text-zinc-600';
+
+        // "Сегодня" и "просматриваемый день" — два разных состояния и должны
+        // различаться одновременно: сегодня всегда отмечено полупрозрачной
+        // заливкой, а выбранный (на который сейчас смотрим/кликнули) день —
+        // рамкой. Если это один и тот же день, оба признака показываются вместе.
         if (isToday) {
-          classes += ' text-white';
-          style = ' style="background:#0077FF"';
-        } else if (dayItems.length) {
-          classes += ' text-white';
-          style = ' style="background:' + dayItems[0].color + '"';
+          classes += ' font-semibold text-[#0077FF] dark:text-[#3391FF]';
+          style = ' style="background:rgba(0,119,255,0.15)"';
+        }
+        if (isSelected) {
+          classes += ' ring-2 ring-inset ring-[#0077FF] font-semibold';
         }
 
-        cells.push('<div class="' + classes + '"' + style + ' data-date="' + isoDate(cellDate) + '">' + cellDate.getDate() + '</div>');
+        const dots = dayItems.slice(0, 4).map(function (it) {
+          return '<span class="h-1 w-1 rounded-full" style="background:' + it.color + '"></span>';
+        }).join('');
+        const dotsRow = dayItems.length ? '<div class="flex items-center justify-center gap-0.5 h-1">' + dots + '</div>' : '<div class="h-1"></div>';
+
+        cells.push('<div class="' + classes + '"' + style + ' data-date="' + isoDate(cellDate) + '"><span>' + cellDate.getDate() + '</span>' + dotsRow + '</div>');
       }
 
       return cells.join('');
@@ -573,11 +584,12 @@
 
     function renderFullGrid() {
       fullTitleEl.textContent = MONTHS[fullMonth] + ' ' + fullYear;
-      fullGridEl.innerHTML = buildGridCells(fullYear, fullMonth);
+      fullGridEl.innerHTML = buildGridCells(fullYear, fullMonth, selectedDate);
       fullGridEl.querySelectorAll('[data-date]').forEach(function (cell) {
         cell.addEventListener('click', function () {
           const [y, m, d] = cell.dataset.date.split('-').map(Number);
           selectedDate = new Date(y, m - 1, d);
+          renderFullGrid();
           renderFullDay();
         });
       });

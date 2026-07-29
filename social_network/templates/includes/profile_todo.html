@@ -33,7 +33,7 @@
           <div class="accordion__pane">
           <div class="flex items-center gap-2 px-2 py-2 text-base">
             <label class="task-check-wrap relative flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center">
-              <input type="checkbox" class="task-checkbox peer absolute h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-gray-300 transition-colors checked:border-[#0077FF] checked:bg-[#0077FF] dark:border-zinc-600">
+              <input type="checkbox" autocomplete="off" class="task-checkbox peer absolute h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-gray-300 transition-colors checked:border-[#0077FF] checked:bg-[#0077FF] dark:border-zinc-600">
               <i data-feather="check" class="pointer-events-none absolute h-3 w-3 text-white opacity-0 transition-opacity peer-checked:opacity-100"></i>
             </label>
             <span class="task-desc-toggle {% if task.description %}accordion__pane__toggle cursor-pointer{% endif %} min-w-0 flex-1 truncate text-gray-800 dark:text-gray-100">
@@ -69,7 +69,7 @@
             <div class="accordion__pane">
             <div class="flex items-center gap-2 px-2 py-2 text-base">
               <label class="task-check-wrap relative flex h-5 w-5 flex-shrink-0 cursor-pointer items-center justify-center">
-                <input type="checkbox" checked class="task-checkbox peer absolute h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-gray-300 transition-colors checked:border-[#0077FF] checked:bg-[#0077FF] dark:border-zinc-600">
+                <input type="checkbox" checked autocomplete="off" class="task-checkbox peer absolute h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-gray-300 transition-colors checked:border-[#0077FF] checked:bg-[#0077FF] dark:border-zinc-600">
                 <i data-feather="check" class="pointer-events-none absolute h-3 w-3 text-white opacity-100 transition-opacity"></i>
               </label>
               <span class="task-desc-toggle {% if task.description %}accordion__pane__toggle cursor-pointer{% endif %} min-w-0 flex-1 truncate text-gray-400 line-through">
@@ -361,6 +361,14 @@
     }
 
     document.querySelectorAll('#pending-tasks-list .accordion__pane, #completed-tasks-list .accordion__pane').forEach(observeAccordionPane);
+
+    // Некоторые браузеры при перезагрузке страницы (bfcache) восстанавливают
+    // состояние чекбоксов без name/form по своей истории, а не по HTML с
+    // сервера — принудительно синхронизируем состояние с data-status задачи.
+    document.querySelectorAll('.task-row').forEach(function (row) {
+      const checkbox = row.querySelector('.task-checkbox');
+      if (checkbox) checkbox.checked = row.dataset.status === 'done';
+    });
 
     // --- Модалка создания / редактирования ---
     const modal = document.getElementById('task-modal');
