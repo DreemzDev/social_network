@@ -150,8 +150,8 @@ class AddPost(FormView, TemplateView):
             context['completed_tasks'] = own_tasks.filter(is_completed=True)
             context['task_form'] = TaskForm()
 
-            note, _ = Note.objects.get_or_create(user=user)
-            context['note_form'] = NoteForm(instance=note)
+            context['notes'] = Note.objects.filter(user=user)
+            context['note_form'] = NoteForm()
 
             context['event_form'] = EventForm()
 

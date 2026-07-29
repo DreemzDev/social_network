@@ -2,7 +2,7 @@ from typing import Any
 from django.templatetags.static import static
 from django.urls import reverse, reverse_lazy
 from django.core.cache import cache
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Max
 from django.utils import timezone
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -614,15 +614,45 @@ class TaskEditView(LoginRequiredMixin, View):
         })
 
 
-# --- Личные заметки ---
+# --- Личные заметки (стикеры) ---
 
-class NoteSaveView(LoginRequiredMixin, View):
+def _serialize_note(note):
+    return {
+        'id': note.id,
+        'content': note.content,
+        'color': note.color,
+    }
+
+
+class NoteCreateView(LoginRequiredMixin, View):
     def post(self, request):
-        note, _ = Note.objects.get_or_create(user=request.user)
+        form = NoteForm(request.POST)
+        if not form.is_valid():
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+        note = form.save(commit=False)
+        note.user = request.user
+        max_position = Note.objects.filter(user=request.user).aggregate(m=Max('position'))['m']
+        note.position = (max_position or 0) + 1
+        note.save()
+        return JsonResponse({'success': True, 'note': _serialize_note(note)})
+
+
+class NoteEditView(LoginRequiredMixin, View):
+    def post(self, request, note_id):
+        note = get_object_or_404(Note, pk=note_id, user=request.user)
         form = NoteForm(request.POST, instance=note)
-        if form.is_valid():
-            form.save()
-        return redirect('addpost', username=request.user.username)
+        if not form.is_valid():
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+        note = form.save()
+        return JsonResponse({'success': True, 'note': _serialize_note(note)})
+
+
+class NoteDeleteView(LoginRequiredMixin, View):
+    def post(self, request, note_id):
+        get_object_or_404(Note, pk=note_id, user=request.user).delete()
+        return JsonResponse({'success': True})
 
 
 class TaskQuickCreateView(LoginRequiredMixin, View):

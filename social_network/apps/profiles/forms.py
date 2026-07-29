@@ -146,9 +146,10 @@ class TaskEditForm(forms.ModelForm):
 class NoteForm(forms.ModelForm):
     class Meta:
         model = Note
-        fields = ('content',)
+        fields = ('content', 'color')
         widgets = {
-            'content': forms.Textarea(attrs={'class': TASK_INPUT_CLASSES, 'rows': 8, 'placeholder': "Ваши заметки..."}),
+            'content': forms.Textarea(attrs={'placeholder': "Текст заметки...", 'rows': 5}),
+            'color': forms.Select(),
         }
 
 

@@ -135,11 +135,21 @@ class Task(models.Model):
 
 
 class Note(models.Model):
-    user = models.OneToOneField(get_user_model(), on_delete=models.CASCADE, related_name='note', verbose_name="Пользователь")
+    class Color(models.TextChoices):
+        YELLOW = 'yellow', 'Жёлтый'
+        PINK = 'pink', 'Розовый'
+        BLUE = 'blue', 'Голубой'
+        GREEN = 'green', 'Зелёный'
+        PURPLE = 'purple', 'Фиолетовый'
+
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='notes', verbose_name="Пользователь")
     content = models.TextField(blank=True, verbose_name="Текст заметки")
+    color = models.CharField(max_length=10, choices=Color.choices, default=Color.YELLOW, verbose_name="Цвет")
+    position = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     updated = models.DateTimeField(auto_now=True, verbose_name="Обновлено")
 
     class Meta:
+        ordering = ['position', '-updated']
         verbose_name = 'Личная заметка'
         verbose_name_plural = 'Личные заметки'
 

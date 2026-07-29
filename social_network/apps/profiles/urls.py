@@ -41,8 +41,10 @@ urlpatterns = [
     path('task/<int:task_id>/delete/', TaskDeleteView.as_view(), name='task_delete'),
     path('task/<int:task_id>/edit/', TaskEditView.as_view(), name='task_edit'),
 
-    # Личные заметки
-    path('note/save/', NoteSaveView.as_view(), name='note_save'),
+    # Личные заметки (стикеры)
+    path('note/create/', NoteCreateView.as_view(), name='note_create'),
+    path('note/<int:note_id>/edit/', NoteEditView.as_view(), name='note_edit'),
+    path('note/<int:note_id>/delete/', NoteDeleteView.as_view(), name='note_delete'),
 
     # Календарь
     path('event/create/', EventCreateView.as_view(), name='event_create'),
