@@ -110,6 +110,10 @@
      stretch-растянут родителем flex-col на всю ширину bubble. */
   .msg-bubble > .msg-text { align-self: flex-start; width: fit-content; max-width: 100%; }
 
+  /* Если у сообщения есть реакции — метка времени переезжает в конец их
+     строки (см. JS relocateMsgMeta), но visually чуть ниже самой строки. */
+  .msg-meta-inline { margin-left: auto; align-self: flex-end; margin-top: 0.375rem; }
+
   /* Цитата ответа внутри пузыря сообщения — кликабельна, ведёт к оригиналу. */
   .msg-reply-quote:hover { opacity: 1; }
   @keyframes msg-highlight-flash {
@@ -1272,32 +1276,26 @@ async function toggleReaction(messageEl, emoji) {
 // Время+галочки живут внутри <p class="msg-text"> и через float-right
 // прижимаются к концу текста (см. CSS .msg-bubble > .msg-text) — это
 // работает, только пока после текста в облачке больше ничего нет. Если у
-// сообщения есть реакции, метка должна переехать в отдельную строку под
-// реакциями, в правый нижний угол облачка целиком.
+// сообщения есть реакции, метка должна переехать в конец их строки (тот же
+// flex-wrap ряд .msg-reactions), а не в отдельную строку под ними.
 function relocateMsgMeta(messageEl) {
   const bubble = messageEl.querySelector('.msg-bubble');
   if (!bubble) return;
   const metaEl = bubble.querySelector('.msg-meta');
   if (!metaEl) return;
-  const hasReactions = !!bubble.querySelector('.msg-reactions');
+  const reactionsEl = bubble.querySelector('.msg-reactions');
 
-  let footerEl = bubble.querySelector('.msg-meta-footer');
-
-  if (hasReactions) {
-    if (!footerEl) {
-      footerEl = document.createElement('div');
-      footerEl.className = 'msg-meta-footer mt-1 flex justify-end';
-      bubble.appendChild(footerEl);
-    }
+  if (reactionsEl) {
     metaEl.classList.remove('float-right', 'ml-2', 'mt-1.5');
-    footerEl.appendChild(metaEl);
-  } else if (footerEl) {
+    metaEl.classList.add('msg-meta-inline');
+    reactionsEl.appendChild(metaEl);
+  } else {
     const textEl = bubble.querySelector('.msg-text');
     if (textEl) {
+      metaEl.classList.remove('msg-meta-inline');
       metaEl.classList.add('float-right', 'ml-2', 'mt-1.5');
       textEl.appendChild(metaEl);
     }
-    footerEl.remove();
   }
 }
 
