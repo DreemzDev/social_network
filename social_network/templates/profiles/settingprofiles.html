@@ -16,9 +16,25 @@
       >
         {% csrf_token %}
 
+        <!-- Обложка профиля -->
+        <label class="group relative block h-36 w-full cursor-pointer overflow-hidden border-b border-gray-100 dark:border-zinc-800">
+          <img
+            x-ref="coverPreview"
+            class="h-full w-full object-cover"
+            {% if user.cover %}src="{{ user.cover.url }}"{% endif %}
+            style="{% if not user.cover %}display:none{% endif %}"
+            alt=""
+          />
+          <div x-ref="coverPlaceholder" class="h-full w-full bg-gradient-to-br from-[#1C3FAA] to-[#3391FF]" style="{% if user.cover %}display:none{% endif %}"></div>
+          <span class="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 text-sm font-medium text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
+            <i data-feather="image" class="h-5 w-5"></i> Изменить обложку
+          </span>
+          {{ form.cover }}
+        </label>
+
         <!-- Аватар и ID -->
         <div class="flex items-center gap-4 border-b border-gray-100 p-4 dark:border-zinc-800">
-          <label class="group relative block h-28 w-28 flex-shrink-0 cursor-pointer">
+          <button type="button" id="avatar-open-cropper" class="group relative block h-28 w-28 flex-shrink-0 cursor-pointer rounded-full">
             <img
               x-ref="preview"
               class="h-28 w-28 rounded-full object-cover"
@@ -31,12 +47,13 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
               </svg>
             </span>
-            {{ form.avatar }}
-          </label>
+          </button>
+          <input type="file" id="avatar-file-input" accept="image/*" class="hidden" name="avatar_source">
+          {{ form.avatar }}
           <div class="min-w-0">
             <div class="truncate text-lg font-medium text-gray-900 dark:text-white">{{ user.first_name }} {{ user.last_name }}</div>
             <div class="truncate text-base text-gray-500 dark:text-gray-400">ID: {{ user.username }}</div>
-            <div class="mt-1 text-sm text-gray-400">Наведите на фото, чтобы заменить</div>
+            <div class="mt-1 text-sm text-gray-400">Нажмите на фото, чтобы заменить</div>
           </div>
         </div>
 
@@ -222,19 +239,210 @@
 </div>
 </div>
 
+<!-- Модалка обрезки аватара по кругу -->
+<div id="avatar-cropper-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+  <div class="w-full max-w-sm rounded-xl bg-white p-5 dark:bg-zinc-900">
+    <div class="mb-4 flex items-center justify-between">
+      <div class="text-base font-semibold text-gray-900 dark:text-white">Выберите область фото</div>
+      <button type="button" id="avatar-cropper-close" class="text-gray-400 hover:text-gray-600">
+        <i data-feather="x" class="h-5 w-5"></i>
+      </button>
+    </div>
+
+    <div id="avatar-cropper-viewport" class="relative mx-auto h-72 w-72 touch-none overflow-hidden rounded-lg bg-gray-900 select-none">
+      <canvas id="avatar-cropper-canvas" class="absolute left-0 top-0 cursor-move"></canvas>
+      <div class="pointer-events-none absolute inset-0" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.55); border-radius: 50%;"></div>
+      <div class="pointer-events-none absolute inset-0 rounded-full ring-2 ring-white/80"></div>
+    </div>
+
+    <div class="mt-4 flex items-center gap-3">
+      <i data-feather="zoom-out" class="h-4 w-4 flex-shrink-0 text-gray-400"></i>
+      <input type="range" id="avatar-cropper-zoom" min="1" max="3" step="0.01" value="1" class="w-full">
+      <i data-feather="zoom-in" class="h-4 w-4 flex-shrink-0 text-gray-400"></i>
+    </div>
+
+    <div class="mt-4 flex justify-end gap-2">
+      <button type="button" id="avatar-cropper-cancel" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-600 dark:text-gray-200 dark:hover:bg-zinc-800">Отмена</button>
+      <button type="button" id="avatar-cropper-apply" class="rounded-lg bg-[#0077FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#3391FF]">Применить</button>
+    </div>
+  </div>
+</div>
+
 <script>
   function avatarPreview() {
     return {
       init() {
-        this.$el.querySelector('input[type=file][name=avatar]').addEventListener('change', (event) => {
+        this.$el.querySelector('input[type=file][name=cover]').addEventListener('change', (event) => {
           const file = event.target.files[0];
           if (file) {
-            this.$refs.preview.src = URL.createObjectURL(file);
+            const url = URL.createObjectURL(file);
+            this.$refs.coverPreview.src = url;
+            this.$refs.coverPreview.style.display = '';
+            this.$refs.coverPlaceholder.style.display = 'none';
           }
         });
       },
     };
   }
+
+  // --- Круговой кроппер аватара: пользователь двигает/масштабирует фото
+  // внутри круглой маски холста, итоговый квадратный кадр (300x300, PNG)
+  // подставляется в скрытый input[name=avatar] перед отправкой формы.
+  (function () {
+    const openBtn = document.getElementById('avatar-open-cropper');
+    const fileInput = document.getElementById('avatar-file-input');
+    const realAvatarInput = document.querySelector('input[type=file][name=avatar]');
+    if (!openBtn || !fileInput || !realAvatarInput) return;
+
+    const modal = document.getElementById('avatar-cropper-modal');
+    const viewport = document.getElementById('avatar-cropper-viewport');
+    const canvas = document.getElementById('avatar-cropper-canvas');
+    const ctx = canvas.getContext('2d');
+    const zoomSlider = document.getElementById('avatar-cropper-zoom');
+    const closeBtn = document.getElementById('avatar-cropper-close');
+    const cancelBtn = document.getElementById('avatar-cropper-cancel');
+    const applyBtn = document.getElementById('avatar-cropper-apply');
+    const preview = document.querySelector('[x-ref="preview"]');
+
+    const OUTPUT_SIZE = 300;
+    const VIEWPORT_SIZE = 288; // h-72/w-72
+
+    let img = null;
+    let scale = 1;
+    let minScale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+    let dragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragOffsetStartX = 0;
+    let dragOffsetStartY = 0;
+
+    openBtn.addEventListener('click', function () {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', function () {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = function () {
+        img = image;
+        canvas.width = VIEWPORT_SIZE;
+        canvas.height = VIEWPORT_SIZE;
+
+        // Минимальный масштаб — чтобы меньшая сторона фото полностью
+        // закрывала круглую область без пустых полей.
+        minScale = Math.max(VIEWPORT_SIZE / img.width, VIEWPORT_SIZE / img.height);
+        scale = minScale;
+        offsetX = (VIEWPORT_SIZE - img.width * scale) / 2;
+        offsetY = (VIEWPORT_SIZE - img.height * scale) / 2;
+
+        zoomSlider.min = minScale;
+        zoomSlider.max = minScale * 3;
+        zoomSlider.step = (zoomSlider.max - zoomSlider.min) / 100 || 0.01;
+        zoomSlider.value = scale;
+
+        drawCanvas();
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      };
+      image.src = url;
+    });
+
+    function clampOffset() {
+      const w = img.width * scale;
+      const h = img.height * scale;
+      offsetX = Math.min(0, Math.max(VIEWPORT_SIZE - w, offsetX));
+      offsetY = Math.min(0, Math.max(VIEWPORT_SIZE - h, offsetY));
+    }
+
+    function drawCanvas() {
+      if (!img) return;
+      ctx.clearRect(0, 0, VIEWPORT_SIZE, VIEWPORT_SIZE);
+      ctx.drawImage(img, offsetX, offsetY, img.width * scale, img.height * scale);
+    }
+
+    zoomSlider.addEventListener('input', function () {
+      const newScale = parseFloat(zoomSlider.value);
+      // Масштабируем относительно центра видимой области, чтобы зум не
+      // «убегал» в угол.
+      const cx = VIEWPORT_SIZE / 2;
+      const cy = VIEWPORT_SIZE / 2;
+      const imgX = (cx - offsetX) / scale;
+      const imgY = (cy - offsetY) / scale;
+      scale = newScale;
+      offsetX = cx - imgX * scale;
+      offsetY = cy - imgY * scale;
+      clampOffset();
+      drawCanvas();
+    });
+
+    function pointerDown(x, y) {
+      dragging = true;
+      dragStartX = x;
+      dragStartY = y;
+      dragOffsetStartX = offsetX;
+      dragOffsetStartY = offsetY;
+    }
+
+    function pointerMove(x, y) {
+      if (!dragging) return;
+      offsetX = dragOffsetStartX + (x - dragStartX);
+      offsetY = dragOffsetStartY + (y - dragStartY);
+      clampOffset();
+      drawCanvas();
+    }
+
+    function pointerUp() {
+      dragging = false;
+    }
+
+    canvas.addEventListener('mousedown', function (e) { pointerDown(e.clientX, e.clientY); });
+    window.addEventListener('mousemove', function (e) { pointerMove(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', pointerUp);
+
+    canvas.addEventListener('touchstart', function (e) {
+      const t = e.touches[0];
+      pointerDown(t.clientX, t.clientY);
+    }, { passive: true });
+    canvas.addEventListener('touchmove', function (e) {
+      const t = e.touches[0];
+      pointerMove(t.clientX, t.clientY);
+    }, { passive: true });
+    canvas.addEventListener('touchend', pointerUp);
+
+    function closeCropper() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      fileInput.value = '';
+    }
+
+    closeBtn.addEventListener('click', closeCropper);
+    cancelBtn.addEventListener('click', closeCropper);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeCropper(); });
+
+    applyBtn.addEventListener('click', function () {
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = OUTPUT_SIZE;
+      outCanvas.height = OUTPUT_SIZE;
+      const outCtx = outCanvas.getContext('2d');
+      const ratio = OUTPUT_SIZE / VIEWPORT_SIZE;
+      outCtx.drawImage(img, offsetX * ratio, offsetY * ratio, img.width * scale * ratio, img.height * scale * ratio);
+
+      outCanvas.toBlob(function (blob) {
+        const file = new File([blob], 'avatar.png', { type: 'image/png' });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        realAvatarInput.files = dt.files;
+
+        if (preview) preview.src = URL.createObjectURL(blob);
+        closeCropper();
+      }, 'image/png');
+    });
+  })();
 
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.password-toggle').forEach(function (toggle) {
