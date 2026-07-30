@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block breadcrumb %}{% if is_owner %}Моя страница{% else %}{{ user.first_name }} {{ user.last_name }}{% endif %}{% endblock breadcrumb %}
+
 {% block Profiles %}
 <div class="w-full min-w-0">
 
@@ -93,46 +95,79 @@
   <div class="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start">
 
 <div class="w-full min-w-0{% if is_owner %} xl:w-2/3{% else %} xl:w-2/3 xl:mx-auto{% endif %}">
-  <!-- Форма для постов -->
+  <!-- Форма для постов — пилюля в стиле мессенджера -->
   {% if request.user == user %}
   <div>
     <form
       x-data="activateImagePreview()"
       action=""
       method="post"
-      id="comment-form"
+      id="post-form"
       enctype="multipart/form-data"
       class="mb-4"
     >
       {% csrf_token %}
-      <div x-data="{open:false, contentLength:0}" class="box dark:bg-zinc-900">
-        <div class="flex items-start gap-3 px-5 pt-4">
+      <div x-data="{open: false, contentLength: 0}">
+        <!-- Превью выбранных изображений/файлов — появляется только при выборе -->
+        <div x-cloak x-show="open" id="images-preview" class="hidden grid-cols-6 gap-2 mb-2"></div>
+        <div x-cloak x-show="open" id="attachments-preview" class="hidden flex-col gap-1.5 mb-2"></div>
+
+        <div class="flex items-end gap-3">
           <img
-            class="w-12 h-12 object-cover flex-shrink-0 rounded-full"
+            class="w-10 h-10 object-cover flex-shrink-0 rounded-full mb-0.5"
             src="{%if user.avatar%}{{user.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
             alt=""
           />
-          <div class="relative w-full" x-data="{ emojiOpen: false }">
-            <div class="relative">
-              <textarea
-                rows="1"
-                id="id_content"
-                name="content"
-                required=""
-                class="no-scrollbar text-lg w-full min-h-[48px] resize-none overflow-y-auto border-none p-0 py-3 pr-10 outline-none focus:outline-none focus:ring-0 bg-transparent dark:text-white placeholder:text-gray-400"
-                style="max-height: 440px;"
-                placeholder="Что у вас нового?"
-                x-on:focus="open = true"
-                x-on:input="autoResize($el); contentLength = $el.value.length"
-              ></textarea>
+
+          <div class="post-input-pill relative flex min-h-[48px] flex-grow items-center gap-1 rounded-3xl border border-gray-100 bg-white py-1.5 pl-1.5 pr-1.5 shadow-sm dark:border-zinc-700 dark:bg-zinc-800"
+               x-data="{ attachOpen: false, emojiOpen: false }">
+
+            <!-- Скрепка: дропдаун "Фото" / "Файл" -->
+            <div class="relative flex-shrink-0" x-on:click.outside="attachOpen = false">
+              <button type="button" x-on:click="attachOpen = !attachOpen"
+                      class="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+                      title="Прикрепить">
+                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+                </svg>
+              </button>
+              <div x-cloak x-show="attachOpen"
+                   class="absolute bottom-full left-0 z-20 mb-2 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+                <label for="id_images" x-on:click="attachOpen = false"
+                       class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700">
+                  <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 21h18a1.5 1.5 0 001.5-1.5V4.5A1.5 1.5 0 0021 3H3a1.5 1.5 0 00-1.5 1.5v15A1.5 1.5 0 003 21zm12.75-13.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+                  </svg>
+                  Фото
+                </label>
+                <label for="id_attachments" x-on:click="attachOpen = false"
+                       class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-zinc-700">
+                  <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                  </svg>
+                  Файл
+                </label>
+              </div>
             </div>
+
+            <textarea
+              rows="1"
+              id="id_content"
+              name="content"
+              required=""
+              class="no-scrollbar w-full flex-1 resize-none overflow-y-auto border-none bg-transparent py-1.5 text-base outline-none focus:outline-none focus:ring-0 dark:text-white placeholder:text-gray-400"
+              style="max-height: 200px;"
+              placeholder="Что у вас нового?"
+              x-on:focus="open = true"
+              x-on:input="autoResize($el); contentLength = $el.value.length"
+            ></textarea>
 
             <!-- Кнопка эмодзи -->
             <button
               id="emojiDropdownButton"
               x-on:click="emojiOpen = !emojiOpen"
               x-on:click.away="emojiOpen = false"
-              class="absolute right-0 top-2 p-1.5 text-gray-400 hover:text-gray-600 rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-[#0077FF] focus:outline-none dark:hover:text-gray-200"
+              class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
               type="button"
               title="Эмодзи"
             >
@@ -161,7 +196,7 @@
               x-cloak
               x-show="emojiOpen"
               x-on:click.outside="emojiOpen = false"
-              class="absolute right-0 top-full z-20 mt-2 flex h-80 w-80 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800"
+              class="absolute bottom-full right-0 z-20 mb-2 flex h-80 w-80 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-800"
             >
               <!-- Вкладки категорий -->
               <div
@@ -347,82 +382,22 @@
 
               document.addEventListener("DOMContentLoaded", initEmojiPicker);
             </script>
-          </div>
-        </div>
 
-        <!-- Превью выбранных изображений -->
-        <div x-cloak x-show="open" id="images-preview" class="hidden grid-cols-6 gap-2 px-5 pt-3"></div>
-
-        <!-- Список прикреплённых файлов -->
-        <div x-cloak x-show="open" id="attachments-preview" class="hidden flex-col gap-1.5 px-5 pt-3"></div>
-
-        <div class="mb-2 hidden">
-          <input
-            class="input__file-button block w-full h-10.5 leading-9 rounded overflow-hidden text-sm text-gray-900 bg-gray-50 border border-gray-300 cursor-pointer dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
-            id="id_images"
-            name="images"
-            accept="image/*"
-            multiple
-            type="file"
-          />
-          <input
-            id="id_attachments"
-            name="attachments"
-            multiple
-            type="file"
-          />
-        </div>
-
-        <div class="mt-4 flex items-center justify-between border-t border-gray-100 px-5 py-3 dark:border-zinc-800">
-          <div class="flex items-center gap-1">
-            <label for="id_images" class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-zinc-800 dark:hover:text-gray-200" title="Добавить фото">
-              <svg
-                class="w-5 h-5"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 21h18a1.5 1.5 0 001.5-1.5V4.5A1.5 1.5 0 0021 3H3a1.5 1.5 0 00-1.5 1.5v15A1.5 1.5 0 003 21zm12.75-13.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"
-                />
-              </svg>
-              <span class="hidden sm:inline">Фото</span>
-            </label>
-
-            <label for="id_attachments" class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-zinc-800 dark:hover:text-gray-200" title="Прикрепить файл">
-              <svg
-                class="w-5 h-5"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="1.5"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"
-                />
-              </svg>
-              <span class="hidden sm:inline">Файл</span>
-            </label>
-          </div>
-
-          <div class="flex items-center gap-3">
-            <span x-cloak x-show="contentLength > 0" class="text-xs text-gray-400" x-text="contentLength + ' симв.'"></span>
             <button
               type="submit"
               x-bind:disabled="contentLength === 0"
-              class="rounded-lg bg-[#0077FF] px-5 py-2 text-sm font-medium text-white transition-opacity hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-40 dark:focus:ring-blue-800"
+              class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0077FF] text-white transition-colors hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-40 dark:focus:ring-blue-800"
+              title="Опубликовать"
             >
-              Опубликовать
+              <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6" />
+              </svg>
             </button>
           </div>
         </div>
+
+        <input class="hidden" id="id_images" name="images" accept="image/*" multiple type="file" />
+        <input class="hidden" id="id_attachments" name="attachments" multiple type="file" />
       </div>
     </form>
   </div>

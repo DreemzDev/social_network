@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
 {% load static %}
 
+{% block breadcrumb %}Редактирование поста{% endblock breadcrumb %}
+
 {% block content %}
-<div class="w-full min-w-0 mx-auto space-y-6">
+<div class="w-full min-w-0 mx-auto space-y-6 md:w-2/3 md:mx-auto">
   <!-- Post Edit Card -->
   <div class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800">
     <!-- Header -->

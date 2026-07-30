@@ -1,10 +1,12 @@
-{% extends 'base.html' %} 
+{% extends 'base.html' %}
 {% load static %}
+
+{% block breadcrumb %}Пост{% endblock breadcrumb %}
 
 <!-- Открытый пост -->
 {% block content %}
 <!-- Post -->
-<div class="w-full min-w-0 space-y-4 sm:space-y-6">
+<div class="w-full min-w-0 space-y-4 sm:space-y-6 md:w-2/3 md:mx-auto">
   <div class="bg-white w-full dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800 px-4 py-3 sm:px-5 sm:py-4">
     <div class="flex justify-between">
         <!-- Автор и дата -->
@@ -71,18 +73,21 @@
       </div>
     </div>
       
-      <!-- Фото с Lightbox -->
+      <!-- Фото с Lightbox: одна картинка — во всю ширину, 2 — в ряд по 2,
+           3+ — в ряд не больше 3 (иначе пост получается слишком длинным) -->
       {% if post.images.all %}
-      <div class="pt-4 space-y-2">
+      {% with total=post.images.count %}
+      <div class="pt-4 {% if total > 1 %}grid gap-2 {% if total == 2 %}grid-cols-2{% else %}grid-cols-3{% endif %}{% endif %}">
         {% for image in post.images.all %}
         <a href="{{ image.image.url }}" data-lightbox="gallery-{{ post.id }}"
            data-title="Фото от {{ post.author.first_name|default:'Пользователя' }}"
-           class="block rounded-xl overflow-hidden cursor-zoom-in">
+           class="block overflow-hidden rounded-xl cursor-zoom-in">
           <img src="{{ image.image.url }}" alt="Фото поста"
-               class="rounded-xl w-full h-auto object-contain max-h-96 transition-transform hover:scale-105 duration-300" />
+               class="w-full {% if total > 1 %}aspect-square object-cover{% else %}h-auto max-h-96 object-contain{% endif %} rounded-xl transition-transform hover:scale-105 duration-300" />
         </a>
         {% endfor %}
       </div>
+      {% endwith %}
       {% endif %}
 
       <!-- Прикреплённые файлы -->
@@ -255,61 +260,47 @@
         class="bg-white dark:bg-zinc-900 mb-4"
       >
         {% csrf_token %}
-        <div>
-          <div class="flex min-w-0 flex-shrink-0 items-center">
-            <div class="py-3 flex-shrink-0 mr-3 sm:mr-4">
-              <img
-                class="w-10 h-10 flex-shrink-0 rounded-full avatar-ring"
-                src="{% if user.avatar %}{{user.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
-                alt=""
-              />
-            </div>
-            <div class="w-full min-w-0 border rounded-lg dark:border-zinc-600">
-              <div class="relative border rounded-lg bg-white dark:bg-zinc-800 flex items-end">
-                <textarea
-                  rows="1"
-                  id="id_comment_text"
-                  name="comment_text"
-                  maxlength="350"
-                  required=""
-                  class="text-base pl-3 pr-10 w-full rounded py-3 resize-none border-none outline-none focus:outline-none dark:bg-zinc-800 dark:text-white"
-                  oninput="autoResize(this)"
-                  placeholder="Написать комментарий..."
-                ></textarea>
+        <div class="flex items-end gap-3">
+          <img
+            class="w-10 h-10 flex-shrink-0 rounded-full avatar-ring mb-0.5"
+            src="{% if user.avatar %}{{user.avatar.url}}{%else%}{% static '/img/avatar7.png' %}{%endif%}"
+            alt=""
+          />
 
-                <!-- Кнопка эмодзи с Flowbite dropdown -->
-                <button
-                  id="commentEmojiDropdownButton"
-                  data-dropdown-toggle="commentEmojiDropdown"
-                  data-dropdown-trigger="click"
-                  class="absolute right-2 top-1 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-lg transition-colors duration-200 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  type="button"
-                >
-                  <svg
-                    class="w-6 h-6"
-                    aria-hidden="true"
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke="currentColor"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="1.5"
-                      d="M15 9h.01M8.99 9H9m12 3a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM6.6 13a5.5 5.5 0 0 0 10.81 0H6.6Z"
-                    />
-                  </svg>
-                </button>
-              </div>
+          <div class="comment-input-pill relative flex min-h-[48px] flex-grow items-center gap-1 rounded-3xl border border-gray-100 bg-white py-1.5 pl-4 pr-1.5 shadow-sm dark:border-zinc-700 dark:bg-zinc-800"
+               x-data="{ emojiOpen: false }">
+            <textarea
+              rows="1"
+              id="id_comment_text"
+              name="comment_text"
+              maxlength="350"
+              required=""
+              class="no-scrollbar w-full flex-1 resize-none overflow-y-auto border-none bg-transparent py-1.5 text-base outline-none focus:outline-none focus:ring-0 dark:text-white placeholder:text-gray-400"
+              style="max-height: 200px;"
+              oninput="autoResize(this)"
+              placeholder="Написать комментарий..."
+            ></textarea>
 
-              <!-- Dropdown эмодзи-пикер для комментариев -->
-              <div
-                id="commentEmojiDropdown"
-                class="z-10 hidden bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-600 rounded-xl shadow-xl w-80 max-w-[90vw] h-80 overflow-hidden flex flex-col"
-              >
+            <button
+              id="commentEmojiDropdownButton"
+              x-on:click="emojiOpen = !emojiOpen"
+              x-on:click.away="emojiOpen = false"
+              class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+              type="button"
+              title="Эмодзи"
+            >
+              <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h.01M8.99 9H9m12 3a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM6.6 13a5.5 5.5 0 0 0 10.81 0H6.6Z" />
+              </svg>
+            </button>
+
+            <!-- Dropdown эмодзи-пикер для комментариев -->
+            <div
+              id="commentEmojiDropdown"
+              x-cloak
+              x-show="emojiOpen"
+              class="absolute bottom-full right-0 z-20 mb-2 flex h-80 w-80 max-w-[90vw] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-zinc-600 dark:bg-zinc-800"
+            >
                 <!-- Вкладки категорий -->
                 <div
                   class="flex border-b border-gray-200 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-700 p-2 gap-1 flex-shrink-0 overflow-x-auto"
@@ -371,23 +362,17 @@
                     <!-- Эмодзи загружаются через JavaScript -->
                   </div>
                 </div>
-              </div>
             </div>
-            <div>
-              <button type="submit" class="focus:outline-none group">
-                <svg
-                  class="ml-4 w-6 text-gray-400 rotate-90 rtl:-rotate-90 group-hover:text-gray-600 dark:group-hover:text-gray-300"
-                  aria-hidden="true"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="currentColor"
-                  viewBox="0 0 18 20"
-                >
-                  <path
-                    d="m17.914 18.594-8-18a1 1 0 0 0-1.828 0l-8 18a1 1 0 0 0 1.157 1.376L8 18.281V9a1 1 0 0 1 2 0v9.281l6.758 1.689a1 1 0 0 0 1.156-1.376Z"
-                  />
-                </svg>
-              </button>
-            </div>
+
+            <button
+              type="submit"
+              class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#0077FF] text-white transition-colors hover:bg-[#3391FF] focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
+              title="Отправить"
+            >
+              <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-6 6m6-6l6 6" />
+              </svg>
+            </button>
           </div>
         </div>
       </form>
