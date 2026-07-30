@@ -21,7 +21,7 @@
 </div>
 {% endif %}
 
-<form method="post" action="{% url 'addprofile' user.id %}" novalidate>
+<form method="post" action="{% url 'addprofile' %}" novalidate>
     {% csrf_token %}
     <div class="intro-x mt-8">
         {{ form.last_name }}

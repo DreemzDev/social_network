@@ -3,8 +3,8 @@ from django.urls import path
 from .views import *
 
 urlpatterns = [
-    path('addprofile/<int:user_id>/', AddProfile.as_view(), name='addprofile'), 
-    path('settingprofile/<int:user_id>/', SettingProfile.as_view(), name='settingprofile'),
+    path('addprofile/', AddProfile.as_view(), name='addprofile'),
+    path('settingprofile/', SettingProfile.as_view(), name='settingprofile'),
     path('users/', ShowUsers.as_view(), name='show_users'),
     path('phones/', ShowPhones.as_view(), name='show_phones'),
 # Список всех диалогов
@@ -13,8 +13,7 @@ urlpatterns = [
     # Конкретный диалог с пользователем
     path('dialog/<int:user_id>/', DialogMessagesView.as_view(), name='dialog_messages'),
     
-    # Отправка сообщения
-    path('send-message/<int:user_id>/', SendMessageView.as_view(), name='send_message'),
+    # Отправка сообщения (HTTP-путь; используется для reply, но обрабатывает и обычные сообщения)
     path('send-message-reply/<int:user_id>/', SendMessageWithReplyView.as_view(), name='send_message_reply'),
     
     # API для ленивой загрузки сообщений

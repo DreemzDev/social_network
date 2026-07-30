@@ -10,7 +10,7 @@
     <div class="rounded-xl border border-gray-100 bg-white dark:border-zinc-800 dark:bg-zinc-900">
       <form
         x-data="avatarPreview()"
-        action="{% url 'settingprofile' user.id %}"
+        action="{% url 'settingprofile' %}"
         method="post"
         enctype="multipart/form-data"
       >
@@ -142,7 +142,7 @@
         </div>
         {% endif %}
 
-        <form action="{% url 'settingprofile' user.id %}" method="post">
+        <form action="{% url 'settingprofile' %}" method="post">
           {% csrf_token %}
           <div class="mb-2 text-base font-semibold text-gray-900 dark:text-white">Смена пароля</div>
           <div class="space-y-4">
@@ -194,7 +194,7 @@
             {% for error in security_form.security_answer.errors %}<p>{{ error }}</p>{% endfor %}
           </div>
           {% endif %}
-          <form action="{% url 'settingprofile' user.id %}" method="post">
+          <form action="{% url 'settingprofile' %}" method="post">
             {% csrf_token %}
             <div class="mb-2 text-base font-semibold text-gray-900 dark:text-white">Проверочное слово</div>
             <div class="mb-3 text-sm text-gray-500 dark:text-gray-400">Используется для восстановления доступа без электронной почты.</div>

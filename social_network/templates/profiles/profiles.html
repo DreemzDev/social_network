@@ -14,7 +14,7 @@
     </div>
     {% endif %}
     {% if request.user == user %}
-    <a href="{% url 'settingprofile' user.id %}"
+    <a href="{% url 'settingprofile' %}"
        class="absolute right-3 top-3 z-10 flex items-center gap-2 rounded-lg bg-black/40 px-4 py-2 text-sm font-medium text-white hover:bg-black/60">
       <i data-feather="image" class="h-5 w-5"></i> Изменить обложку
     </a>
@@ -64,7 +64,7 @@
     <div class="flex-shrink-0">
       {% if request.user == user %}
       <a
-        href="{% url 'settingprofile' user.id %}"
+        href="{% url 'settingprofile' %}"
         class="flex items-center justify-center gap-2 rounded-lg bg-[#EDEEF0] px-5 py-2.5 text-base font-medium text-gray-700 hover:bg-gray-200 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
       >
         <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
