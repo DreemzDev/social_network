@@ -27,6 +27,15 @@ class ExtendedChatConsumer(ChatConsumer):
             'receiver': event['receiver'],
         }))
 
+    async def reply_quote_updated(self, event: dict):
+        """Сообщение, на которое кто-то отвечал, было отредактировано —
+        обновляем текст цитаты во всех пузырях-ответах на него."""
+        await self.send(text_data=json.dumps({
+            'msg_type': 105,
+            'reply_to_id': event['reply_to_id'],
+            'text': event['text'],
+        }))
+
     async def message_reaction(self, event: dict):
         await self.send(text_data=json.dumps({
             'msg_type': 102,
@@ -43,10 +52,18 @@ class ExtendedChatConsumer(ChatConsumer):
             'unread_count': event['unread_count'],
         }))
 
-    async def new_text_message(self, event: dict):
+    async def new_reply_message(self, event: dict):
         """Сообщение, отправленное через SendMessageWithReplyView (HTTP, не
         через стандартный WebSocket-путь библиотеки) — используется, когда
-        нужно приложить reply_to, которого нативный протокол не знает."""
+        нужно приложить reply_to, которого нативный протокол не знает.
+
+        ВАЖНО: имя метода/событие НЕ должно совпадать с 'new_text_message' —
+        это имя уже занято библиотечным ChatConsumer.new_text_message,
+        который обслуживает штатную отправку обычных сообщений через
+        нативный WebSocket-путь (см. chat_consumer.py, OutgoingEventNewTextMessage).
+        Переопределение того же имени в подклассе полностью подменяло
+        библиотечный обработчик, и обычные (не-reply) сообщения падали с
+        KeyError при доставке онлайн-получателю."""
         await self.send(text_data=json.dumps({
             'msg_type': 104,
             'id': event['id'],

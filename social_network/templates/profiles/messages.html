@@ -214,7 +214,7 @@
                         </p>
                         <p class="flex-shrink-0 text-xs text-gray-400">
                             {% if dialog.last_message %}
-                                {{ dialog.last_message.created|date:"H:i" }}
+                                {{ dialog.last_message.created|dialog_time_label }}
                             {% endif %}
                         </p>
                     </div>
@@ -453,8 +453,8 @@ window.addEventListener('beforeunload', () => {
 let typingTimeout = null;
 let isLoadingMessages = false;
 let hasMoreMessages = true;
-let messagesOffset = {{ messages|length }};
-let lastMessageId = null;
+let oldestLoadedMessageId = {{ messages.0.id|default:"null" }};
+const seenMessageIds = new Set(); // id входящих сообщений, уже отрисованных через WebSocket — защита от дублей
 let isMarkingRead = false; // Флаг для предотвращения дублирования запросов
 
 // ========================================
@@ -654,11 +654,11 @@ function handleChatWebSocketMessage(data) {
     }
 
     // Предотвращаем дублирование
-    if (lastMessageId && data.id === lastMessageId) {
+    if (data.id && seenMessageIds.has(data.id)) {
       console.log('⚠️ Дублирующееся сообщение');
       return;
     }
-    lastMessageId = data.id;
+    if (data.id) seenMessageIds.add(data.id);
 
     // Добавляем сообщение в UI
     addMessageToUI(data);
@@ -682,11 +682,19 @@ function handleChatWebSocketMessage(data) {
       return;
     }
 
-    if (lastMessageId && data.id === lastMessageId) return;
-    lastMessageId = data.id;
+    if (seenMessageIds.has(data.id)) return;
+    seenMessageIds.add(data.id);
 
     addMessageToUI(data);
     setTimeout(() => markMessagesAsRead(), 500);
+  }
+
+  // Сообщение, на которое кто-то отвечал, отредактировали — обновляем
+  // текст цитаты во всех пузырях-ответах на него, отрисованных на странице
+  if (data.msg_type === 105) {
+    document.querySelectorAll(`.msg-reply-quote[data-goto-message-id="${data.reply_to_id}"] .truncate`).forEach((el) => {
+      el.textContent = data.text.replace(/<[^>]*>/g, '');
+    });
   }
 
   // Сервер подтвердил сохранение сообщения - подставляем реальный id
@@ -771,9 +779,11 @@ if (wsManager) {
 
 function sendMessage() {
   const input = document.getElementById('message-input');
-  const text = getEditableHtml(input);
+  const rawText = getEditableHtml(input);
 
-  if (!text) return;
+  if (!rawText) return;
+
+  const text = sanitizeMessageHtml(rawText);
 
   // Режим редактирования - сохраняем изменения вместо отправки нового сообщения
   if (editingMessageEl) {
@@ -858,6 +868,34 @@ function getEditableHtml(el) {
   return html;
 }
 
+// Разрешённые теги форматирования — тот же список, что сервер применяет
+// через nh3.clean (см. apps/profiles/signals.py, ALLOWED_MESSAGE_TAGS).
+// Используется только для оптимистичного рендера у самого отправителя —
+// без этого локально мог отобразиться HTML, который сервер затем вырежет,
+// и разметка у отправителя разошлась бы с тем, что видит получатель.
+const ALLOWED_MESSAGE_TAGS = new Set(['B', 'I', 'U', 'S', 'STRIKE', 'BR']);
+
+function sanitizeMessageHtml(html) {
+  const container = document.createElement('div');
+  container.innerHTML = html;
+
+  const walk = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        walk(child);
+        if (!ALLOWED_MESSAGE_TAGS.has(child.tagName)) {
+          child.replaceWith(...child.childNodes);
+        } else {
+          [...child.attributes].forEach((attr) => child.removeAttribute(attr.name));
+        }
+      }
+    });
+  };
+  walk(container);
+
+  return container.innerHTML;
+}
+
 function sendTypingStopped() {
   if (wsManager && wsManager.isConnected) {
     wsManager.send({
@@ -882,22 +920,32 @@ async function loadMoreMessages() {
   const previousScrollHeight = messagesContainer.scrollHeight;
   
   try {
-    const response = await fetch(`/load-messages/${recipientPk}/?offset=${messagesOffset}`);
+    const url = oldestLoadedMessageId
+      ? `/load-messages/${recipientPk}/?before_id=${oldestLoadedMessageId}`
+      : `/load-messages/${recipientPk}/`;
+    const response = await fetch(url);
     const data = await response.json();
-    
+
     if (data.messages.length > 0) {
       const fragment = document.createDocumentFragment();
       const tempDiv = document.createElement('div');
-      
+      const insertedEls = [];
+
       data.messages.forEach(msg => {
         tempDiv.innerHTML = createMessageElement(msg);
-        fragment.insertBefore(tempDiv.firstElementChild, fragment.firstChild);
+        const el = tempDiv.firstElementChild;
+        insertedEls.push([el, msg.reactions]);
+        fragment.insertBefore(el, fragment.firstChild);
       });
-      
+
       messagesContainer.insertBefore(fragment, loadingIndicator.nextSibling);
       messagesContainer.scrollTop = messagesContainer.scrollHeight - previousScrollHeight;
-      
-      messagesOffset += data.messages.length;
+
+      insertedEls.forEach(([el, reactions]) => {
+        if (reactions && reactions.length > 0) renderMessageReactions(el, reactions);
+      });
+
+      oldestLoadedMessageId = data.messages[0].id;
       hasMoreMessages = data.has_more;
     } else {
       hasMoreMessages = false;
@@ -1054,7 +1102,8 @@ function setupFormatToolbar() {
 }
 
 // Периодическое обновление счетчиков (backup)
-setInterval(updateUnreadCounts, 30000);
+const unreadCountsIntervalId = setInterval(updateUnreadCounts, 30000);
+window.addEventListener('beforeunload', () => clearInterval(unreadCountsIntervalId));
 
 // ========================================
 // 😀 ЭМОДЗИ-ПИКЕР (та же реализация, что и в форме поста)
@@ -1303,7 +1352,13 @@ function renderMessageReactions(messageEl, reactions) {
   let reactionsEl = messageEl.querySelector('.msg-reactions');
 
   if (!reactions || reactions.length === 0) {
-    if (reactionsEl) reactionsEl.remove();
+    if (reactionsEl) {
+      // .msg-meta может лежать внутри .msg-reactions (см. relocateMsgMeta) —
+      // сначала вынимаем её обратно в bubble, иначе удалится вместе с блоком реакций.
+      const metaEl = reactionsEl.querySelector('.msg-meta');
+      if (metaEl) messageEl.querySelector('.msg-bubble')?.appendChild(metaEl);
+      reactionsEl.remove();
+    }
     relocateMsgMeta(messageEl);
     return;
   }
@@ -1314,6 +1369,12 @@ function renderMessageReactions(messageEl, reactions) {
     const targetBubble = messageEl.querySelector('.msg-bubble');
     if (targetBubble) targetBubble.appendChild(reactionsEl);
   }
+
+  // .msg-meta может уже лежать внутри reactionsEl (см. relocateMsgMeta) —
+  // вынимаем её перед innerHTML='', иначе будет удалена вместе со старыми
+  // пилюлями реакций.
+  const existingMetaEl = reactionsEl.querySelector('.msg-meta');
+  if (existingMetaEl) messageEl.querySelector('.msg-bubble')?.appendChild(existingMetaEl);
 
   reactionsEl.innerHTML = '';
   reactions.forEach((r) => {
