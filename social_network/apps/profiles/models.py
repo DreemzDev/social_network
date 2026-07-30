@@ -66,14 +66,19 @@ class User(AbstractUser):
         else:
             return "offline"
 
-    def get_status_display(self):
-        """Текстовое представление статуса"""
-        status_map = {
-            "online": "Онлайн",
-            "recently": "Был(а) недавно", 
-            "offline": "Офлайн"
-        }
-        return status_map.get(self.online_status, "Офлайн")
+    _ONLINE_STATUS_LABELS = {
+        "online": "Онлайн",
+        "recently": "Был(а) недавно",
+        "offline": "Офлайн",
+    }
+
+    def get_online_status_display(self):
+        """Текстовое представление online_status.
+
+        Не называется get_status_display() — у User нет поля status,
+        и такое имя выглядело бы как автосгенерированный Django-метод
+        для поля с choices (как get_status_display() у Task), но им не является."""
+        return self._ONLINE_STATUS_LABELS.get(self.online_status, "Офлайн")
 
     def __str__(self):
         return f"{self.last_name} {self.first_name}"
@@ -211,12 +216,14 @@ class Notification(models.Model):
         TASK_ASSIGNED = 'task_assigned', 'Поставлена задача'
         TASK_EDITED = 'task_edited', 'Задача изменена'
         TASK_STATUS_CHANGED = 'task_status_changed', 'Статус задачи изменён'
+        POST_COMMENTED = 'post_commented', 'Новый комментарий к посту'
 
     recipient = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='notifications', verbose_name="Получатель")
     actor = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='+', null=True, blank=True, verbose_name="Инициатор")
     kind = models.CharField(max_length=30, choices=Kind.choices, verbose_name="Тип")
     text = models.CharField(max_length=255, verbose_name="Текст")
     task = models.ForeignKey('Task', on_delete=models.CASCADE, null=True, blank=True, related_name='notifications', verbose_name="Задача")
+    post = models.ForeignKey('posts.Post', on_delete=models.CASCADE, null=True, blank=True, related_name='notifications', verbose_name="Пост")
     is_read = models.BooleanField(default=False, verbose_name="Прочитано")
     created = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 

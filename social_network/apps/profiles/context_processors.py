@@ -54,13 +54,19 @@ def notification_center(request):
 
     items = []
     for n in stored:
+        if n.task_id:
+            url = f'/profile/{n.task.user.username}/'
+        elif n.post_id:
+            url = f'/post/{n.post_id}/'
+        else:
+            url = None
         items.append({
             'kind': n.kind,
             'text': n.text,
             'created': n.created,
             'is_read': n.is_read,
             'id': n.id,
-            'url': f'/profile/{n.task.user.username}/' if n.task_id else None,
+            'url': url,
         })
 
     # Дедлайны считаем на лету: свои задачи (или поставленные другим) с

@@ -1,0 +1,57 @@
+{% load static %}
+{% comment %}
+Кнопки "Изменить"/"Удалить" всегда рендерятся в разметке, но скрыты через
+CSS-класс comment-owner-only — JS на клиенте показывает их, только если
+data-author-id совпадает с текущим пользователем (comments.js:
+applyCommentOwnership). Так рендер идентичен и при обычной загрузке
+страницы, и при вставке нового комментария через WebSocket — сервер не
+может знать, кто именно сейчас смотрит страницу, когда рендерит HTML для
+рассылки всем подписчикам разом.
+{% endcomment %}
+<div class="flex min-w-0 space-x-3"
+     data-comment-id="{{ comment.id }}"
+     data-author-id="{{ comment.comment_author_id }}"
+     data-likes-count="{{ comment.likes.count }}"
+     data-liked-user-ids="{% for u in comment.likes.all %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+     data-raw-text="{{ comment.comment_text }}">
+    <div class="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden avatar-ring">
+        <img src="{% if comment.comment_author.avatar %}{{ comment.comment_author.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
+             class="w-full h-full object-cover" alt="Аватар" />
+    </div>
+    <div class="min-w-0 flex-1">
+        <div class="bg-gray-50 dark:bg-zinc-800 rounded-xl p-4">
+            <div class="flex flex-wrap items-center gap-x-2 mb-2">
+                <a href="{% url 'addpost' comment.comment_author.username %}"
+                   class="truncate text-sm font-semibold text-[#0077FF] hover:underline">
+                    {{ comment.comment_author.first_name|default:"Имя" }} {{ comment.comment_author.last_name|default:"Фамилия" }}
+                </a>
+                <span class="text-gray-400">•</span>
+                <span class="text-gray-500 dark:text-gray-400 text-sm">
+                    {{ comment.comment_pubdate|date:"d M Y" }} в {{ comment.comment_pubdate|time:"H:i" }}
+                </span>
+                <span class="comment-edited-mark text-gray-400 text-xs {% if not comment.is_edited %}hidden{% endif %}">(изменено)</span>
+                <button type="button" class="comment-edit-button comment-owner-only hidden ml-auto text-gray-400 hover:text-blue-500 transition-colors duration-200" title="Изменить комментарий">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                    </svg>
+                </button>
+                <button type="button" class="comment-delete-button comment-owner-only hidden text-gray-400 hover:text-red-500 transition-colors duration-200" title="Удалить комментарий">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m14.74 9-.346 9m-4.788 0L9.26 9M4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                </button>
+            </div>
+            <div class="comment-text-display text-gray-700 dark:text-gray-300 leading-relaxed">
+                {{ comment.comment_text|linebreaks }}
+            </div>
+            <div class="flex items-center mt-3 text-sm text-gray-500 dark:text-gray-400">
+                <button type="button" class="comment-like-button flex items-center focus:outline-none">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"/>
+                    </svg>
+                </button>
+                <button type="button" class="comment-likes-count pl-1.5 hover:underline"></button>
+            </div>
+        </div>
+    </div>
+</div>
