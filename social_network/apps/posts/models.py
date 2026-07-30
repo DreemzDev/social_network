@@ -1,10 +1,5 @@
-
-
-import datetime
 from django.db import models
 from django.urls import reverse
-from django.contrib.auth.models import User
-
 from django.contrib.auth import get_user_model
 
 
@@ -12,6 +7,8 @@ from django.contrib.auth import get_user_model
 class Post(models.Model):
 
     content = models.TextField(blank=True, verbose_name="Текст поста")   #Поле может быть пустым blank=True
+    # У 6 существующих постов есть данные в этом поле — нельзя удалить без
+    # миграции данных (перенос в PostImage). Оставлено намеренно.
     photo = models.ImageField(upload_to="photos/%Y/%m/%d/", blank=True, null=True, verbose_name="Изображение (устаревшее поле)")
     time_create = models.DateTimeField(auto_now_add=True, verbose_name="Время создания")
     time_update = models.DateTimeField(auto_now=True, verbose_name="Время изменения")

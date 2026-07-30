@@ -1,31 +1,29 @@
-from django.db.models import Count, F, Q
-from typing import Any
+from datetime import timedelta
+
 from django.contrib import messages
-from datetime import date, timedelta
-from urllib import request
-from django.db.models.query import QuerySet
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
-from django.views import View
-from django.views.generic import ListView, DetailView, CreateView, TemplateView, FormView, UpdateView, DeleteView
-from django.views.generic.edit import FormMixin
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count, Q
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404
+from django.templatetags.static import static
+from django.urls import reverse, reverse_lazy
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.http import require_POST
+from django.views.generic import ListView, DetailView, TemplateView, FormView, UpdateView, DeleteView
+from django.views.generic.edit import FormMixin
+
 from category.models import Category
 from comments.forms import CommentForm
 from comments.models import Comment
-from .forms import *
-from .models import Post, PostImage, PostFile
-from profiles.models import Task, Note
+from comments.realtime import broadcast_new_comment, notify_post_author_about_comment
 from profiles.forms import TaskForm, NoteForm, EventForm
-from django.core.paginator import Paginator
-from django.views.generic.detail import SingleObjectMixin
-# from dateutil.relativedelta import relativedelta
-# from django.core import serializers
-from django.shortcuts import get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
-from django.utils import timezone
+from profiles.models import Task, Note
+
+from .forms import AddPostForm
+from .models import Post, PostImage, PostFile
 
 
 class PortalHome(LoginRequiredMixin, ListView):
@@ -37,21 +35,20 @@ class PortalHome(LoginRequiredMixin, ListView):
     
 
     def get_queryset(self):
-        return Post.objects.annotate(num_comments=Count('post_comments')).prefetch_related('images', 'files').order_by('-time_create')
-    
+        return Post.objects.select_related('author').annotate(
+            num_comments=Count('post_comments')
+        ).prefetch_related('images', 'files', 'likes', 'viewers').order_by('-time_create')
+
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context['cats'] = Category.objects.all()
-        # context["birthday"] = get_user_model().objects.filter(birthday__day=date.today().day, birthday__month=date.today().month)
-        # dt =date.today().day+1
-        # context["delta_birthday"] = get_user_model().objects.filter(birthday__day=dt, birthday__month=date.today().month)
         return context
     
 
 
 
 class ShowPost(FormMixin, DetailView):
-    
+
     model = Post
     template_name = 'post/single.html'
     context_object_name = 'post'
@@ -60,41 +57,79 @@ class ShowPost(FormMixin, DetailView):
 
     def get_queryset(self):
         return Post.objects.prefetch_related('images', 'files')
-    
-  
+
     def get_success_url(self, **kwargs):
-        return reverse_lazy('post', kwargs={'post_id': self.get_object().id})
-    
+        return reverse_lazy('post', kwargs={'post_id': self.object.id})
+
+    @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
+        # Просмотр поста открыт всем (см. get()), но комментировать может
+        # только залогиненный пользователь — иначе form_valid() ниже
+        # попытается сохранить comment_author=AnonymousUser.
+        self.object = self.get_object()
         form = self.get_form()
-        return self.form_valid(form)
+        if form.is_valid():
+            return self.form_valid(form)
+        return self.form_invalid(form)
 
     def form_valid(self, form):
-        self.object = form.save(commit=False)
-        self.object.post = self.get_object()
-        self.object.comment_author = self.request.user
-        self.object.save()
+        comment = form.save(commit=False)
+        comment.post = self.object
+        comment.comment_author = self.request.user
+        comment.save()
+
+        broadcast_new_comment(comment)
+        notify_post_author_about_comment(comment)
+
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': True})
         return super().form_valid(form)
-    
+
+    def form_invalid(self, form):
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+        return super().form_invalid(form)
+
     def get(self, request, *args, **kwargs):
-        post = self.get_object()
+        self.object = self.get_object()
         if request.user.is_authenticated:
-            post.viewers.add(request.user)
+            self.object.viewers.add(request.user)
         return super().get(request, *args, **kwargs)
 
+@login_required
+@require_POST
 def toggle_like(request, post_id):
-    if request.method == 'POST':
-        post = get_object_or_404(Post, id=post_id)
-        if request.user in post.likes.all():
-            post.likes.remove(request.user)
-            liked = False
-        else:
-            post.likes.add(request.user)
-            liked = True
-        return JsonResponse({'liked': liked, 'likes_count': post.likes.count()})   
+    post = get_object_or_404(Post, id=post_id)
+    if post.likes.filter(pk=request.user.pk).exists():
+        post.likes.remove(request.user)
+        liked = False
+    else:
+        post.likes.add(request.user)
+        liked = True
+    return JsonResponse({'liked': liked, 'likes_count': post.likes.count()})
 
-class AddPost(FormView, TemplateView):
-    
+
+@login_required
+def post_likers(request, post_id):
+    """JSON-список лайкнувших пост — для модального окна вместо тултипа
+    (тултип не помещал весь список при большом числе лайков)."""
+    post = get_object_or_404(Post, id=post_id)
+    return JsonResponse({'users': serialize_likers(post.likes.all())})
+
+
+def serialize_likers(users):
+    return [
+        {
+            'name': f'{u.first_name} {u.last_name}'.strip() or u.username,
+            'avatar': u.avatar.url if u.avatar else static('img/avatar7.png'),
+            'profile_url': reverse('addpost', kwargs={'username': u.username}),
+        }
+        for u in users
+    ]
+
+
+class AddPost(LoginRequiredMixin, FormView, TemplateView):
+
     form_class = AddPostForm
     template_name = 'profiles/profiles.html'
     success_url = reverse_lazy('home')
@@ -130,7 +165,9 @@ class AddPost(FormView, TemplateView):
 
         context['user_list'] = user_list  # Используем уже созданный user_list
         context["sh_online"] = self.get_online_users()
-        context['posts'] = Post.objects.annotate(num_comments=Count('post_comments')).prefetch_related('images', 'files').filter(author=user).order_by('-time_create')
+        context['posts'] = Post.objects.select_related('author').annotate(
+            num_comments=Count('post_comments')
+        ).prefetch_related('images', 'files', 'likes', 'viewers').filter(author=user).order_by('-time_create')
         context['user'] = user
         context['profile_user'] = user
         context['online_count'] = online_count  # Добавляем в контекст!
@@ -157,9 +194,13 @@ class AddPost(FormView, TemplateView):
 
         return context
   
-class PostDeleteView(DeleteView):
+class PostDeleteView(LoginRequiredMixin, DeleteView):
     model = Post
-    success_url = reverse_lazy('home')  # или куда нужно
+    success_url = reverse_lazy('home')
+
+    def get_queryset(self):
+        # Удалить пост может только его автор.
+        return Post.objects.filter(author=self.request.user)
 
     def delete(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -175,14 +216,16 @@ class HelpView(TemplateView):
     template_name = 'post/help.html'
 
 
-class SettingPost( LoginRequiredMixin, UpdateView):
+class SettingPost(LoginRequiredMixin, UpdateView):
     form_class = AddPostForm
-    model = Post
-
     template_name = 'post/setting_post.html'
     pk_url_kwarg = 'post_id'
     success_url = reverse_lazy('home')
     context_object_name = 'post'
+
+    def get_queryset(self):
+        # Редактировать пост может только его автор.
+        return Post.objects.filter(author=self.request.user)
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -204,7 +247,3 @@ class SettingPost( LoginRequiredMixin, UpdateView):
             PostFile.objects.create(post=post, file=uploaded_file, original_name=uploaded_file.name)
 
         return response
-    # def get_context_data(self, *, object_list=None, **kwargs):
-    #     context = super().get_context_data(**kwargs)
-    #     context['cats'] = Category.objects.all()
-    #     return context
