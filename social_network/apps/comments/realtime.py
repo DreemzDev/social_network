@@ -24,6 +24,9 @@ def broadcast_new_comment(comment):
     html = render_to_string('includes/comment.html', {'comment': comment, 'request': None})
     _push(comment.post_id, 'comment_created', html=html)
 
+    from posts.realtime import broadcast_post_comment_count_changed
+    broadcast_post_comment_count_changed(comment.post_id, delta=1)
+
 
 def broadcast_comment_updated(comment):
     _push(comment.post_id, 'comment_updated', comment_id=comment.id, comment_text=comment.comment_text, is_edited=comment.is_edited)
@@ -31,6 +34,9 @@ def broadcast_comment_updated(comment):
 
 def broadcast_comment_deleted(comment_id, post_id):
     _push(post_id, 'comment_deleted', comment_id=comment_id)
+
+    from posts.realtime import broadcast_post_comment_count_changed
+    broadcast_post_comment_count_changed(post_id, delta=-1)
 
 
 def broadcast_comment_like_toggled(comment):

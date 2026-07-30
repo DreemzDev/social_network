@@ -7,10 +7,12 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
 from django.templatetags.static import static
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.views import View
 from django.views.decorators.http import require_POST
 from django.views.generic import ListView, DetailView, TemplateView, FormView, UpdateView, DeleteView
 from django.views.generic.edit import FormMixin
@@ -24,6 +26,7 @@ from profiles.models import Task, Note
 
 from .forms import AddPostForm
 from .models import Post, PostImage, PostFile
+from .realtime import broadcast_post_created, broadcast_post_like_toggled, broadcast_post_deleted
 
 
 class PortalHome(LoginRequiredMixin, ListView):
@@ -43,7 +46,23 @@ class PortalHome(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['cats'] = Category.objects.all()
         return context
-    
+
+
+class NewPostsFeedView(LoginRequiredMixin, View):
+    """Отдаёт HTML новых постов (created позже last_post_id) для кнопки
+    «Есть новые посты» — рендерит тем же partial-шаблоном, что и основная
+    лента (includes/post.html), чтобы разметка карточки не расходилась
+    между обычной загрузкой страницы и live-довставкой."""
+
+    def get(self, request, last_post_id):
+        posts = Post.objects.select_related('author').annotate(
+            num_comments=Count('post_comments')
+        ).prefetch_related('images', 'files', 'likes', 'viewers').filter(
+            pk__gt=last_post_id
+        ).order_by('-time_create')
+
+        html = render_to_string('includes/post_list_fragment.html', {'posts': posts, 'request': request}, request=request)
+        return JsonResponse({'html': html, 'count': posts.count()})
 
 
 
@@ -106,6 +125,8 @@ def toggle_like(request, post_id):
     else:
         post.likes.add(request.user)
         liked = True
+
+    broadcast_post_like_toggled(post)
     return JsonResponse({'liked': liked, 'likes_count': post.likes.count()})
 
 
@@ -145,6 +166,7 @@ class AddPost(LoginRequiredMixin, FormView, TemplateView):
         for uploaded_file in self.request.FILES.getlist('attachments'):
             PostFile.objects.create(post=post, file=uploaded_file, original_name=uploaded_file.name)
 
+        broadcast_post_created(post)
         return super().form_valid(form)
 
     def get_online_users(self):
@@ -204,7 +226,9 @@ class PostDeleteView(LoginRequiredMixin, DeleteView):
 
     def delete(self, request, *args, **kwargs):
         self.object = self.get_object()
+        post_id = self.object.id
         self.object.delete()
+        broadcast_post_deleted(post_id)
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return HttpResponse(status=204)
         messages.success(request, 'Пост удалён')

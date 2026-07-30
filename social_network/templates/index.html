@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block content_layout %} md:flex-row-reverse{% endblock content_layout %}
+{% block content_layout %} md:flex-row-reverse md:w-2/3 md:flex-none md:mx-auto{% endblock content_layout %}
 
 {% block sidebar_wrapper %}
 <div class="w-full flex-shrink-0 md:w-72">
@@ -17,6 +17,17 @@
 {% endblock sidebar_wrapper %}
 
 {% block content %}
+
+<!-- Кнопка "Есть новые посты" — только на странице ленты новостей. Клик и
+     WS-подписка на post_created обрабатываются в includes/post.html (общий
+     partial), она просто ищет этот элемент по id, если он есть на странице. -->
+<button type="button" id="new-posts-button"
+        class="hidden sticky top-2 z-10 mx-auto mb-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#0077FF] px-4 py-2.5 text-sm font-medium text-white shadow-lg hover:bg-[#3391FF]">
+  <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18" />
+  </svg>
+  Есть новые посты
+</button>
 
 {% include "includes/post.html" %}
 

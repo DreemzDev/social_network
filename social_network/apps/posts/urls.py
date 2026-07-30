@@ -7,6 +7,7 @@ urlpatterns = [
 
     path('post/<int:post_id>/', ShowPost.as_view(), name='post'),
     path('post/<int:post_id>/likers/', post_likers, name='post_likers'),
+    path('posts/new-since/<int:last_post_id>/', NewPostsFeedView.as_view(), name='new_posts_feed'),
 
     path('profile/<str:username>/', AddPost.as_view(), name='addpost'),
 

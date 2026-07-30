@@ -285,7 +285,10 @@
         </svg>`;
 
         $(document).ready(function() {
-            $('.like-button').click(function() {
+            // Делегирование через document — работает и для карточек,
+            // вставленных позже (кнопка «Есть новые посты»), а не только
+            // для тех, что были в разметке при загрузке страницы.
+            $(document).on('click', '.like-button', function() {
                 const postId = $(this).data('post-id');
                 const button = $(this);
                 const countEl = button.next('.likes-count');

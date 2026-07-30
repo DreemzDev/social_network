@@ -1,196 +1,15 @@
-{% load static %} {%if request.user == user%}
+{% load static %}
+<!-- Кнопка "Есть новые посты" рендерится только на странице ленты новостей
+     (см. index.html), а не здесь — includes/post.html переиспользуется и
+     на "Моей странице", где эта кнопка не нужна. Разметку и обработчик клика
+     ищите в index.html; WS-событие post_created ниже просто её показывает,
+     если элемент присутствует на странице. -->
 
-{%endif%}
-<div class="space-y-6  flex flex-1 flex-col mx-auto">
-  {% for post in posts %}
-  <article id="post-{{ post.id }}" class="bg-white dark:bg-zinc-900 rounded-xl border border-gray-100 dark:border-zinc-800 px-5 py-4">
-    <div class="pb-4">
-      <div class="flex justify-between items-start">
-        <!-- Автор и дата -->
-        <div class="flex items-center space-x-3">
-          <a href="{% if post.author.username %}{% url 'addpost' post.author.username %}{% else %}#{% endif %}">
-            <img src="{% if post.author.avatar %}{{ post.author.avatar.url }}{% else %}{% static 'img/avatar7.png' %}{% endif %}"
-                 class="w-12 h-12 rounded-full avatar-ring" alt="Аватар" />
-          </a>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center space-x-2">
-              <a href="{% if post.author.username %}{% url 'addpost' post.author.username %}{% else %}#{% endif %}"
-                 class="text-base font-semibold text-gray-900 dark:text-white hover:underline">
-                {{ post.author.first_name|default:"Имя" }} {{ post.author.last_name|default:"Фамилия" }}
-              </a>
-              <span class="text-gray-500 text-xs">•</span>
-              <span class="text-gray-500 text-xs">
-                {{ post.time_create|date:"d M Y" }} в {{ post.time_create|time:"H:i" }}
-              </span>
-            </div>
-            <!-- Показываем "Обновлено" только если пост редактировался -->
-            {% if post.time_update != post.time_create and post.author == user %}
-            <p class="text-gray-500 text-xs mt-1">
-              Обновлено: {{ post.time_update|date:"d M Y" }} в {{ post.time_update|time:"H:i" }}
-            </p>
-            {% endif %}
-          </div>
-        </div>
+<div class="space-y-6 flex flex-col mx-auto w-full" id="posts-list">
+  {% include "includes/post_list_fragment.html" %}
+</div>
 
-<!-- Dropdown Flowbite - ТОЛЬКО для автора поста -->
-        {% if post.author == request.user %}
-        <div class="relative">
-          <button id="dropdownMenuButton-{{ post.id }}" data-dropdown-toggle="dropdownMenu-{{ post.id }}" 
-                  class="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
-            </svg>
-          </button>
-          
-          <!-- Dropdown menu -->
-          <div id="dropdownMenu-{{ post.id }}" class="z-10 hidden bg-white dark:bg-zinc-800 divide-y divide-gray-100 dark:divide-zinc-600 rounded-lg shadow w-44">
-            <ul class="py-2 text-sm text-gray-700 dark:text-gray-200">
-              <li>
-                <a href="{% url 'settingpost' post.id %}" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700">Редактировать</a>
-              </li>
-              <!-- <li>
-                <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700">Закрепить</a>
-              </li> -->
-            </ul>
-            <div class="py-2">
-              <button type="button"
-                class="delete-post-btn block w-full px-4 py-2 text-sm text-red-600 text-left hover:bg-gray-100 dark:hover:bg-zinc-700"
-                data-post-id="{{ post.id }}"
-                data-modal-target="popup-modal"
-                data-modal-toggle="popup-modal">
-                Удалить
-              </button>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- Контент -->
-    <div class="px-5 pb-3">
-      <div class="text-base text-gray-800 dark:text-gray-200 leading-relaxed post-content">
-        {{ post.content|linebreaks|truncatewords:40 }}
-        {% if post.content|wordcount > 40 %}
-        <br>
-        <a href="{{ post.get_absolute_url }}" class="text-[#0077FF] hover:underline">Читать далее</a>
-        {% endif %}
-      </div>
-    </div>
-<style>
-  .post-content p {
-    margin-bottom: 0.75rem;
-  }
-  
-  .post-content p:last-child {
-    margin-bottom: 0;
-  }
-  
-  .post-content br {
-    content: '';
-    display: block;
-    margin-bottom: 0.5rem;
-  }
-</style>  
-    <!-- Фото с Lightbox -->
-    {% if post.images.all %}
-    <div class="px-4 pb-4">
-      {% with images=post.images.all total=post.images.all|length %}
-      <div class="grid gap-1 rounded-lg overflow-hidden {% if total == 1 %}grid-cols-1{% elif total == 2 %}grid-cols-2{% else %}grid-cols-3{% endif %}">
-        {% for image in images %}
-          {% if total == 1 %}
-          <a href="{{ image.image.url }}" data-lightbox="gallery-{{ post.id }}"
-             data-title="Фото от {{ post.author.first_name|default:'Пользователя' }}"
-             class="block cursor-zoom-in">
-            <img src="{{ image.image.url }}" alt="Фото поста"
-                 class="w-full h-auto object-contain max-h-96 transition-transform hover:scale-105 duration-300" />
-          </a>
-          {% elif forloop.counter <= 5 %}
-          <a href="{{ image.image.url }}" data-lightbox="gallery-{{ post.id }}"
-             data-title="Фото от {{ post.author.first_name|default:'Пользователя' }}"
-             class="relative block aspect-square cursor-zoom-in overflow-hidden">
-            <img src="{{ image.image.url }}" alt="Фото поста"
-                 class="w-full h-full object-cover transition-transform hover:scale-105 duration-300" />
-            {% if forloop.counter == 5 and total > 5 %}
-            <span class="absolute inset-0 flex items-center justify-center bg-black/50 text-xl font-semibold text-white">
-              +{{ total|add:"-5" }}
-            </span>
-            {% endif %}
-          </a>
-          {% else %}
-          <a href="{{ image.image.url }}" data-lightbox="gallery-{{ post.id }}"
-             data-title="Фото от {{ post.author.first_name|default:'Пользователя' }}"
-             class="hidden"></a>
-          {% endif %}
-        {% endfor %}
-      </div>
-      {% endwith %}
-    </div>
-    {% endif %}
-
-    <!-- Прикреплённые файлы -->
-    {% if post.files.all %}
-    <div class="px-4 pb-4 space-y-1.5">
-      {% for f in post.files.all %}
-      <a href="{{ f.file.url }}" target="_blank" download
-         class="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700">
-        <div class="flex min-w-0 items-center gap-2">
-          <svg class="w-5 h-5 flex-shrink-0 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-          </svg>
-          <span class="truncate text-gray-700 dark:text-gray-200">{{ f.original_name }}</span>
-        </div>
-        <span class="flex-shrink-0 text-xs text-gray-400">{{ f.extension }} · {{ f.size_display }}</span>
-      </a>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- Действия -->
-    <div class="flex justify-between items-center mt-4 text-sm text-gray-500">
-      <div class="flex space-x-6">
-        <!-- Лайк -->
-        <div class="flex items-center">
-          <button class="like-button flex items-center focus:outline-none" data-post-id="{{ post.id }}">
-            {% if user in post.likes.all %}
-            <svg class="w-6 text-red-400" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-            </svg>
-            {% else %}
-            <svg class="w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-            </svg>
-            {% endif %}
-          </button>
-          {% if post.likes.count > 0 %}
-          <button type="button" class="likes-count pl-1.5 text-gray-500 text-sm hover:underline" onclick="openLikersModal('{% url 'post_likers' post.id %}')">{{ post.likes.count }}</button>
-          {% else %}
-          <span class="likes-count pl-1.5 text-gray-500 text-sm"></span>
-          {% endif %}
-        </div>
-
-        <!-- Комментарии -->
-        <a href="{{ post.get_absolute_url }}" class="flex items-center space-x-1 hover:text-[#0077FF]">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227A48.4 48.4 0 008.25 16.5v4.5l4.076-4.076c.29-.29.682-.437 1.085-.443A48.3 48.3 0 0019.5 15.25c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.39 48.39 0 0012 3a48.39 48.39 0 00-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
-          </svg>
-          <span>{{ post.num_comments }}</span>
-        </a>
-      </div>
-
-      <!-- Просмотры -->
-      <div class="flex items-center space-x-1 text-xs">
-        <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
-          <path fill-rule="evenodd"
-                d="M1.323 11.447C2.811 6.976 7.028 3.75 12.001 3.75c4.97 0 9.185 3.223 10.675 7.69.12.362.12.752 0 1.113-1.487 4.471-5.705 7.697-10.677 7.697-4.97 0-9.186-3.223-10.675-7.69a1.762 1.762 0 010-1.113zM17.25 12a5.25 5.25 0 11-10.5 0 5.25 5.25 0 0110.5 0z"
-                clip-rule="evenodd"/>
-        </svg>
-        <span>{{ post.viewers.count }}</span>
-      </div>
-    </div>
-  </article>
+<!-- Modal удаления поста (общая на всю ленту, не дублируется на карточку) -->
 <div id="popup-modal" tabindex="-1" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full inset-0 h-full">
   <div class="relative p-4 w-full max-w-md max-h-full">
     <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
@@ -200,7 +19,7 @@
       <div class="p-6 text-center">
         <svg class="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200" fill="none" viewBox="0 0 20 20"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11V6m0 8h.01M19 10a9 9 0 11-18 0 9 9 0 0118 0Z"/></svg>
         <h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">Вы уверены, что хотите удалить этот пост?</h3>
-        
+
         <form id="delete-post-form" method="POST">
           {% csrf_token %}
           <button type="submit" class="text-white bg-red-600 hover:bg-red-800 focus:ring-4 focus:outline-none focus:ring-red-300 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center mr-2">
@@ -214,10 +33,7 @@
     </div>
   </div>
 </div>
-  {% empty %}
-  {% include "includes/empty.html" %}
-  {% endfor %}
-</div>
+
 <!-- Инициализация Lightbox -->
 <script>
   lightbox.option({
@@ -234,19 +50,18 @@
 </script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-
-
-    // Логика удаления поста
-    const deleteButtons = document.querySelectorAll(".delete-post-btn");
+    const postsList = document.getElementById('posts-list');
     const deleteForm = document.getElementById("delete-post-form");
-
     let currentPostId = null;
 
-    deleteButtons.forEach(button => {
-      button.addEventListener("click", () => {
-        currentPostId = button.getAttribute("data-post-id");
-        deleteForm.setAttribute("action", `/deletepost/${currentPostId}/`);
-      });
+    // Делегирование через один слушатель на контейнере — работает и для
+    // карточек, добавленных позже (кнопка "Есть новые посты"), а не только
+    // для тех, что были в разметке при первой загрузке страницы.
+    postsList.addEventListener('click', function (e) {
+      const deleteBtn = e.target.closest('.delete-post-btn');
+      if (!deleteBtn) return;
+      currentPostId = deleteBtn.getAttribute('data-post-id');
+      deleteForm.setAttribute('action', `/deletepost/${currentPostId}/`);
     });
 
     deleteForm.addEventListener("submit", function (e) {
@@ -268,7 +83,6 @@
           setTimeout(() => {
             postElement.remove();
 
-            // Закрыть модалку через Flowbite
             const modalEl = document.getElementById("popup-modal");
             if (modalEl && typeof Modal !== "undefined") {
               const modalInstance = new Modal(modalEl);
@@ -286,3 +100,86 @@
   });
 </script>
 
+<!-- Живая лента: новые посты (кнопка — только если она есть на странице,
+     см. index.html), счётчики лайков/комментариев (на всех страницах,
+     включающих этот partial, в т.ч. "Моя страница") -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const postsList = document.getElementById('posts-list');
+    if (!postsList) return;
+
+    const newPostsButton = document.getElementById('new-posts-button');
+
+    function firstPostId() {
+      const first = postsList.querySelector('[data-post-id]');
+      return first ? first.dataset.postId : null;
+    }
+
+    let hasPendingNewPosts = false;
+
+    if (newPostsButton) {
+      newPostsButton.addEventListener('click', function () {
+        const lastId = firstPostId();
+        if (!lastId) return;
+
+        fetch(`/posts/new-since/${lastId}/`)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.count > 0) {
+              postsList.insertAdjacentHTML('afterbegin', data.html);
+            }
+            newPostsButton.classList.add('hidden');
+            hasPendingNewPosts = false;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          })
+          .catch(() => alert('Не удалось загрузить новые посты'));
+      });
+    }
+
+    function connectFeedSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const socket = new WebSocket(`${protocol}://${window.location.host}/ws/feed/`);
+
+      socket.addEventListener('message', function (event) {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'post_created') {
+          if (newPostsButton && !hasPendingNewPosts) {
+            hasPendingNewPosts = true;
+            newPostsButton.classList.remove('hidden');
+          }
+        }
+
+        if (data.type === 'post_like_toggled') {
+          const article = postsList.querySelector(`[data-post-id="${data.post_id}"]`);
+          if (!article) return;
+          const countEl = article.querySelector('.likes-count');
+          if (countEl) {
+            countEl.textContent = data.likes_count > 0 ? data.likes_count : '';
+            countEl.onclick = data.likes_count > 0
+              ? function () { openLikersModal(`/post/${data.post_id}/likers/`); }
+              : null;
+          }
+        }
+
+        if (data.type === 'post_comment_count_changed') {
+          const article = postsList.querySelector(`[data-post-id="${data.post_id}"]`);
+          if (!article) return;
+          const countEl = article.querySelector('.post-comments-count');
+          if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent, 10) + data.delta);
+        }
+
+        if (data.type === 'post_deleted') {
+          const article = postsList.querySelector(`[data-post-id="${data.post_id}"]`);
+          if (article) article.remove();
+        }
+      });
+
+      socket.addEventListener('close', function () {
+        setTimeout(connectFeedSocket, 3000);
+      });
+    }
+
+    connectFeedSocket();
+  });
+</script>
