@@ -21,7 +21,11 @@
   </div>
 
   <div class="overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-    <iframe class="min-h-dvh w-full" src="{{ books.book.url }}"></iframe>
+    {% if books.file_object %}
+    <iframe class="min-h-dvh w-full" src="{% url 'phonebook_view_file' books.id %}"></iframe>
+    {% else %}
+    <div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">Файл справочника ещё не загружен</div>
+    {% endif %}
   </div>
 
   <!-- Main modal -->

@@ -2,6 +2,8 @@ from django.db import models
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
+from storage.models import FileObject
+
 
 # Create your models here.
 class Post(models.Model):
@@ -45,9 +47,13 @@ class PostImage(models.Model):
 
 
 class PostFile(models.Model):
+    """Вложенный документ поста — хранится через storage (не собственный
+    FileField), т.к. пересылаемые в постах файлы (приказы, бланки) часто
+    дублируются с информационным каталогом и обменником; дедупликация между
+    модулями даёт реальную экономию (ARCHITECTURE.md, раздел 1.1)."""
+
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='files', verbose_name="Пост")
-    file = models.FileField(upload_to="post_files/%Y/%m/%d/", verbose_name="Файл")
-    original_name = models.CharField(max_length=255, blank=True, verbose_name="Исходное имя файла")
+    file_object = models.ForeignKey(FileObject, on_delete=models.PROTECT, related_name='+', verbose_name="Файл")
 
     class Meta:
         verbose_name = 'Файл поста'
@@ -55,16 +61,15 @@ class PostFile(models.Model):
         ordering = ['id']
 
     def __str__(self):
-        return self.original_name or self.file.name
+        return self.file_object.original_name
 
-    def save(self, *args, **kwargs):
-        if not self.original_name and self.file:
-            self.original_name = self.file.name
-        super().save(*args, **kwargs)
+    @property
+    def original_name(self):
+        return self.file_object.original_name
 
     @property
     def size_display(self):
-        size = self.file.size
+        size = self.file_object.size
         for unit in ('Б', 'КБ', 'МБ', 'ГБ'):
             if size < 1024:
                 return f"{size:.0f} {unit}" if unit == 'Б' else f"{size:.1f} {unit}"
@@ -73,5 +78,5 @@ class PostFile(models.Model):
 
     @property
     def extension(self):
-        return self.original_name.rsplit('.', 1)[-1].upper() if '.' in self.original_name else ''
+        return self.file_object.extension
 

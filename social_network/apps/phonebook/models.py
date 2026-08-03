@@ -1,15 +1,22 @@
 from django.db import models
 
-# Create your models here.
-
+from storage.models import FileObject
 
 
 class Phonebook(models.Model):
+    """Документ справочника — хранится через storage
+    (STORAGE_CATEGORY_TTL['catalog'] = None, бессрочно), т.к. по смыслу это
+    тот же информационный каталог (ARCHITECTURE.md, раздел 1.1)."""
+
     title = models.CharField(max_length=255, verbose_name="Заголовок")
-    book = models.FileField(upload_to="Phonebook/", blank=True, null=True, verbose_name="Справочники")
+    file_object = models.ForeignKey(
+        FileObject, on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+        verbose_name="Справочник",
+    )
 
     def __str__(self):
-        return self.title  
-class Meta:
+        return self.title
+
+    class Meta:
         verbose_name = 'Справочники'
         verbose_name_plural = 'Справочники'

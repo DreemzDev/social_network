@@ -94,7 +94,7 @@
       {% if post.files.all %}
       <div class="pt-4 space-y-1.5">
         {% for f in post.files.all %}
-        <a href="{{ f.file.url }}" target="_blank" download
+        <a href="{% url 'post_file_download' f.id %}" target="_blank" download
            class="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700">
           <div class="flex min-w-0 items-center gap-2">
             <svg class="w-5 h-5 flex-shrink-0 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

@@ -24,6 +24,10 @@ from comments.realtime import broadcast_new_comment, notify_post_author_about_co
 from profiles.forms import TaskForm, NoteForm, EventForm
 from profiles.models import Task, Note
 
+from storage.models import FileObject
+from storage.services import StorageService
+from storage.signals import attribute_deletion
+
 from .forms import AddPostForm
 from .models import Post, PostImage, PostFile
 from .realtime import broadcast_post_created, broadcast_post_like_toggled, broadcast_post_deleted
@@ -164,7 +168,10 @@ class AddPost(LoginRequiredMixin, FormView, TemplateView):
             PostImage.objects.create(post=post, image=image_file, order=order)
 
         for uploaded_file in self.request.FILES.getlist('attachments'):
-            PostFile.objects.create(post=post, file=uploaded_file, original_name=uploaded_file.name)
+            file_object = StorageService.upload(
+                uploaded_file, user=self.request.user, category=FileObject.Category.DOCUMENT,
+            )
+            PostFile.objects.create(post=post, file_object=file_object)
 
         broadcast_post_created(post)
         return super().form_valid(form)
@@ -224,20 +231,49 @@ class PostDeleteView(LoginRequiredMixin, DeleteView):
         # Удалить пост может только его автор.
         return Post.objects.filter(author=self.request.user)
 
-    def delete(self, request, *args, **kwargs):
-        self.object = self.get_object()
+    def form_valid(self, form):
+        # Реальный путь удаления для этого view: Django (начиная с 4.0)
+        # обрабатывает POST через post() -> form_valid() -> object.delete(),
+        # а не через delete() (тот вызывается только на настоящий HTTP
+        # DELETE-запрос, которым фронтенд проекта не пользуется — здесь
+        # везде fetch(..., {method: 'POST'})). Переопределение delete() было
+        # мёртвым кодом: PostFile каскадно удалялись вместе с постом, но
+        # StorageService.detach() ни разу не вызывался, и FileObject
+        # оставался ACTIVE навсегда.
         post_id = self.object.id
-        self.object.delete()
+
+        # Вложения удаляются явно ДО поста, хотя каскад снёс бы их сам:
+        # сигнал storage отработал бы и на каскаде, но без атрибуции —
+        # collector создаёт собственные экземпляры PostFile и пометок,
+        # проставленных здесь, на них уже не будет. Явное удаление
+        # сохраняет в журнале, кто именно удалил файл.
+        for post_file in self.object.files.all():
+            attribute_deletion(post_file, user=self.request.user, consumer='posts.PostFile')
+            post_file.delete()
+
+        response = super().form_valid(form)
+
         broadcast_post_deleted(post_id)
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return HttpResponse(status=204)
-        messages.success(request, 'Пост удалён')
-        return super().delete(request, *args, **kwargs)
+        messages.success(self.request, 'Пост удалён')
+        return response
 
     
 
 class HelpView(TemplateView):
     template_name = 'post/help.html'
+
+
+class PostFileDownloadView(LoginRequiredMixin, View):
+    """Скачивание вложения поста. Права тривиальны: лента постов видна всем
+    аутентифицированным (как и сам пост), поэтому LoginRequiredMixin
+    достаточно — дополнительная проверка владения постом не нужна
+    (ARCHITECTURE.md, раздел 8)."""
+
+    def get(self, request, file_id):
+        post_file = get_object_or_404(PostFile, pk=file_id)
+        return StorageService.get_download_response(post_file.file_object, request)
 
 
 class SettingPost(LoginRequiredMixin, UpdateView):
@@ -261,13 +297,21 @@ class SettingPost(LoginRequiredMixin, UpdateView):
 
         remove_file_ids = self.request.POST.getlist('remove_file_ids')
         if remove_file_ids:
-            PostFile.objects.filter(post=post, id__in=remove_file_ids).delete()
+            # Удаляем по одной записи, а не queryset.delete(): пометка
+            # атрибуции ставится на конкретный экземпляр, и её подхватывает
+            # сигнал storage, переводящий blob в ORPHAN.
+            for post_file in PostFile.objects.filter(post=post, id__in=remove_file_ids):
+                attribute_deletion(post_file, user=self.request.user, consumer='posts.PostFile')
+                post_file.delete()
 
         existing_count = post.images.count()
         for order, image_file in enumerate(self.request.FILES.getlist('images')):
             PostImage.objects.create(post=post, image=image_file, order=existing_count + order)
 
         for uploaded_file in self.request.FILES.getlist('attachments'):
-            PostFile.objects.create(post=post, file=uploaded_file, original_name=uploaded_file.name)
+            file_object = StorageService.upload(
+                uploaded_file, user=self.request.user, category=FileObject.Category.DOCUMENT,
+            )
+            PostFile.objects.create(post=post, file_object=file_object)
 
         return response

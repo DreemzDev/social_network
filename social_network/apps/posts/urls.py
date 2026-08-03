@@ -18,4 +18,6 @@ urlpatterns = [
     path('deletepost/<int:pk>/', PostDeleteView.as_view(), name='delete-post'),
 
     path('help/', HelpView.as_view(), name='help'),
+
+    path('post-file/<int:file_id>/download/', PostFileDownloadView.as_view(), name='post_file_download'),
 ]
