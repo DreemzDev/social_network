@@ -57,6 +57,9 @@ urlpatterns = [
     path('', include('comments.urls')),
     path('', include('gallery.urls')),
     path('', include('phonebook.urls')),
+    path('', include('exchange.urls')),
+    path('', include('catalog.urls')),
+    path('', include('deptdocs.urls')),
     re_path(r'', include('django_private_chat2.urls', namespace='django_private_chat2'))
 ]
 # Файлы storage лежат внутри MEDIA_ROOT, но раздавать их как обычную

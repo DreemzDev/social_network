@@ -1,0 +1,44 @@
+{% comment %}
+  Пагинация — разметка Midone («Pagination»), 1-в-1, с inline-SVG иконками,
+  но на реальном page_obj. Селектор размера страницы визуальный (в макете он
+  тоже ни к чему не привязан).
+{% endcomment %}
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+<div class="intro-y flex flex-wrap sm:flex-row sm:flex-no-wrap items-center mt-6">
+  <ul class="pagination">
+    <li>
+      <a class="pagination__link" href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+        {% include "includes/fm_icons.html" with icon='chevrons-left' cls='w-4 h-4' %}
+      </a>
+    </li>
+    <li>
+      <a class="pagination__link" href="?page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+        {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4' %}
+      </a>
+    </li>
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+      <li> <a class="pagination__link pagination__link--active" href="javascript:;">{{ num }}</a> </li>
+      {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+      <li> <a class="pagination__link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">{{ num }}</a> </li>
+      {% endif %}
+    {% endfor %}
+    <li>
+      <a class="pagination__link" href="?page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+        {% include "includes/fm_icons.html" with icon='chevron-right' cls='w-4 h-4' %}
+      </a>
+    </li>
+    <li>
+      <a class="pagination__link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+        {% include "includes/fm_icons.html" with icon='chevrons-right' cls='w-4 h-4' %}
+      </a>
+    </li>
+  </ul>
+  <select class="w-20 input box mt-3 sm:mt-0">
+    <option>10</option>
+    <option>25</option>
+    <option>35</option>
+    <option>50</option>
+  </select>
+</div>
+{% endif %}

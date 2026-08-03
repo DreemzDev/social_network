@@ -1,0 +1,53 @@
+/*
+  Возврат Midone-вида полям внутри файлового менеджера.
+
+  Причина: в base.html поверх Midone подключены Tailwind (js/tailwinds.js) и
+  Flowbite (src/flowbite.min.css). Базовые стили Flowbite для полей —
+  [type=text],select,textarea { border-radius: 0; border-color: #6b7280;
+  font-size: 1rem } — перебивают .input из app.css, потому что подключаются
+  позже. Из-за этого поле поиска в файловом менеджере выглядело иначе, чем в
+  макете: прямые углы, серая рамка, крупный шрифт.
+
+  Область действия ограничена .fm-scope, чтобы не задеть остальной портал —
+  там формы уже свёрстаны на Tailwind и рассчитывают на его стили.
+*/
+
+.fm-scope .input[type="text"],
+.fm-scope .input[type="search"],
+.fm-scope select.input,
+.fm-scope textarea.input {
+  border-radius: 0.375rem;
+  border-width: 1px;
+  border-color: #e2e8f0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  padding: 0.5rem 0.75rem;
+  background-color: #fff;
+}
+
+/* .box уже даёт фон и тень — рамка от Flowbite тут лишняя */
+.fm-scope .input.box {
+  border-color: transparent;
+  box-shadow: 0px 3px 20px #0000000b;
+}
+
+.fm-scope .input:focus {
+  outline: none;
+  border-color: #3160d8;
+  box-shadow: 0 0 0 3px rgba(49, 96, 216, 0.15);
+}
+
+/* Поле поиска с иконкой: padding-left задан утилитой px-10, но Flowbite
+   перебивает его своим padding — возвращаем место под иконку. */
+.fm-scope .input.px-10 {
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
+}
+
+/* Чекбоксы карточек: Flowbite сбрасывает им радиус и размер */
+.fm-scope input[type="checkbox"].input {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.25rem;
+  padding: 0;
+}

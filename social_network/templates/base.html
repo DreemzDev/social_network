@@ -38,6 +38,9 @@
 
     <!-- Midone (Left4Code) — оригинальные стили для sidebar/header/content-обёртки -->
     <link href="{% static 'midone/css/app.css' %}" rel="stylesheet" />
+    <!-- Возврат Midone-вида полям в файловом менеджере: Flowbite/Tailwind
+         подключаются раньше и перебивают .input (см. комментарий в файле) -->
+    <link href="{% static 'midone/css/fm-overrides.css' %}" rel="stylesheet" />
 
     <style>
         /* Боковое меню не должно сжиматься, даже если контент справа требует

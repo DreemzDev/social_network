@@ -73,6 +73,9 @@ INSTALLED_APPS = [
     'phonebook.apps.PhonebookConfig',
     'django_celery_beat',
     'storage.apps.StorageConfig',
+    'exchange.apps.ExchangeConfig',
+    'catalog.apps.CatalogConfig',
+    'deptdocs.apps.DeptdocsConfig',
     'django_private_chat2',
     'minio_storage',
 ]   

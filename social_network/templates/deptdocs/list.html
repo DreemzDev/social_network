@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block breadcrumb %}Документы отдела{% if current_folder %} — {{ current_folder.name }}{% endif %}{% endblock breadcrumb %}
+
+{% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
+
+{% block content %}
+<div class="fm-scope grid grid-cols-12 gap-6 mt-8" x-data="{ uploadOpen: false, folderOpen: false, accessOpen: false }">
+  <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
+    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Документы отдела</h2>
+    {% include "includes/fm_menu.html" with fm_active='deptdocs' fm_trash_url=trash_url %}
+  </div>
+
+  <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
+    {% if can_upload %}
+      {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск документов' fm_upload_label='Загрузить документ' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' %}
+    {% else %}
+      {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск документов' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' %}
+    {% endif %}
+
+    <div class="intro-y flex items-center justify-between mt-5">
+      <div class="flex items-center">
+        <a href="{% url 'deptdocs_list' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
+          {% include "includes/fm_icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Документы отдела
+        </a>
+        {% if current_folder %}
+        <div class="mx-2 text-gray-400">/</div>
+        <div class="font-medium">{{ current_folder.name }}</div>
+        {% endif %}
+      </div>
+      {% if current_folder %}
+      <button type="button" class="button box text-gray-700 text-sm" x-on:click="accessOpen = true">
+        {% include "includes/fm_icons.html" with icon='users' cls='w-4 h-4 mr-2' %} Доступ ({{ current_folder.allowed_users.count }})
+      </button>
+      {% endif %}
+    </div>
+
+    {% if not current_folder %}
+    <div class="intro-y p-4 mt-5 rounded-md bg-blue-50 text-sm text-gray-700 dark:bg-dark-1 dark:text-gray-300">
+      Видны только папки, к которым у вас есть доступ. Любой сотрудник может создать
+      новую папку и указать, кто ещё будет её видеть и управлять содержимым.
+    </div>
+    {% endif %}
+
+    <div id="deptdocs-grid" class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
+      {% for folder in subfolders %}
+      <div class="intro-y col-span-6 sm:col-span-4 md:col-span-3 xl:col-span-2 xxl:col-span-2">
+        <div class="file box rounded-md px-5 pt-8 pb-5 px-3 sm:px-5 relative zoom-in">
+          <div class="absolute left-0 top-0 mt-3 ml-3">
+            <input class="input border border-gray-500" type="checkbox">
+          </div>
+          <a href="{% url 'deptdocs_folder' folder.id %}" class="w-3/5 file__icon file__icon--directory mx-auto"></a>
+          <a href="{% url 'deptdocs_folder' folder.id %}" class="block font-medium mt-4 text-center truncate" title="{{ folder.name }}">{{ folder.name }}</a>
+          <div class="text-gray-600 text-xs text-center">{{ folder.allowed_users.count }} с доступом</div>
+          <div class="absolute top-0 right-0 mr-2 mt-2 dropdown ml-auto" x-data="{ open: false }">
+            <a class="w-5 h-5 block" href="javascript:;" x-on:click="open = !open">
+              {% include "includes/fm_icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
+            </a>
+            <div class="dropdown-box mt-5 absolute w-44 top-0 right-0 z-10" x-show="open" x-on:click.outside="open = false" x-cloak>
+              <div class="dropdown-box__content box p-2">
+                <a href="{% url 'deptdocs_folder' folder.id %}" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
+                  {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Открыть
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+      {% for item in documents %}
+      {% include "includes/deptdoc_card.html" with can_upload=True %}
+      {% endfor %}
+
+      {% if not subfolders and not documents %}
+      <div class="col-span-12 box p-8 text-center text-sm text-gray-600">
+        {% if current_folder %}Здесь пока пусто{% else %}Нет доступных папок — создайте новую{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% include "includes/fm_pagination.html" %}
+  </div>
+
+  <!-- Модалка новой папки -->
+  <div x-show="folderOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="folderOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium">Новая папка</h3>
+      <form id="deptdocs-folder-form">
+        <input type="hidden" name="parent_id" value="{{ current_folder.id|default:'' }}">
+        <label class="mb-1 block text-xs text-gray-600">Название</label>
+        <input type="text" name="name" required placeholder="Название папки" class="input w-full border mb-3">
+
+        <label class="mb-1 block text-xs text-gray-600">Кому дать доступ (кроме вас)</label>
+        <div class="mb-4 max-h-40 overflow-y-auto border rounded-md p-2">
+          {% for person in all_users %}
+          <label class="flex items-center gap-2 py-1 text-sm">
+            <input type="checkbox" class="input border" name="user_ids" value="{{ person.pk }}">
+            {{ person.last_name }} {{ person.first_name }}
+          </label>
+          {% endfor %}
+        </div>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="folderOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Создать</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if current_folder %}
+  <!-- Модалка управления доступом -->
+  <div x-show="accessOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="accessOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium">Доступ к папке «{{ current_folder.name }}»</h3>
+      <form id="deptdocs-access-form">
+        <div id="deptdocs-access-error" class="mb-3 hidden rounded-md bg-theme-31 px-3 py-2 text-sm text-theme-6"></div>
+        <p class="mb-3 text-xs text-gray-600">
+          Любой из отмеченных может управлять доступом, в том числе исключить себя.
+        </p>
+        <div class="mb-4 max-h-56 overflow-y-auto border rounded-md p-2">
+          {% for person in all_users %}
+          <label class="flex items-center gap-2 py-1 text-sm">
+            <input type="checkbox" class="input border" name="user_ids" value="{{ person.pk }}"
+                   {% if person in current_folder.allowed_users.all %}checked{% endif %}>
+            {{ person.last_name }} {{ person.first_name }}
+            {% if person.pk == request.user.pk %}<span class="text-gray-400">(вы)</span>{% endif %}
+          </label>
+          {% endfor %}
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="accessOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Модалка загрузки -->
+  <div x-show="uploadOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="uploadOpen = false">
+    <div class="w-full max-w-md box p-6">
+      <h3 class="mb-4 text-lg font-medium">Загрузить документ</h3>
+      <form id="deptdocs-upload-form" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="folder_id" value="{{ current_folder.id|default:'' }}">
+        <label class="mb-1 block text-xs text-gray-600">Название</label>
+        <input type="text" name="title" placeholder="Необязательно — по умолчанию имя файла" class="input w-full border mb-3">
+        <label class="mb-1 block text-xs text-gray-600">Файл</label>
+        <input type="file" name="file" required class="input w-full border mb-4 text-sm">
+        <div id="deptdocs-upload-error" class="mb-3 hidden rounded-md bg-theme-31 px-3 py-2 text-sm text-theme-6"></div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="uploadOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Загрузить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const folderForm = document.getElementById('deptdocs-folder-form');
+  folderForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    fetch('{% url "deptdocs_folder_create" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      body: new FormData(folderForm),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) window.location.href = `/deptdocs/folder/${data.id}/`;
+      });
+  });
+
+  {% if current_folder %}
+  const accessForm = document.getElementById('deptdocs-access-form');
+  const accessError = document.getElementById('deptdocs-access-error');
+  accessForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    accessError.classList.add('hidden');
+    fetch('{% url "deptdocs_folder_access" current_folder.id %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      body: new FormData(accessForm),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.success) {
+          accessError.textContent = data.error || 'Не удалось сохранить доступ';
+          accessError.classList.remove('hidden');
+          return;
+        }
+        if (data.lost_access) {
+          window.location.href = '{% url "deptdocs_list" %}';
+        } else {
+          window.location.reload();
+        }
+      });
+  });
+  {% endif %}
+
+  const uploadForm = document.getElementById('deptdocs-upload-form');
+  if (uploadForm) {
+    const errorBox = document.getElementById('deptdocs-upload-error');
+    uploadForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      errorBox.classList.add('hidden');
+      fetch('{% url "deptdocs_upload" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+        body: new FormData(uploadForm),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success) {
+            window.location.reload();
+          } else {
+            errorBox.textContent = data.error || 'Не удалось загрузить документ';
+            errorBox.classList.remove('hidden');
+          }
+        });
+    });
+  }
+
+  const grid = document.getElementById('deptdocs-grid');
+  grid.addEventListener('click', function (e) {
+    const trashBtn = e.target.closest('.deptdoc-trash-btn');
+    if (!trashBtn) return;
+    const docId = trashBtn.dataset.docId;
+    const card = grid.querySelector(`[data-deptdoc-id="${docId}"]`);
+    fetch(`/deptdocs/trash-doc/${docId}/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+    })
+      .then((r) => r.json())
+      .then((data) => { if (data.success && card) card.remove(); });
+  });
+});
+</script>
+{% endblock content %}

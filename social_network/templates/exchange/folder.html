@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block breadcrumb %}Обменник — {{ folder_owner.last_name }} {{ folder_owner.first_name }}{% endblock breadcrumb %}
+
+{% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
+
+{% block content %}
+<div class="fm-scope grid grid-cols-12 gap-6 mt-8" x-data="{ uploadOpen: false }">
+  <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
+    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Обменник</h2>
+    {% include "includes/fm_menu.html" with fm_active='exchange' fm_trash_url=trash_url %}
+  </div>
+
+  <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
+    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск файлов' fm_upload_label='Загрузить файлы' %}
+
+    <div class="intro-y flex items-center mt-5">
+      <a href="{% url 'exchange_inbox' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
+        {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4 mr-1' %} Все папки
+      </a>
+      <div class="mx-2 text-gray-400">/</div>
+      <div class="font-medium">
+        {% if folder_owner.last_name or folder_owner.first_name %}{{ folder_owner.last_name }} {{ folder_owner.first_name }}{% else %}{{ folder_owner.username }}{% endif %}
+        {% if is_own_folder %}<span class="text-gray-500 text-sm">(моя папка)</span>{% endif %}
+      </div>
+    </div>
+
+    <div id="exchange-file-list" class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
+      {% for item in files %}
+      {% include "includes/exchange_file_card.html" %}
+      {% empty %}
+      <div class="col-span-12 box p-8 text-center text-sm text-gray-600">В этой папке пока пусто</div>
+      {% endfor %}
+    </div>
+
+    {% include "includes/fm_pagination.html" %}
+  </div>
+
+  <!-- Модалка загрузки -->
+  <div x-show="uploadOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="uploadOpen = false">
+    <div class="w-full max-w-md box p-6">
+      <h3 class="mb-4 text-lg font-medium">
+        Загрузить в папку: {{ folder_owner.last_name }} {{ folder_owner.first_name }}
+      </h3>
+      <form id="exchange-upload-form" method="post" enctype="multipart/form-data">
+        <label class="mb-1 block text-xs text-gray-600">Файлы (можно несколько)</label>
+        <input type="file" name="files" multiple required class="input w-full border mb-4 text-sm">
+
+        <div id="exchange-upload-error" class="mb-3 hidden rounded-md bg-theme-31 px-3 py-2 text-sm text-theme-6"></div>
+
+        <p class="mb-4 text-xs text-gray-600">Файлы будут автоматически удалены через 7 дней.</p>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="uploadOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Загрузить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('exchange-upload-form');
+  const errorBox = document.getElementById('exchange-upload-error');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    errorBox.classList.add('hidden');
+
+    fetch('{% url "exchange_upload" folder_owner.pk %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      body: new FormData(form),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success) {
+          window.location.reload();
+        } else {
+          errorBox.textContent = data.error || 'Не удалось загрузить файл';
+          errorBox.classList.remove('hidden');
+        }
+      })
+      .catch(() => {
+        errorBox.textContent = 'Не удалось загрузить файл';
+        errorBox.classList.remove('hidden');
+      });
+  });
+
+  const list = document.getElementById('exchange-file-list');
+  list.addEventListener('click', function (e) {
+    const trashBtn = e.target.closest('.exchange-trash-btn');
+    if (!trashBtn) return;
+
+    const fileId = trashBtn.dataset.fileId;
+    const card = list.querySelector(`[data-exchange-file-id="${fileId}"]`);
+
+    fetch(`/exchange/trash-file/${fileId}/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+    })
+      .then((r) => r.json())
+      .then((data) => { if (data.success && card) card.remove(); });
+  });
+});
+</script>
+{% endblock content %}

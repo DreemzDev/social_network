@@ -1,0 +1,85 @@
+{% comment %}
+  Панель фильтров — разметка Midone («File Manager Filter»), 1-в-1,
+  с inline-SVG иконками.
+
+  Рабочее: поле поиска, кнопка загрузки (открывает модалку родителя через
+  Alpine-переменную uploadOpen).
+  Визуальное (в моделях не реализовано): поля расширенного фильтра и
+  «Настройки» — как в макете.
+
+  Параметры: fm_search_placeholder, fm_upload_label,
+             fm_extra_button_label / fm_extra_button_action
+{% endcomment %}
+<div class="intro-y flex flex-col-reverse sm:flex-row items-center">
+  <div class="w-full sm:w-auto relative mr-auto mt-3 sm:mt-0">
+    <form method="get">
+      {% include "includes/fm_icons.html" with icon='search' cls='w-4 h-4 absolute my-auto inset-y-0 ml-3 left-0 z-10 text-gray-700' %}
+      <input type="text" name="q" value="{{ request.GET.q }}"
+             class="input w-full sm:w-64 box px-10 text-gray-700 placeholder-theme-13"
+             placeholder="{{ fm_search_placeholder|default:'Поиск файлов' }}">
+    </form>
+    <div class="inbox-filter dropdown absolute inset-y-0 mr-3 right-0 flex items-center" x-data="{ filterOpen: false }">
+      <span class="cursor-pointer" x-on:click="filterOpen = !filterOpen">
+        {% include "includes/fm_icons.html" with icon='chevron-down' cls='w-4 h-4 text-gray-700' %}
+      </span>
+      <div class="inbox-filter__dropdown-box dropdown-box mt-10 absolute top-0 left-0 z-20"
+           x-show="filterOpen" x-on:click.outside="filterOpen = false" x-cloak>
+        <div class="dropdown-box__content box p-5">
+          <div class="grid grid-cols-12 gap-4 row-gap-3">
+            <div class="col-span-6">
+              <div class="text-xs">Имя файла</div>
+              <input type="text" class="input w-full border mt-2 flex-1" placeholder="Введите имя файла">
+            </div>
+            <div class="col-span-6">
+              <div class="text-xs">Кто загрузил</div>
+              <input type="text" class="input w-full border mt-2 flex-1" placeholder="Фамилия">
+            </div>
+            <div class="col-span-6">
+              <div class="text-xs">Дата загрузки</div>
+              <input type="text" class="input w-full border mt-2 flex-1" placeholder="дд.мм.гггг">
+            </div>
+            <div class="col-span-6">
+              <div class="text-xs">Размер</div>
+              <select class="input w-full border mt-2 flex-1">
+                <option>10</option>
+                <option>25</option>
+                <option>35</option>
+                <option>50</option>
+              </select>
+            </div>
+            <div class="col-span-12 flex items-center mt-3">
+              <button type="button" class="button w-32 justify-center block bg-gray-200 text-gray-600 ml-auto">Сбросить</button>
+              <button type="button" class="button w-32 justify-center block bg-theme-1 text-white ml-2">Найти</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="w-full sm:w-auto flex">
+    {% if fm_upload_label %}
+    <button type="button" class="button text-white bg-theme-1 shadow-md mr-2" x-on:click="uploadOpen = true">{{ fm_upload_label }}</button>
+    {% endif %}
+    <div class="dropdown relative" x-data="{ plusOpen: false }">
+      <button class="button px-2 box text-gray-700" x-on:click="plusOpen = !plusOpen">
+        <span class="w-5 h-5 flex items-center justify-center">
+          {% include "includes/fm_icons.html" with icon='plus' cls='w-4 h-4' %}
+        </span>
+      </button>
+      <div class="dropdown-box mt-10 absolute w-40 top-0 right-0 z-20"
+           x-show="plusOpen" x-on:click.outside="plusOpen = false" x-cloak>
+        <div class="dropdown-box__content box p-2">
+          {% if fm_extra_button_label %}
+          <a href="javascript:;" x-on:click="{{ fm_extra_button_action }}; plusOpen = false"
+             class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
+            {% include "includes/fm_icons.html" with icon='folder-plus' cls='w-4 h-4 mr-2' %} {{ fm_extra_button_label }}
+          </a>
+          {% endif %}
+          <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
+            {% include "includes/fm_icons.html" with icon='settings' cls='w-4 h-4 mr-2' %} Настройки
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

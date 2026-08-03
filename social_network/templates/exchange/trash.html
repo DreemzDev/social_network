@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block breadcrumb %}Обменник — Корзина{% endblock breadcrumb %}
+
+{% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
+
+{% block content %}
+<div class="fm-scope grid grid-cols-12 gap-6 mt-8">
+  <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
+    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Обменник</h2>
+    {% include "includes/fm_menu.html" with fm_active='trash' fm_trash_url=trash_url %}
+  </div>
+
+  <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
+    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск в корзине' %}
+
+    <div class="intro-y flex items-center mt-5">
+      <a href="{% url 'exchange_inbox' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
+        {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4 mr-1' %} Все папки
+      </a>
+      <div class="mx-2 text-gray-400">/</div>
+      <div class="font-medium">Корзина</div>
+    </div>
+
+    <div id="exchange-trash-list" class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
+      {% for item in files %}
+      {% include "includes/exchange_file_card.html" with is_trash=True %}
+      {% empty %}
+      <div class="col-span-12 box p-8 text-center text-sm text-gray-600">Корзина пуста</div>
+      {% endfor %}
+    </div>
+
+    {% include "includes/fm_pagination.html" %}
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const grid = document.getElementById('exchange-trash-list');
+  grid.addEventListener('click', function (e) {
+    const restoreBtn = e.target.closest('.exchange-restore-btn');
+    const purgeBtn = e.target.closest('.exchange-purge-btn');
+    const btn = restoreBtn || purgeBtn;
+    if (!btn) return;
+
+    const fileId = btn.dataset.fileId;
+    const card = grid.querySelector(`[data-exchange-file-id="${fileId}"]`);
+    const url = restoreBtn ? `/exchange/restore/${fileId}/` : `/exchange/purge/${fileId}/`;
+
+    if (purgeBtn && !confirm('Удалить файл окончательно? Это действие нельзя отменить.')) return;
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+    })
+      .then((r) => r.json())
+      .then((data) => { if (data.success && card) card.remove(); });
+  });
+});
+</script>
+{% endblock content %}
