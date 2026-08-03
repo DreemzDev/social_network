@@ -71,6 +71,8 @@ INSTALLED_APPS = [
     'comments.apps.CommentsConfig',
     'gallery.apps.GalleryConfig',
     'phonebook.apps.PhonebookConfig',
+    'django_celery_beat',
+    'storage.apps.StorageConfig',
     'django_private_chat2',
     'minio_storage',
 ]   
@@ -123,6 +125,33 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# Celery — используется тот же Redis, что и для CHANNEL_LAYERS, но отдельная
+# логическая база (db=1), чтобы не смешивать очередь задач с WS-трафиком.
+# Расписание периодических задач (cleanup_orphan_files и т.д.) хранится в БД
+# через django_celery_beat — настраивается через /admin/, а не через код,
+# и работает одинаково на Windows (разработка) и Astra Linux (прод).
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/1'
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/1'
+CELERY_TIMEZONE = 'Europe/Moscow'  # держать в синхроне с TIME_ZONE ниже
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Storage — единый сервис хранения файлов (apps/storage/ARCHITECTURE.md).
+STORAGE_MAX_UPLOAD_SIZE = 100 * 1024 * 1024      # 100 МБ на один файл
+STORAGE_USER_QUOTA = None                        # None = без квоты на пользователя
+STORAGE_ORPHAN_RETENTION_DAYS = 7                # сколько blob лежит в ORPHAN до удаления
+
+# Срок хранения по категориям, в днях. None = бессрочно.
+# Пустой словарь означал бы, что cleanup_expired_objects не удаляет ничего
+# никогда — включая вложения чата и обменника, которые должны истекать.
+STORAGE_CATEGORY_TTL = {
+    'chat': 30,
+    'exchange': 7,
+    'task': 90,
+    'document': None,
+    'catalog': None,
+}
+
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 # DATABASES = {
@@ -146,8 +175,12 @@ CHANNEL_LAYERS = {
 # }
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'portal',
+        'USER': 'postgres',
+        'PASSWORD': '123',
+        'HOST': '127.0.0.1',
+        'PORT': '5432',
     }
 }
 

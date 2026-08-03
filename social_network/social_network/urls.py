@@ -18,13 +18,12 @@ from __future__ import unicode_literals, absolute_import
 
 from django.urls import path, re_path, include
 from django.contrib import admin
-from django.views.generic import TemplateView, ListView
-from django.contrib.auth.decorators import login_required
+from django.views.generic import ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.contrib.auth.models import AbstractBaseUser
 
 from typing import List
@@ -49,7 +48,7 @@ class UsersListView(LoginRequiredMixin, ListView):
         return JsonResponse(data, safe=False, **response_kwargs)
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
+
     path('', include('posts.urls')),
     path('', include('category.urls')),
     path('', include('register.urls')),
@@ -59,6 +58,22 @@ urlpatterns = [
     path('', include('gallery.urls')),
     path('', include('phonebook.urls')),
     re_path(r'', include('django_private_chat2.urls', namespace='django_private_chat2'))
+]
+# Файлы storage лежат внутри MEDIA_ROOT, но раздавать их как обычную
+# медиатеку нельзя: путь предсказуем (/media/storage/blobs/<checksum>), и
+# прямая ссылка обходила бы ВСЮ проверку прав — приватный документ отдела
+# читался бы даже анонимом. Скачивание возможно только через view
+# модуля-потребителя, который сначала проверяет права, а затем зовёт
+# StorageService.get_download_response() (ARCHITECTURE.md, раздел 8).
+# В проде тот же путь дополнительно закрывается на уровне nginx
+# (location /media/storage/ { deny all; }) — здесь защита на случай
+# runserver/DEBUG и как страховка от неверного конфига веб-сервера.
+def _storage_media_forbidden(request, *args, **kwargs):
+    raise Http404('Прямой доступ к файлам storage запрещён')
+
+
+urlpatterns += [
+    re_path(r'^media/storage/', _storage_media_forbidden),
 ]
 urlpatterns +=static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

@@ -1,0 +1,897 @@
+# storage — единый сервис хранения файлов
+
+## 1. Назначение модуля
+
+`storage` — единственная точка входа для работы с файлами, у которых есть хотя бы
+одно из свойств: нетривиальные права доступа, ограниченный срок жизни,
+разделяемость между модулями. Такие файлы не хранятся модулями самостоятельно —
+ни один потребитель не объявляет собственный `FileField` для них и не пишет
+напрямую в `MEDIA_ROOT`.
+
+Модуль отвечает за:
+
+- физическое хранение содержимого (одно содержимое — одна копия на диске);
+- метаданные (имя, размер, MIME-тип, контрольная сумма, автор, дата, категория);
+- жизненный цикл содержимого: `ACTIVE → ORPHAN → физическое удаление`;
+- API (`StorageService`), через который остальные приложения загружают,
+  отвязывают и отдают файлы;
+- ограничение размера и учёт занятого места;
+- аудит операций над файлами.
+
+Модуль **не отвечает** за:
+
+- права доступа «кто может увидеть этот файл» — это бизнес-логика
+  модуля-потребителя (раздел 8);
+- корзину и восстановление удалённого — это тоже уровень потребителя
+  (раздел 6);
+- смысл файла (документ, вложение чата, приказ) — storage знает лишь
+  категорию для расчёта срока хранения, но не бизнес-семантику.
+
+### 1.1. Что использует storage, а что нет
+
+Критерий: файл идёт в storage, если у него есть **хотя бы одно** из трёх —
+нетривиальные права доступа, ограниченный срок жизни, разделяемость между
+модулями. Если нет ни одного — обычный `FileField`/`ImageField` проще и
+честнее, а перевод такого файла в storage добавит слой абстракции, ничего не
+дав взамен.
+
+**Остаются на обычных полях (не трогаем):**
+
+| Модель | Поле | Почему не в storage |
+|---|---|---|
+| `profiles.User` | `avatar` | одно изображение на пользователя, видят все, живёт вместе с пользователем, дедуплицировать нечего |
+| `posts.PostImage` | `image` | публичны (видны всем, кто видит пост), не переиспользуются, нужны превью/сжатие — этого в storage нет |
+| `gallery.GalleryImage` | `image` | галерея общедоступна, приватных альбомов нет и не планируется |
+
+**Переводятся в storage:**
+
+| Модель | Поле | Почему в storage |
+|---|---|---|
+| `posts.PostFile` | `file` | документы (приказы, бланки, инструкции), которые будут дублироваться с информационным каталогом и пересылаться в чате — дедупликация даёт реальную экономию |
+| `phonebook.Phonebook` | `book` | по смыслу тот же каталог документов, логично держать в одной системе |
+
+Обратите внимание: у постов **изображения и файлы разведены по разным
+моделям** (`PostImage` / `PostFile`) — это позволяет перевести документы в
+storage, не трогая картинки.
+
+**Новые модули, которые пишутся сразу на storage:** обменник, информационный
+каталог, документы подразделений, вложения чата, приказы, файлы задач.
+
+### 1.1.1. Порядок внедрения
+
+Портал ещё не в проде, поэтому миграция обходится дёшево — но это не повод
+начинать с неё. Правильный порядок:
+
+1. Написать `storage` (модели, сервис, команды).
+2. Написать **обменник** поверх него — первый потребитель, на котором нечего
+   ломать.
+3. Убедиться на нём, что дедупликация, `detach()`, `ORPHAN` и очистка по
+   расписанию работают как задумано.
+4. Только после этого мигрировать `posts.PostFile` и `phonebook.Phonebook`
+   (раздел 11).
+
+Причина такого порядка: на первом реальном потребителе почти наверняка
+вскроется что-то, не предусмотренное в этом документе, и API немного
+изменится. Дешевле поймать это на пустом модуле, чем переписывать уже
+мигрированные посты второй раз.
+
+### 1.2. Отклонённые варианты
+
+- **`FileReference` (GenericForeignKey) как отдельная таблица связей** —
+  отклонено. При наличии прямых `ForeignKey` из моделей-потребителей это
+  второй источник истины об одном факте, то есть гарантированный источник
+  рассинхронизации. Источник истины — сами FK.
+- **Ref-count на файле** — отклонено: счётчик рассинхронизируется с
+  реальностью при любой операции в обход сервиса (`bulk_create`,
+  `queryset.delete()`, прямой SQL), и расхождение проявляется как молчаливая
+  потеря данных. Аргумент «ref-count безопасен, если все операции идут через
+  сервис» не выдерживает проверки: сервис не может создавать записи
+  потребителей за них (у `ExchangeFile` свои обязательные поля — `owner`,
+  `expires_at`, `folder`), значит FK всё равно создаёт потребитель, и забыть
+  инкремент так же легко, как забыть что угодно ещё.
+- **Явный реестр моделей-потребителей в settings** — отклонено (см. 5.2).
+- **Метод `attach()`** — отклонён (см. 5.1).
+- **Поле `visibility` на файле «просто как метаданные»** — отклонено. Поле,
+  заведённое «не для проверки доступа», рано или поздно будет использовано
+  именно для неё. Кроме того, при дедупликации оно неопределимо: один blob
+  бывает приватным в чате и публичным в приказах одновременно. Видимость —
+  свойство объекта-потребителя, там ей и место.
+
+---
+
+## 2. Модели
+
+Ключевое решение: **содержимое и его именованное использование разделены на две
+модели.** Одно и то же содержимое (`FileBlob`) может фигурировать в системе под
+разными именами (`FileObject`): «Трудовой договор.docx» в отделе кадров и
+«Договор Иванова.docx», отправленный в чате, — это один физический blob и два
+`FileObject` с разными правами и разными сроками хранения.
+
+Без этого разделения `unique(checksum)` на единственной модели сделал бы
+невозможным хранение одного содержимого под двумя именами, а отказ от
+`unique` — сделал бы дедупликацию негарантированной при конкурентных
+аплоадах. Вводить это разделение миграцией позже, на заполненной БД, заметно
+дороже, чем заложить сразу.
+
+### `FileBlob` — физическое содержимое
+
+```python
+class FileBlob(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Активен'
+        ORPHAN = 'orphan', 'Без ссылок (ожидает удаления)'
+
+    file = models.FileField(upload_to=blob_upload_path)
+    checksum = models.CharField(max_length=64, unique=True)  # sha256, hex
+    size = models.PositiveBigIntegerField()
+    mime_type = models.CharField(max_length=100, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.ACTIVE, db_index=True
+    )
+    orphaned_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['status', 'orphaned_at'])]
+```
+
+- `checksum` — `unique=True`, а не просто индекс. Гарантирует дедупликацию даже
+  при одновременных аплоадах одного содержимого: второй запрос получит
+  `IntegrityError` и подхватит запись первого (см. 5.3).
+- `blob_upload_path` кладёт файл в `storage/blobs/<checksum[:2]>/<checksum>` —
+  путь определяется только содержимым, оригинальное имя в путь не входит.
+- Статус жизненного цикла живёт здесь, а не на `FileObject`: с диска удаляется
+  именно содержимое, когда на него не осталось ни одной ссылки.
+
+### `FileObject` — именованный объект файла
+
+```python
+class FileObject(models.Model):
+    class Category(models.TextChoices):
+        CHAT = 'chat', 'Вложение чата'
+        EXCHANGE = 'exchange', 'Обменник'
+        DOCUMENT = 'document', 'Документ подразделения'
+        CATALOG = 'catalog', 'Информационный каталог'
+        TASK = 'task', 'Файл задачи'
+
+    blob = models.ForeignKey(FileBlob, on_delete=models.PROTECT, related_name='objects')
+    original_name = models.CharField(max_length=255)
+    category = models.CharField(max_length=20, choices=Category.choices, db_index=True)
+
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+'
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def size(self):
+        return self.blob.size
+
+    @property
+    def mime_type(self):
+        return self.blob.mime_type
+```
+
+- Модули-потребители ссылаются **на `FileObject`**, не на `FileBlob`.
+- `category` определяет срок хранения (раздел 4).
+- `uploaded_by` — информационное поле (кто произвёл аплоад), в проверке прав
+  не участвует (раздел 8).
+- Полей прав доступа здесь нет намеренно: после дедупликации одно содержимое
+  может иметь несовместимые политики видимости одновременно.
+
+**О названиях.** `FileBlob` — физическое содержимое (`8a72ff…pdf`),
+`FileObject` — объект с именем и метаданными («Приказ №12 от 2026 года»). Это
+стандартное для индустрии разделение blob/object; вариант `StoredFile` из
+ранней редакции отброшен, так как не объяснял, чем отличается от `FileBlob`.
+
+### `StorageAuditLog` — журнал операций
+
+```python
+class StorageAuditLog(models.Model):
+    class Action(models.TextChoices):
+        UPLOAD = 'upload', 'Загрузка'
+        DETACH = 'detach', 'Отвязка ссылки'
+        PURGE = 'purge', 'Физическое удаление'
+        RESTORE = 'restore', 'Восстановление из ORPHAN'
+
+    action = models.CharField(max_length=20, choices=Action.choices)
+    checksum = models.CharField(max_length=64, db_index=True)
+    original_name = models.CharField(max_length=255, blank=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+'
+    )
+    consumer = models.CharField(max_length=100, blank=True)  # 'exchange.ExchangeFile'
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+```
+
+Журнал хранит `checksum` строкой, а не FK на `FileBlob` — чтобы записи
+переживали физическое удаление blob'а и отвечали на вопрос «кто и когда удалил
+файл, которого больше нет». Для портала с приказами и документами
+подразделений это требование, а не пожелание.
+
+### Модели-потребители
+
+```python
+# apps/exchange/models.py
+class ExchangeFile(models.Model):
+    file_object = models.ForeignKey('storage.FileObject', on_delete=models.PROTECT, related_name='+')
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='exchange_files')
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    # Корзина (раздел 6)
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+'
+    )
+```
+
+`on_delete=PROTECT` на `file_object` намеренно: `FileObject` не должен
+исчезать каскадом от потребителя, иначе не соблюдается отложенное удаление
+(раздел 7) и не пишется аудит. Обратное направление — когда каскад сносит
+саму запись `ExchangeFile` (например, при удалении пользователя-владельца
+папки) — закрыто автоматическим `detach()` через `post_delete` (5.5).
+
+---
+
+## 3. Размещение на диске
+
+```
+media/
+    storage/
+        blobs/
+            ab/
+                abcdef0123…        ← живые файлы, имя = checksum
+```
+
+- **`blobs/`** — единственное место, где лежат файлы. Имя файла равно
+  checksum, поэтому одинаковое содержимое физически не дублируется.
+- Отдельного `temp/` **нет**. Ранняя редакция документа предполагала запись
+  в `temp/` с последующим `os.replace` в `blobs/`, но в реализации это
+  оказалось лишним слоем: Django к моменту вызова `upload()` уже полностью
+  приняла загрузку (в память или во временный файл), а `FileSystemStorage`
+  сам пишет через временный файл с последующим переименованием. Расхождения
+  диска и БД всё равно возможны при аварийном завершении процесса — их ловит
+  `storage_verify` (5.4).
+- Отдельного `trash/` **нет**: корзина реализована на уровне
+  модуля-потребителя (раздел 6), файл при удалении физически никуда не
+  переезжает.
+- `media/storage/` **не должен раздаваться как обычная медиатека** — иначе
+  проверка прав обходится прямой ссылкой вида
+  `/media/storage/blobs/<checksum>`. Закрыто на двух уровнях: в корневом
+  `urls.py` перехватчик `^media/storage/` возвращает 404 до общего
+  `static()`-обработчика, и в проде дополнительно
+  `location /media/storage/ { deny all; }` в nginx. Регрессионный тест —
+  `storage/tests/test_direct_access.py`.
+
+---
+
+## 4. Категории и сроки хранения
+
+Срок жизни задаётся централизованно по категории, а не разрозненными
+настройками в каждом модуле:
+
+```python
+# settings.py
+STORAGE_CATEGORY_TTL = {
+    'chat': 30,        # дней
+    'exchange': 7,
+    'task': 90,
+    'document': None,  # бессрочно
+    'catalog': None,   # бессрочно
+}
+```
+
+**Применяет TTL сам модуль-потребитель, а не storage.** `storage` отдаёт
+только политику — `StorageService.get_category_ttl_days(category)`. Задача
+удаления живёт в потребителе, потому что только он знает, что значит
+«просроченная запись» в его предметной области: см.
+`exchange.tasks.cleanup_expired_exchange_files`, которая удаляет
+`ExchangeFile` старше срока и затем зовёт `detach()`.
+
+Собственной задачи «удалить всё истёкшее» у storage намеренно **нет**. Такая
+задача (была в ранней редакции как `purge_expired_objects`) вызывала
+`detach()` для `FileObject`, на который ещё ссылается живая запись
+потребителя. `detach()` такие файлы защищает и не удаляет ничего — но
+счётчик всё равно рапортовал об успехе, то есть очистка молча не работала.
+Удалять же чужие записи storage не может: он не знает бизнес-логику
+потребителей.
+
+**Про дедупликацию отдельного правила не требуется.** Один blob может быть
+одновременно вложением чата (TTL 30 дней) и документом каталога (бессрочно).
+Когда истекает срок чат-вложения, удаляется только его `FileObject`; blob
+уходит в `ORPHAN` лишь если на него не осталось **ни одной** ссылки — эту
+проверку уже делает `detach()` (5.2). Отдельно вычислять «максимальный TTL по
+всем ссылающимся объектам», как предполагала ранняя редакция, не нужно:
+инвариант обеспечивается на уровне подсчёта ссылок.
+
+---
+
+## 5. Сервисный слой — `StorageService`
+
+`storage/services.py` — единственная точка входа. Модули-потребители не
+работают с `FileBlob`/`FileObject.objects` напрямую и не трогают файловую
+систему.
+
+```python
+class StorageService:
+    @staticmethod
+    def upload(uploaded_file, *, user, category) -> FileObject: ...
+
+    @staticmethod
+    def detach(file_object: FileObject, *, user=None, consumer='') -> None: ...
+
+    @staticmethod
+    def get_download_response(
+        file_object: FileObject, request, *, inline: bool = False
+    ) -> HttpResponse: ...
+
+    @staticmethod
+    def get_usage(user) -> int: ...
+
+    @staticmethod
+    def get_category_ttl_days(category) -> int | None: ...
+
+    @staticmethod
+    def purge_expired_orphans() -> int: ...
+
+    @staticmethod
+    def find_untracked_files() -> list[str]: ...
+```
+
+`inline=True` в `get_download_response()` отдаёт файл с
+`Content-Disposition: inline` вместо `attachment` — нужно там, где документ
+показывается прямо в браузере, а не скачивается (PDF справочника в
+`<iframe>`, см. `phonebook.views.PhonebookViewFileView`).
+
+### 5.1. Почему нет `attach()`
+
+Ранний вариант API требовал от потребителя вызвать `attach()` после создания
+своей FK-записи. Это API, приглашающее к ошибке: забыть вызов легко, а
+последствие отложено на неделю и проявляется как «пропал файл» без видимой
+связи с причиной.
+
+Вместо этого `upload()` **всегда** возвращает `FileObject`, чей blob находится
+в `ACTIVE`: если по checksum нашёлся blob в `ORPHAN`, `upload()` сам
+возвращает его в `ACTIVE` внутри своей транзакции. Потребителю остаётся один
+метод — `detach()` при удалении. Меньше API — меньше способов ошибиться, и
+удаление обычно пишут внимательнее, чем создание.
+
+Вариант «сервис сам создаёт запись потребителя» (`create_reference()`) тоже
+отклонён: у моделей-потребителей свои обязательные поля, которые storage знать
+не должен, иначе он превращается в модуль, зависящий от всех остальных.
+
+### 5.2. Как определяется «ссылок больше нет»
+
+Без реестра в settings — потребители находятся интроспекцией:
+
+```python
+def _iter_consumer_fields():
+    for model in apps.get_models():
+        if model._meta.app_label == 'storage':
+            continue
+        for field in model._meta.concrete_fields:
+            if field.is_relation and field.related_model is FileObject:
+                yield model, field.name
+
+
+def _object_has_references(file_object) -> bool:
+    for model, field_name in _iter_consumer_fields():
+        if model._default_manager.filter(**{field_name: file_object}).exists():
+            return True
+    return False
+```
+
+**Важно: обходить нужно `apps.get_models()`, а не
+`FileObject._meta.get_fields()`.** Первая реализация искала обратные связи
+через `get_fields()` и была нерабочей: все потребители объявляют FK с
+`related_name='+'`, который подавляет создание обратной связи, поэтому
+`get_fields()` не возвращал по ним ничего и проверка **всегда** давала
+`False`. От тихой потери данных спасал только `on_delete=PROTECT`,
+превращавший баг в `ProtectedError` (500 у пользователя) вместо удаления
+используемого файла. Регрессия закрыта тестами
+`storage/tests/test_references.py`, включая проверку, что все пять
+потребителей действительно находятся.
+
+Строковый список моделей в settings отклонён: его легко забыть обновить при
+добавлении нового потребителя, ни один тест на это не упадёт, а последствие —
+молчаливое удаление используемых файлов. Интроспекция не требует ручной
+синхронизации в принципе.
+
+Если в будущем появятся служебные модели со ссылкой на `FileObject`, которые
+не должны считаться «использованием» (архивы, история изменений), они
+исключаются одним предикатом в `_iter_consumer_fields()` — в отличие от
+ref-count, где та же ситуация требует не забыть инкремент в каждом новом месте.
+
+### 5.3. Транзакции и гонки
+
+Три места требуют явной блокировки, иначе возможна потеря данных:
+
+**`upload()` — воскрешение из ORPHAN.** Без блокировки cleanup может удалить
+файл с диска между проверкой статуса и коммитом, и пользователь получит
+успешный аплоад несуществующего файла:
+
+```python
+@transaction.atomic
+def upload(uploaded_file, *, user, category):
+    _validate_size_and_quota(uploaded_file, user)
+    checksum = _sha256(uploaded_file)
+
+    # Ключевой момент: select_for_update() блокирует СУЩЕСТВУЮЩУЮ строку, но
+    # если blob'а с этим checksum ещё нет — блокировать нечего, и два
+    # параллельных upload() одинакового нового содержимого оба увидят None,
+    # оба запишут файл на диск, и лишь один словит IntegrityError. На диске
+    # останутся дубликаты с суффиксами от FileSystemStorage. Advisory lock
+    # по checksum сериализует именно эту гонку — ДО появления строки.
+    _acquire_checksum_lock(checksum)   # pg_advisory_xact_lock
+
+    blob = FileBlob.objects.select_for_update().filter(checksum=checksum).first()
+    if blob:
+        if blob.status == FileBlob.Status.ORPHAN:
+            blob.status = FileBlob.Status.ACTIVE
+            blob.orphaned_at = None
+            blob.save(update_fields=['status', 'orphaned_at'])
+            _audit(Action.RESTORE, checksum=checksum, user=user)
+    else:
+        try:
+            # Вложенный atomic() = savepoint. Без него IntegrityError
+            # помечает всю транзакцию Postgres «испорченной», и следующий
+            # же SELECT падает с TransactionManagementError вместо штатной
+            # обработки гонки.
+            with transaction.atomic():
+                blob = FileBlob.objects.create(
+                    file=File(uploaded_file, name=checksum),
+                    checksum=checksum, size=uploaded_file.size, mime_type=mime_type,
+                )
+            _audit(Action.UPLOAD, checksum=checksum, user=user)
+        except IntegrityError:
+            # Страховка на случай бэкенда без advisory lock.
+            blob = FileBlob.objects.select_for_update().get(checksum=checksum)
+
+    return FileObject.objects.create(
+        blob=blob, original_name=uploaded_file.name, category=category, uploaded_by=user,
+    )
+```
+
+**`detach()` — проверка оставшихся ссылок.** Вся операция в одной транзакции с
+блокировкой blob'а, иначе между проверкой разных моделей может появиться новая
+ссылка:
+
+```python
+@transaction.atomic
+def detach(file_object, *, user=None, consumer=''):
+    blob = FileBlob.objects.select_for_update().get(pk=file_object.blob_id)
+    _audit(Action.DETACH, blob, user, consumer, file_object.original_name)
+
+    if _has_references(file_object):
+        return
+
+    file_object.delete()
+
+    if not blob.objects.exists():
+        blob.status = FileBlob.Status.ORPHAN
+        blob.orphaned_at = timezone.now()
+        blob.save(update_fields=['status', 'orphaned_at'])
+```
+
+**`purge_expired_orphans()` — повторная проверка внутри транзакции.** Статус
+обязательно перечитывается под блокировкой непосредственно перед удалением
+файла — между выборкой кандидатов и удалением blob мог быть воскрешён:
+
+```python
+def purge_expired_orphans():
+    deadline = timezone.now() - timedelta(days=settings.STORAGE_ORPHAN_RETENTION_DAYS)
+    candidates = FileBlob.objects.filter(status=FileBlob.Status.ORPHAN, orphaned_at__lte=deadline)
+
+    purged = 0
+    for blob_id in list(candidates.values_list('pk', flat=True)):
+        with transaction.atomic():
+            blob = FileBlob.objects.select_for_update().filter(pk=blob_id).first()
+            # Перечитываем статус под блокировкой: за время цикла blob мог
+            # вернуться в ACTIVE через upload().
+            if not blob or blob.status != FileBlob.Status.ORPHAN:
+                continue
+            if blob.orphaned_at > deadline or blob.objects.exists():
+                continue
+
+            _audit(Action.PURGE, blob, user=None)
+            blob.file.delete(save=False)
+            blob.delete()
+            purged += 1
+    return purged
+```
+
+### 5.4. Сверка диска и БД
+
+Файл пишется на диск внутри транзакции, поэтому её откат (или аварийное
+завершение процесса) может оставить файл, о котором БД не знает. Механизм
+`ORPHAN` его не найдёт по определению — он работает по записям `FileBlob`.
+
+`find_untracked_files()` обходит `MEDIA_ROOT/storage/blobs/` и возвращает
+пути, для которых нет `FileBlob` с соответствующим checksum. Запускается
+редко (раз в месяц) командой `storage_verify --delete-untracked`, по
+умолчанию — только отчёт, без удаления.
+
+### 5.5. Автоматический `detach()` при удалении записи потребителя
+
+Требовать от потребителя ручной вызов `detach()` после удаления своей записи
+достаточно ровно до первого `ForeignKey` с `on_delete=CASCADE`. Каскад сносит
+запись сам, и вызвать `detach()` в этот момент некому.
+
+В проекте таких путей четыре, и ни один не является нарушением дисциплины —
+их никто не пишет, они срабатывают сами:
+
+| Каскад | Что сносит |
+|---|---|
+| `CatalogFolder` → `CatalogDocument` | удаление папки каталога |
+| `DepartmentFolder` → `DepartmentDocument` | удаление папки документов отдела |
+| `*Folder.parent` → `self` | удаление дерева папок целиком |
+| `User` → `ExchangeFile` (`owner`) | удаление уволенного сотрудника |
+
+Последствие пропущенного `detach()` тихое и необратимое: blob остаётся
+`ACTIVE` без единой ссылки. Механизм `ORPHAN` его не найдёт (статус не
+сменился), `purge_expired_orphans()` не тронет, а `find_untracked_files()`
+не сочтёт потерянным — запись `FileBlob` на месте и файл на диске тоже.
+Такой blob живёт вечно, то есть ровно та проблема, ради которой storage и
+писался.
+
+Поэтому `detach()` при удалении строки потребителя выполняется
+**автоматически** — сигналом `post_delete` (`storage/signals.py`),
+подключённым ко всем моделям с FK на `FileObject` той же интроспекцией, что
+и в 5.2. Регистрировать потребителя не нужно, забыть вызов невозможно.
+
+**Атрибуция.** Сигнал не знает, кто инициировал удаление, а `StorageAuditLog`
+обязан отвечать на вопрос «кто удалил файл» (раздел 2). Поэтому вызывающий
+код помечает объект перед `delete()`:
+
+```python
+from storage.signals import attribute_deletion
+
+attribute_deletion(document, user=request.user, consumer='catalog.CatalogDocument')
+document.delete()          # detach() выполнит сигнал, журнал получит инициатора
+```
+
+Без пометки удаление записывается как каскадное: `user=None`, `consumer` с
+суффиксом `:cascade`. Это не ошибка, а честная запись «файл удалён вместе с
+владельцем, конкретного инициатора не было».
+
+Пометка живёт на экземпляре в памяти, поэтому работает только при удалении
+**самого помеченного объекта**. При каскаде Django создаёт собственные
+экземпляры, и пометки на них не будет — если атрибуция важна, удаляйте
+записи явно до того, как их снесёт каскад (так сделано в
+`posts.PostDeleteView`: вложения удаляются до поста).
+
+**`StorageService.detach()` остаётся публичным API** — для случая, когда
+ссылка снимается *без* удаления строки: `phonebook` подменяет `file_object`
+на живой записи при замене файла справочника, и никакого `post_delete` там
+не происходит. Повторный вызов безопасен: если `FileObject` уже удалён,
+`detach()` выходит сразу, не дублируя запись в журнале и не сбрасывая
+`orphaned_at`.
+
+Регрессионные тесты — `storage/tests/test_cascade.py` (все четыре каскадных
+пути) и `storage/tests/test_consumers.py` (окончательное удаление у каждого
+потребителя плюс сохранение атрибуции).
+
+---
+
+## 6. Корзина
+
+Корзина — **функция модуля-потребителя, не storage**. Причина: пользователь
+восстанавливает документ с его именем, папкой, правами и местом в каталоге, а
+не абстрактный blob. Если запись `DepartmentDocument` физически удалена,
+воскрешение blob'а не даёт ничего — восстанавливать нечего.
+
+Схема:
+
+```
+Пользователь удалил документ
+        │
+        ▼
+  is_deleted = True, deleted_at = now()      ← объект в корзине,
+  detach() НЕ вызывается                       blob остаётся ACTIVE
+        │
+        ├──── восстановление: is_deleted = False  ──▶ ничего больше не нужно,
+        │                                              файл никуда не девался
+        ▼
+  очистка корзины (по сроку или вручную)
+        │
+        ▼
+  реальное удаление записи + StorageService.detach()
+        │
+        ▼
+  дальше — обычный жизненный цикл blob'а (раздел 7)
+```
+
+- Пока объект в корзине, `detach()` не вызывается вообще — никаких новых
+  состояний в `FileBlob` для этого не требуется.
+- Срок жизни корзины — настройка потребителя (обычно 30 дней), не storage.
+- Списки/выдача в модуле-потребителе фильтруются по `is_deleted=False`;
+  удобно оформить менеджером по умолчанию, чтобы забыть фильтр было сложнее.
+- `ORPHAN` (раздел 7) — **не корзина**, а техническое состояние «на содержимое
+  не осталось ссылок». Он защищает от потери файла при повторной загрузке того
+  же содержимого, но не заменяет пользовательское восстановление.
+
+---
+
+## 7. Жизненный цикл содержимого и правила удаления
+
+```
+    StorageService.upload()
+            │
+            ▼
+      ┌──────────┐   detach(): ссылок на blob не осталось   ┌────────┐
+      │  ACTIVE  │ ─────────────────────────────────────────▶│ ORPHAN │
+      └──────────┘                                           └────────┘
+            ▲                                                     │
+            │  upload() нашёл тот же checksum → RESTORE           │  спустя
+            └─────────────────────────────────────────────────────┤  N дней
+                                                                  ▼
+                                              purge: файл с диска + запись FileBlob
+                                              (запись в StorageAuditLog остаётся)
+```
+
+- **ACTIVE → ORPHAN** — синхронно внутри `detach()`, когда удалён последний
+  `FileObject`, ссылающийся на blob. Сам `detach()` при удалении записи
+  потребителя вызывается автоматически сигналом `post_delete` (5.5), в том
+  числе когда запись сносит каскад.
+- **ORPHAN → ACTIVE** — внутри `upload()`, если то же содержимое загружено
+  повторно до истечения срока.
+- **ORPHAN → удалён** — задача `storage.tasks.cleanup_orphan_files` (обёртка
+  над `StorageService.purge_expired_orphans()`), ежедневно через **Celery
+  beat**. Расписание хранится в БД (`django_celery_beat`), а не в конфиге ОС:
+  разработка идёт на Windows, прод — на Astra Linux, и вариант «Task
+  Scheduler здесь, cron там» означал бы два разных набора конфигурации.
+  Первичное расписание заводится дата-миграцией
+  `storage/migrations/0002_seed_periodic_tasks.py`, дальше правится через
+  `/admin/` без деплоя. Брокер — тот же Redis, что и для Channels, но
+  отдельная логическая база (`db=1`).
+- Прямой `FileBlob.delete()` в обход сервиса не используется нигде: он оставит
+  файл на диске (Django не удаляет файлы при удалении записи) и не запишет
+  аудит.
+
+Периодические задачи (Celery beat, расписание в `/admin/`):
+
+| Задача | Периодичность | Что делает |
+|---|---|---|
+| `storage.tasks.cleanup_orphan_files` | ежедневно | физически удаляет blob'ы, пробывшие в `ORPHAN` дольше `STORAGE_ORPHAN_RETENTION_DAYS` |
+| `storage.tasks.storage_verify` | ежемесячно | сверка диска и БД (5.4), по умолчанию только отчёт |
+| `exchange.tasks.cleanup_expired_exchange_files` | ежедневно | удаляет файлы обменника старше TTL категории и зовёт `detach()` (раздел 4) |
+
+Задачи storage продублированы management-командами (`cleanup_orphan_files`,
+`storage_verify`) — удобно для ручного прогона и отладки без Celery.
+
+---
+
+## 8. Проверка прав и отдача файлов
+
+**storage не хранит и не проверяет права доступа.** После дедупликации одно
+содержимое может иметь несовместимые политики видимости в разных местах
+использования, поэтому единая политика на уровне файла логически невозможна.
+
+1. Модуль-потребитель реализует свою логику доступа обычными средствами
+   (участник диалога, состоит в отделе `Category`, входит в
+   `allowed_departments` документа и т.д.).
+2. View потребителя сначала проверяет права **на свой объект**, и только затем
+   вызывает `StorageService.get_download_response(...)`.
+3. `storage` не публикует URL вида `/storage/file/<id>/` — скачать файл можно
+   только через view модуля-потребителя. Это исключает обход прав прямой
+   ссылкой.
+
+### Отдача файлов
+
+`get_download_response()` не пропускает файл через процесс Django в проде:
+
+- **прод**: ответ с заголовком `X-Accel-Redirect` на внутренний
+  (`internal`) nginx-location плюс `Content-Disposition` с `original_name` из
+  `FileObject` — пользователь получает осмысленное имя, хотя на диске файл
+  лежит под именем-хэшем;
+- **разработка** (`DEBUG=True`): `FileResponse`, чтобы не требовать nginx
+  локально.
+
+```nginx
+location /protected/ {
+    internal;
+    alias /path/to/media/storage/blobs/;
+}
+```
+
+Прод-путь через `X-Accel-Redirect` — не преждевременная оптимизация «для
+больших систем»: портал работает на Daphne/ASGI, где отдача файла через воркер
+занимает его на всё время скачивания. Десяток пользователей, тянущих по
+100 МБ, забьют пул воркеров, и портал начнёт тормозить целиком, включая
+WebSocket-чат. Стоимость решения — несколько строк кода и один `location` в
+конфиге.
+
+---
+
+## 9. Ограничения размера и квоты
+
+Исходная мотивация проекта — риск переполнения диска. Дедупликация и очистка
+сирот помогают, но не защищают от одного пользователя, заливающего сотни
+гигабайт уникального содержимого. Поэтому лимиты — часть первой версии:
+
+```python
+# settings.py
+STORAGE_MAX_UPLOAD_SIZE = 100 * 1024 * 1024      # 100 МБ на один файл
+STORAGE_USER_QUOTA = None                        # None = без квоты на пользователя
+STORAGE_ORPHAN_RETENTION_DAYS = 7                # сколько blob лежит в ORPHAN до удаления
+```
+
+Квота на пользователя сейчас отключена (`None`): портал внутренний, дисковое
+пространство контролируется на уровне тома, и упереться в лимит по ошибке
+неприятнее, чем разово почистить хранилище. Код квоты при этом рабочий и
+покрыт `QuotaExceededError` — включается одним значением в settings, без
+изменений в модулях-потребителях.
+
+- `upload()` отклоняет файл больше `STORAGE_MAX_UPLOAD_SIZE`
+  (`FileTooLargeError`) **до** записи на диск.
+- `get_usage(user)` возвращает сумму `blob.size` по **уникальным** blob'ам, на
+  которые ссылаются `FileObject` пользователя, — иначе дедуплицированный файл
+  учитывался бы многократно.
+- Превышение квоты — `QuotaExceededError`, тоже до записи на диск.
+
+---
+
+## 10. API для потребителей
+
+```python
+from storage.services import StorageService
+from storage.exceptions import FileTooLargeError, QuotaExceededError
+from storage.models import FileObject
+```
+
+### Загрузка
+
+```python
+class UploadExchangeFileView(LoginRequiredMixin, View):
+    def post(self, request, recipient_id):
+        recipient = get_object_or_404(get_user_model(), pk=recipient_id)
+
+        try:
+            file_object = StorageService.upload(
+                request.FILES['file'], user=request.user, category=FileObject.Category.EXCHANGE,
+            )
+        except FileTooLargeError:
+            return JsonResponse({'error': 'Файл слишком большой'}, status=400)
+        except QuotaExceededError:
+            return JsonResponse({'error': 'Превышена квота хранилища'}, status=400)
+
+        exchange_file = ExchangeFile.objects.create(
+            file_object=file_object, owner=recipient, uploaded_by=request.user,
+        )
+        return JsonResponse({'id': exchange_file.id})
+```
+
+Никакого `attach()` — `upload()` уже вернул объект, чей blob в `ACTIVE`.
+
+### Удаление в корзину и восстановление
+
+```python
+class TrashExchangeFileView(LoginRequiredMixin, View):
+    def post(self, request, file_id):
+        exchange_file = get_object_or_404(ExchangeFile, pk=file_id, owner=request.user, is_deleted=False)
+        exchange_file.is_deleted = True
+        exchange_file.deleted_at = timezone.now()
+        exchange_file.deleted_by = request.user
+        exchange_file.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+        # detach() НЕ вызывается — файл ещё можно восстановить
+        return JsonResponse({'success': True})
+
+
+class RestoreExchangeFileView(LoginRequiredMixin, View):
+    def post(self, request, file_id):
+        exchange_file = get_object_or_404(ExchangeFile, pk=file_id, owner=request.user, is_deleted=True)
+        exchange_file.is_deleted = False
+        exchange_file.deleted_at = None
+        exchange_file.deleted_by = None
+        exchange_file.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+        return JsonResponse({'success': True})
+```
+
+### Окончательное удаление
+
+```python
+def purge_exchange_file(exchange_file, *, user=None):
+    file_object = exchange_file.file_object
+    exchange_file.delete()
+    StorageService.detach(file_object, user=user, consumer='exchange.ExchangeFile')
+```
+
+Порядок важен: сначала удаляется FK-запись потребителя, затем `detach()` —
+иначе `_has_references()` увидит собственную, ещё не удалённую ссылку.
+
+### Скачивание с проверкой прав
+
+```python
+class DownloadDepartmentDocumentView(LoginRequiredMixin, View):
+    def get(self, request, doc_id):
+        doc = get_object_or_404(DepartmentDocument, pk=doc_id, is_deleted=False)
+
+        if not doc.allowed_departments.filter(pk=request.user.cat_id).exists():
+            raise PermissionDenied
+
+        return StorageService.get_download_response(doc.file_object, request)
+```
+
+### Чек-лист подключения нового потребителя
+
+1. Модель с `ForeignKey('storage.FileObject', on_delete=models.PROTECT)` и
+   полями корзины (`is_deleted`, `deleted_at`, `deleted_by`), если для неё
+   нужна корзина.
+2. View загрузки вызывает `StorageService.upload()` с правильной `category` и
+   обрабатывает `FileTooLargeError` / `QuotaExceededError`.
+3. Удаление — в корзину (флаг), окончательное — обычным `instance.delete()`;
+   `detach()` выполнит сигнал (5.5). Перед удалением пометить инициатора
+   через `attribute_deletion()`, иначе журнал не сохранит, кто удалил.
+   **Тест обязателен**: «окончательное удаление объекта X переводит blob без
+   других ссылок в ORPHAN» — см. `storage/tests/test_consumers.py`.
+4. View скачивания проверяет права **до** вызова `get_download_response()` и
+   не отдаёт объекты из корзины.
+5. `queryset.delete()` и `bulk_delete` по моделям со ссылкой на `FileObject`
+   применять с осторожностью: blob'ы они освободят корректно (сигнал
+   `post_delete` рассылается и при массовом удалении), но пометку
+   `attribute_deletion()` поставить некуда, поэтому в журнале удаление
+   останется без инициатора. Где атрибуция важна — удалять записи по одной.
+6. Категория добавлена в `FileObject.Category` и в `STORAGE_CATEGORY_TTL`.
+
+Регистрировать модель где-либо не требуется — `_has_references()` находит её
+через интроспекцию автоматически.
+
+---
+
+## 11. Миграция существующих файлов (выполнена)
+
+Перевод существующих модулей на storage завершён. Мигрировали ровно две
+модели — те, где файлы имеют смысл разделяемости с каталогом и обменником:
+
+| Модель | Было | Стало | Категория |
+|---|---|---|---|
+| `posts.PostFile` | `file = FileField` | `file_object = FK(FileObject)` | `document` |
+| `phonebook.Phonebook` | `book = FileField` | `file_object = FK(FileObject)` | `catalog` |
+
+Остальные файловые поля остались на `FileField`/`ImageField` (см. 1.1).
+
+**Данных не переносили.** Портал не в проде, БД Postgres поднималась с нуля,
+таблицы `posts_postfile` и `phonebook_phonebook` были пусты — поэтому вместо
+осторожной схемы «добавить поле → команда миграции с dry-run → переключить
+код → удалить старое» сделана прямая замена поля одной миграцией схемы.
+Команда `migrate_files_to_storage` не понадобилась и не писалась.
+
+Что потребовалось помимо самой замены поля:
+
+- `PostFile.original_name` / `size_display` / `extension` стали
+  properties, проксирующими к `FileObject`/`FileBlob` — шаблоны, которые их
+  используют, править не пришлось.
+- Прямые ссылки `{{ f.file.url }}` в шаблонах заменены на view с проверкой
+  прав (`post_file_download`, `phonebook_view_file`).
+- `UpdateBookForm` сужена до `fields = ['title']`: `ModelForm` с FK на
+  `FileObject` отрисовал бы выпадающий список файлов вместо
+  `<input type=file>`. Файл обрабатывается вручную в `form_valid()`.
+- В `PhoneBook.form_valid()` при замене файла старый `FileObject`
+  отвязывается через `detach()` — иначе прежний blob остался бы `ACTIVE`
+  навсегда.
+
+**Побочная находка.** При тестировании удаления поста выяснилось, что
+`PostDeleteView` переопределял `delete()`, который в Django ≥ 4.0 **не
+вызывается на POST-запрос**: POST идёт через `post() → form_valid() →
+object.delete()`. Переопределение было мёртвым кодом — посты удалялись, а
+`detach()` не вызывался ни разу, и `FileObject` копились как `ACTIVE`
+бесконечно. Исправлено переносом логики в `form_valid()`.
+
+## 12. На будущее
+
+- **Антивирусная проверка** — точка расширения в `upload()`: сканирование
+  (например, ClamAV через `clamd`) содержимого в `temp/` до создания
+  `FileBlob`. Схему не меняет.
+- **Версии файла** — `previous_version = FK('self', null=True)` на
+  `FileObject` (не на `FileBlob` — версионируется именованный документ, а не
+  содержимое). Схему удаления не меняет.
+- **Celery** — при появлении в проекте команды из раздела 7 переносятся в
+  periodic tasks один-в-один.
+- **Перенос хранилища в S3/MinIO** — меняются только `DEFAULT_FILE_STORAGE` и
+  реализация `get_download_response()` (pre-signed URL вместо
+  `X-Accel-Redirect`). Модули-потребители не затрагиваются вообще — ради этого
+  и вводился сервисный слой.
