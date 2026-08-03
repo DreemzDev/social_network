@@ -1,0 +1,15 @@
+<div class="rounded-xl border border-gray-100 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+  <div class="mb-2 flex items-center justify-between px-1">
+    <span class="text-sm font-semibold text-gray-900 dark:text-white">Отделы</span>
+  </div>
+  <ul class="space-y-0.5">
+    {% for link in dept_links %}
+    <li class="rounded-lg {% if link.active %}bg-[#EAF3FF] dark:bg-zinc-800{% else %}hover:bg-gray-100 dark:hover:bg-zinc-800{% endif %}">
+      <a class="block px-2 py-1.5 text-sm {% if link.active %}font-semibold text-[#0077FF]{% else %}text-gray-700 dark:text-gray-300{% endif %}"
+         href="?{{ link.qs }}">
+        {{ link.label }}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>

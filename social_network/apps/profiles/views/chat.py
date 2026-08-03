@@ -1,6 +1,7 @@
 from django.templatetags.static import static
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
+from django.template.loader import render_to_string
 from django.views.generic import ListView, View
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -9,6 +10,7 @@ from django.core.cache import cache
 
 from django_private_chat2.models import MessageModel, DialogsModel
 
+from category.models import Category
 from ..models import MessageReaction, MessageReply
 from ._common import clear_user_cache, push_chat_event
 
@@ -18,14 +20,19 @@ ALLOWED_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡']
 class DialogsWithUnreadMixin:
     """Строит список диалогов текущего пользователя с непрочитанными и последним сообщением."""
 
-    def _get_dialogs_with_unread(self):
+    def _get_dialogs_with_unread(self, query='', dept=''):
         dialogs = DialogsModel.objects.filter(
             Q(user1=self.request.user) | Q(user2=self.request.user)
-        ).select_related('user1', 'user2')
+        ).select_related('user1', 'user2', 'user1__cat', 'user2__cat')
 
         dialog_list = []
         for dialog in dialogs:
             other_user = dialog.user1 if dialog.user2 == self.request.user else dialog.user2
+
+            if query and query.lower() not in other_user.get_full_name().lower() and query.lower() not in other_user.username.lower():
+                continue
+            if dept and (not other_user.cat or other_user.cat.name != dept):
+                continue
 
             dialog.unread_count = MessageModel.objects.filter(
                 sender=other_user, recipient=self.request.user, read=False
@@ -50,9 +57,55 @@ class DialogsWithUnreadMixin:
 class DialogsListView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
     template_name = 'profiles/dialogs.html'
     context_object_name = 'dialogs'
+    paginate_by = 20
 
     def get_queryset(self):
-        return self._get_dialogs_with_unread()
+        # DialogsModel не хранит текст/непрочитанные — фильтрация и
+        # сортировка (по времени последнего сообщения) неизбежно идут в
+        # Python, поэтому paginate_by режет уже собранный и отсортированный
+        # список, а не queryset.
+        return self._get_dialogs_with_unread(
+            query=self.request.GET.get('q', ''),
+            dept=self.request.GET.get('dept', ''),
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['cats'] = Category.objects.all()
+
+        def qs_with(**overrides):
+            params = self.request.GET.copy()
+            params.pop('page', None)
+            for key, value in overrides.items():
+                if value:
+                    params[key] = value
+                else:
+                    params.pop(key, None)
+            return params.urlencode()
+
+        context['dept_links'] = [
+            {'label': 'Все отделы', 'qs': qs_with(dept=None), 'active': not self.request.GET.get('dept')},
+            *[
+                {
+                    'label': cat.name,
+                    'qs': qs_with(dept=cat.name),
+                    'active': self.request.GET.get('dept') == cat.name,
+                }
+                for cat in context['cats']
+            ],
+        ]
+        return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            html = render_to_string(
+                'includes/dialog_list_fragment.html', context, request=self.request
+            )
+            return JsonResponse({
+                'html': html,
+                'has_next': context['page_obj'].has_next() if context['page_obj'] else False,
+            })
+        return super().render_to_response(context, **response_kwargs)
 
 
 def _serialize_message(msg):

@@ -2,67 +2,55 @@
 
 {% block breadcrumb %}Мессенджер{% endblock breadcrumb %}
 
+{% block content_layout %} md:flex-row-reverse md:w-2/3 md:flex-none md:mx-auto{% endblock content_layout %}
+
+{% block sidebar_wrapper %}
+<div class="w-full flex-shrink-0 md:w-72">
+  {% include "includes/dialog_filter_dept.html" %}
+</div>
+{% endblock sidebar_wrapper %}
+
 {% block content %}
 <div class="w-full min-w-0">
     <div class="mb-4 flex items-center justify-between">
         <h1 class="text-xl font-semibold text-gray-900 dark:text-white">Мои диалоги</h1>
         <span class="text-sm text-gray-500 dark:text-gray-400">
-            {{ dialogs|length }} диалогов
+            {{ page_obj.paginator.count }} диалогов
         </span>
     </div>
 
-    <div id="dialogs-list" class="flex flex-col gap-2">
-        {% for dialog in dialogs %}
-        <a href="{% url 'dialog_messages' user_id=dialog.other_user.pk %}"
-           class="dialog-item flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 transition hover:border-gray-200 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
-           data-user-id="{{ dialog.other_user.pk }}">
-            <div class="relative flex-shrink-0">
-                {% if dialog.other_user.avatar %}
-                <img class="h-12 w-12 rounded-full object-cover" src="{{ dialog.other_user.avatar.url }}" alt="{{ dialog.other_user.get_full_name }}">
-                {% else %}
-                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF3FF] font-semibold text-[#0077FF] dark:bg-zinc-800">
-                    {{ dialog.other_user.username|first|upper }}
-                </div>
-                {% endif %}
-                {% if dialog.other_user.is_online %}
-                <span class="absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-white bg-green-400 dark:border-zinc-900"></span>
-                {% endif %}
+    <form action="{% url 'dialogs_list' %}" method="get" class="mb-4">
+        {% if request.GET.dept %}<input type="hidden" name="dept" value="{{ request.GET.dept }}">{% endif %}
+        <div class="relative">
+            <input
+                name="q"
+                type="text"
+                value="{{ request.GET.q }}"
+                class="block w-full rounded-full border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+                placeholder="Поиск диалогов..."
+            />
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
             </div>
-            <div class="min-w-0 flex-1">
-                <h3 class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ dialog.other_user.get_full_name|default:dialog.other_user.username }}</h3>
-                <p class="last-message truncate text-sm text-gray-500 dark:text-gray-400">
-                    {% if dialog.last_message %}
-                        {% if dialog.last_message.sender == request.user %}
-                            Вы: {{ dialog.last_message.text|striptags|truncatechars:30 }}
-                        {% else %}
-                            {{ dialog.last_message.text|striptags|truncatechars:30 }}
-                        {% endif %}
-                    {% else %}
-                        Нет сообщений
-                    {% endif %}
-                </p>
-            </div>
-            <div class="flex flex-shrink-0 flex-col items-end gap-1">
-                <span class="last-message-time text-xs text-gray-400">
-                    {% if dialog.last_message %}
-                        {{ dialog.last_message.created|date:"d M H:i" }}
-                    {% endif %}
-                </span>
-                <span class="unread-counter inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0077FF] px-1.5 text-xs font-medium leading-none text-white {% if dialog.unread_count == 0 %}hidden{% endif %}">
-                    {{ dialog.unread_count }}
-                </span>
-            </div>
-        </a>
-        {% empty %}
-        <div class="rounded-xl border border-gray-100 bg-white py-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
-            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <h3 class="mt-2 text-lg font-medium text-gray-900 dark:text-white">Нет диалогов</h3>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Начните новый диалог с пользователями</p>
         </div>
-        {% endfor %}
+    </form>
+
+    <div id="dialogs-list" class="flex flex-col gap-2">
+        {% include "includes/dialog_list_fragment.html" %}
     </div>
+
+    <div id="dialogs-loader" class="hidden justify-center py-6">
+        <svg class="h-6 w-6 animate-spin text-[#0077FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+    </div>
+
+    {% if page_obj %}
+    <div id="dialogs-sentinel" data-has-next="{{ page_obj.has_next|yesno:'1,0' }}" data-next-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"></div>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -75,57 +63,109 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!wsManager) {
         console.error('❌ Global WebSocket Manager не найден!');
-        return;
-    }
+    } else {
+        function stripHtmlTags(html) {
+            const tempEl = document.createElement("div");
+            tempEl.innerHTML = html || "";
+            return tempEl.textContent || "";
+        }
 
-    function stripHtmlTags(html) {
-        const tempEl = document.createElement("div");
-        tempEl.innerHTML = html || "";
-        return tempEl.textContent || "";
-    }
+        function handleDialogsWebSocketMessage(data) {
+            // 🔔 Обновление счётчика непрочитанных сообщений
+            if (data.msg_type === 9) { // NewUnreadCount
+                const dialogEl = document.querySelector(`[data-user-id="${data.sender}"]`);
+                if (dialogEl) {
+                    const counterEl = dialogEl.querySelector(".unread-counter");
+                    if (data.unread_count > 0) {
+                        counterEl.textContent = data.unread_count;
+                        counterEl.classList.remove("hidden");
+                    } else {
+                        counterEl.classList.add("hidden");
+                    }
+                }
+            }
 
-    function handleDialogsWebSocketMessage(data) {
-        // 🔔 Обновление счётчика непрочитанных сообщений
-        if (data.msg_type === 9) { // NewUnreadCount
-            const dialogEl = document.querySelector(`[data-user-id="${data.sender}"]`);
-            if (dialogEl) {
-                const counterEl = dialogEl.querySelector(".unread-counter");
-                if (data.unread_count > 0) {
-                    counterEl.textContent = data.unread_count;
-                    counterEl.classList.remove("hidden");
-                } else {
-                    counterEl.classList.add("hidden");
+            // 📝 Обновление последнего сообщения и времени, перемещение наверх
+            if (data.msg_type === 3) { // TextMessage
+                const isSender = data.sender === currentUserPk;
+                const otherUserId = isSender ? data.receiver : data.sender;
+                const dialogEl = document.querySelector(`[data-user-id="${otherUserId}"]`);
+                if (dialogEl) {
+                    const lastMessageEl = dialogEl.querySelector(".last-message");
+                    const lastMessageTimeEl = dialogEl.querySelector(".last-message-time");
+
+                    lastMessageEl.textContent = (isSender ? "Вы: " : data.sender_username + ": ") + stripHtmlTags(data.text);
+                    const created = new Date(data.created || Date.now());
+                    lastMessageTimeEl.textContent = created.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' }) + ' ' +
+                                                   created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    // плавное перемещение наверх
+                    dialogEl.style.transition = "all 0.3s ease";
+                    dialogsList.prepend(dialogEl);
+                    dialogEl.classList.add("animate-pulse");
+                    setTimeout(() => dialogEl.classList.remove("animate-pulse"), 500);
                 }
             }
         }
 
-        // 📝 Обновление последнего сообщения и времени, перемещение наверх
-        if (data.msg_type === 3) { // TextMessage
-            const isSender = data.sender === currentUserPk;
-            const otherUserId = isSender ? data.receiver : data.sender;
-            const dialogEl = document.querySelector(`[data-user-id="${otherUserId}"]`);
-            if (dialogEl) {
-                const lastMessageEl = dialogEl.querySelector(".last-message");
-                const lastMessageTimeEl = dialogEl.querySelector(".last-message-time");
-
-                lastMessageEl.textContent = (isSender ? "Вы: " : data.sender_username + ": ") + stripHtmlTags(data.text);
-                const created = new Date(data.created || Date.now());
-                lastMessageTimeEl.textContent = created.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' }) + ' ' +
-                                               created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                // плавное перемещение наверх
-                dialogEl.style.transition = "all 0.3s ease";
-                dialogsList.prepend(dialogEl);
-                dialogEl.classList.add("animate-pulse");
-                setTimeout(() => dialogEl.classList.remove("animate-pulse"), 500);
-            }
-        }
+        wsManager.addListener(handleDialogsWebSocketMessage);
+        window.addEventListener('beforeunload', () => {
+            wsManager.removeListener(handleDialogsWebSocketMessage);
+        });
     }
 
-    wsManager.addListener(handleDialogsWebSocketMessage);
-    window.addEventListener('beforeunload', () => {
-        wsManager.removeListener(handleDialogsWebSocketMessage);
-    });
+    // Пагинация с ленивой подгрузкой
+    const sentinel = document.getElementById('dialogs-sentinel');
+    if (!sentinel) return;
+
+    const loader = document.getElementById('dialogs-loader');
+    let loading = false;
+
+    function currentParams() {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('page');
+        return params;
+    }
+
+    function loadNextPage() {
+        const hasNext = sentinel.dataset.hasNext === '1';
+        if (!hasNext || loading) return;
+
+        loading = true;
+        loader.classList.remove('hidden');
+        loader.classList.add('flex');
+
+        const params = currentParams();
+        params.set('page', sentinel.dataset.nextPage);
+
+        fetch(`{% url 'dialogs_list' %}?${params.toString()}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                dialogsList.insertAdjacentHTML('beforeend', data.html);
+                if (data.has_next) {
+                    sentinel.dataset.hasNext = '1';
+                    sentinel.dataset.nextPage = String(parseInt(sentinel.dataset.nextPage, 10) + 1);
+                } else {
+                    sentinel.dataset.hasNext = '0';
+                }
+            })
+            .catch(() => {})
+            .finally(() => {
+                loading = false;
+                loader.classList.add('hidden');
+                loader.classList.remove('flex');
+            });
+    }
+
+    const observer = new IntersectionObserver(
+        (entries) => {
+            if (entries[0].isIntersecting) loadNextPage();
+        },
+        { rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
 });
 </script>
 {% endblock %}

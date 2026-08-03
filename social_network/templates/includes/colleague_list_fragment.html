@@ -1,0 +1,8 @@
+{% load static %}
+{% for p in page_obj.object_list %}
+{% include "includes/colleague_card.html" %}
+{% empty %}
+<div class="col-span-full rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-gray-400">
+  Коллеги не найдены
+</div>
+{% endfor %}

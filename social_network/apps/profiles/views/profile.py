@@ -1,6 +1,10 @@
+from datetime import timedelta
+
 from django.urls import reverse_lazy
 from django.db.models import Q
 from django.http import JsonResponse
+from django.template.loader import render_to_string
+from django.utils import timezone
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.shortcuts import redirect
 from django.views.generic import DetailView, ListView, UpdateView, FormView, View
@@ -70,15 +74,72 @@ class SettingProfile(LoginRequiredMixin, UpdateView, DetailView):
 class ShowUsers(ListView):
     model = get_user_model()
     template_name = 'profiles/all_users.html'
+    paginate_by = 20
 
     def get_queryset(self):
         query = self.request.GET.get('q', '')
-        return get_user_model().objects.filter(Q(first_name__icontains=query) | Q(last_name__icontains=query))
+        dept = self.request.GET.get('dept', '')
+        status = self.request.GET.get('status', '')
+
+        qs = get_user_model().objects.filter(
+            Q(first_name__icontains=query) | Q(last_name__icontains=query)
+        ).select_related('cat').order_by('first_name', 'last_name')
+
+        if dept:
+            qs = qs.filter(cat__name=dept)
+
+        if status == 'online':
+            online_since = timezone.now() - timedelta(minutes=5)
+            qs = qs.filter(last_activity__gte=online_since)
+        elif status == 'offline':
+            online_since = timezone.now() - timedelta(minutes=5)
+            qs = qs.filter(Q(last_activity__lt=online_since) | Q(last_activity__isnull=True))
+
+        return qs
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context["cats"] = Category.objects.all()
+
+        def qs_with(**overrides):
+            params = self.request.GET.copy()
+            params.pop('page', None)
+            for key, value in overrides.items():
+                if value:
+                    params[key] = value
+                else:
+                    params.pop(key, None)
+            return params.urlencode()
+
+        context["dept_links"] = [
+            {'name': None, 'label': 'Все отделы', 'qs': qs_with(dept=None), 'active': not self.request.GET.get('dept')},
+            *[
+                {
+                    'name': cat.name,
+                    'label': cat.name,
+                    'qs': qs_with(dept=cat.name),
+                    'active': self.request.GET.get('dept') == cat.name,
+                }
+                for cat in context['cats']
+            ],
+        ]
+        context["status_links"] = [
+            {'value': None, 'label': 'Все статусы', 'qs': qs_with(status=None), 'active': not self.request.GET.get('status')},
+            {'value': 'online', 'label': 'Онлайн', 'qs': qs_with(status='online'), 'active': self.request.GET.get('status') == 'online'},
+            {'value': 'offline', 'label': 'Офлайн', 'qs': qs_with(status='offline'), 'active': self.request.GET.get('status') == 'offline'},
+        ]
         return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            html = render_to_string(
+                'includes/colleague_list_fragment.html', context, request=self.request
+            )
+            return JsonResponse({
+                'html': html,
+                'has_next': context['page_obj'].has_next() if context['page_obj'] else False,
+            })
+        return super().render_to_response(context, **response_kwargs)
 
 
 class ShowPhones(ListView, FormView):

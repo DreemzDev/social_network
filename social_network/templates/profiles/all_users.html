@@ -1,121 +1,109 @@
 {% extends 'base.html' %}
 {% load static %}
 {% block breadcrumb %}Коллеги{% endblock breadcrumb %}
+
+{% block content_layout %} md:flex-row-reverse md:w-2/3 md:flex-none md:mx-auto{% endblock content_layout %}
+
+{% block sidebar_wrapper %}
+<div class="w-full flex-shrink-0 space-y-4 md:w-72">
+  {% include "includes/colleague_filter_dept.html" %}
+  {% include "includes/colleague_filter_status.html" %}
+</div>
+{% endblock sidebar_wrapper %}
+
 {% block content %}
 
-<div class="w-full" x-data="{ dept: '', status: '' }">
-
-  <!-- Панель поиска и фильтров -->
-  <div class="mb-4 rounded-xl border border-gray-100 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center">
-      <form action="{% url 'show_users' %}" method="get" class="flex-1">
-        <div class="relative">
-          <input
-            name="q"
-            type="text"
-            value="{{ request.GET.q }}"
-            class="block w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
-            placeholder="Поиск коллег..."
-          />
-          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-          </div>
-        </div>
-      </form>
-      <div class="flex gap-3">
-        <select
-          x-model="dept"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white md:w-48"
-        >
-          <option value="">Все отделы</option>
-          {% for cat in cats %}
-          <option value="{{ cat.name }}">{{ cat.name }}</option>
-          {% endfor %}
-        </select>
-        <select
-          x-model="status"
-          class="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white md:w-40"
-        >
-          <option value="">Все статусы</option>
-          <option value="online">Онлайн</option>
-          <option value="offline">Офлайн</option>
-        </select>
+<div class="w-full">
+  <form action="{% url 'show_users' %}" method="get" class="mb-4">
+    {% if request.GET.dept %}<input type="hidden" name="dept" value="{{ request.GET.dept }}">{% endif %}
+    {% if request.GET.status %}<input type="hidden" name="status" value="{{ request.GET.status }}">{% endif %}
+    <div class="relative">
+      <input
+        name="q"
+        type="text"
+        value="{{ request.GET.q }}"
+        class="block w-full rounded-full border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+        placeholder="Поиск коллег..."
+      />
+      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+        <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
       </div>
     </div>
+  </form>
+
+  <div id="colleagues-list" class="flex flex-col gap-2">
+    {% include "includes/colleague_list_fragment.html" %}
   </div>
 
-  <!-- Список коллег -->
-  <div class="flex flex-col gap-2">
-    {% for p in object_list %}
-    <div
-      x-show="(dept === '' || dept === '{{ p.cat.name|default:"" }}') && (status === '' || status === '{{ p.is_online|yesno:"online,offline" }}')"
-      class="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 transition hover:border-gray-200 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 sm:flex-nowrap"
-    >
-      <a href="{% url 'addpost' p.username %}" class="relative flex-shrink-0">
-        <img
-          class="h-14 w-14 rounded-full object-cover"
-          src="{% if p.avatar %}{{ p.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}"
-          alt="{{ p.first_name }} {{ p.last_name }}"
-        />
-        <span class="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-zinc-900 {% if p.is_online %}bg-green-400{% else %}bg-gray-300 dark:bg-zinc-600{% endif %}"></span>
-      </a>
-
-      <div class="min-w-0 flex-1 sm:w-56 sm:flex-shrink-0 sm:flex-none">
-        <a href="{% url 'addpost' p.username %}" class="block truncate text-sm font-medium text-gray-900 hover:text-[#0077FF] dark:text-white">
-          {{ p.first_name }} {{ p.last_name }}
-        </a>
-        <div class="truncate text-xs text-gray-500 dark:text-gray-400">{{ p.rank }}</div>
-        {% if p.cat %}
-        <span class="mt-1 inline-flex items-center rounded-full bg-[#EAF3FF] px-2 py-0.5 text-xs font-medium text-[#0077FF] dark:bg-zinc-800 sm:hidden">
-          {{ p.cat.name }}
-        </span>
-        {% endif %}
-      </div>
-
-      <div class="order-4 hidden min-w-0 flex-1 sm:order-none sm:block">
-        {% if p.cat %}
-        <span class="inline-flex items-center rounded-full bg-[#EAF3FF] px-2 py-0.5 text-xs font-medium text-[#0077FF] dark:bg-zinc-800">
-          {{ p.cat.name }}
-        </span>
-        {% else %}
-        <span class="text-xs text-gray-400">Отдел не указан</span>
-        {% endif %}
-      </div>
-
-      <div class="order-4 hidden min-w-0 truncate text-sm text-gray-600 dark:text-gray-300 sm:order-none sm:block sm:w-48 sm:flex-shrink-0">
-        {{ p.position|default:"Должность не указана" }}
-      </div>
-
-      <div class="flex-shrink-0 sm:w-24">
-        {% if p.is_online %}
-        <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200">Онлайн</span>
-        {% else %}
-        <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-300">Офлайн</span>
-        {% endif %}
-      </div>
-
-      <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center">
-        {% if p.pk and request.user.pk != p.pk %}
-        <a
-          href="{% url 'dialog_messages' user_id=p.pk %}"
-          title="Написать сообщение"
-          class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-zinc-800"
-        >
-          <svg class="h-4.5 w-4.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-          </svg>
-        </a>
-        {% endif %}
-      </div>
-    </div>
-    {% empty %}
-    <div class="col-span-full rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-gray-400">
-      Коллеги не найдены
-    </div>
-    {% endfor %}
+  <div id="colleagues-loader" class="hidden justify-center py-6">
+    <svg class="h-6 w-6 animate-spin text-[#0077FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
   </div>
+
+  {% if page_obj %}
+  <div id="colleagues-sentinel" data-has-next="{{ page_obj.has_next|yesno:'1,0' }}" data-next-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"></div>
+  {% endif %}
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const sentinel = document.getElementById('colleagues-sentinel');
+    if (!sentinel) return;
+
+    const list = document.getElementById('colleagues-list');
+    const loader = document.getElementById('colleagues-loader');
+    let loading = false;
+
+    function currentParams() {
+      const params = new URLSearchParams(window.location.search);
+      params.delete('page');
+      return params;
+    }
+
+    function loadNextPage() {
+      const hasNext = sentinel.dataset.hasNext === '1';
+      if (!hasNext || loading) return;
+
+      loading = true;
+      loader.classList.remove('hidden');
+      loader.classList.add('flex');
+
+      const params = currentParams();
+      params.set('page', sentinel.dataset.nextPage);
+
+      fetch(`{% url 'show_users' %}?${params.toString()}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          list.insertAdjacentHTML('beforeend', data.html);
+          if (data.has_next) {
+            sentinel.dataset.hasNext = '1';
+            sentinel.dataset.nextPage = String(parseInt(sentinel.dataset.nextPage, 10) + 1);
+          } else {
+            sentinel.dataset.hasNext = '0';
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          loading = false;
+          loader.classList.add('hidden');
+          loader.classList.remove('flex');
+        });
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadNextPage();
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
+  });
+</script>
 
 {% endblock content %}
