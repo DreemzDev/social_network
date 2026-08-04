@@ -248,6 +248,28 @@ STATIC_DIRS = []
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
+# Под manage.py test медиа уходит во временный каталог, а не в боевой
+# media/.
+#
+# Django создаёт и удаляет тестовую БД, но файловую систему за собой не
+# убирает. Тесты storage реально пишут blob'ы на диск, поэтому каждый
+# прогон оставлял их в media/storage/blobs/ навсегда: записи FileBlob
+# исчезали вместе с тестовой БД, а файлы — нет. За несколько дней работы
+# так накопилось 2862 файла при 25 записях в БД.
+#
+# Вдобавок это ломало саму дедупликацию в тестах: имя файла равно
+# checksum, и на втором прогоне FileSystemStorage находил файл уже
+# существующим и дописывал случайный суффикс (<checksum>_B24AkEu) — то
+# есть на диске лежали сотни копий одного содержимого, ровно то, ради
+# предотвращения чего storage и писался.
+#
+# Каталог не удаляется автоматически: он в системном temp, ОС вычистит
+# его сама, а сохранённые файлы иногда нужны для разбора упавшего теста.
+if 'test' in sys.argv:
+    import tempfile
+
+    MEDIA_ROOT = tempfile.mkdtemp(prefix='portal-test-media-')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
