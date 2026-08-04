@@ -1,0 +1,40 @@
+{% load fm_tags %}
+{% comment %}
+  Содержимое сетки приватного доступа — кусок, который перезапрашивается с
+  ?partial=1 и подменяется без перезагрузки страницы (см. комментарий в
+  exchange/_grid.html).
+
+  Список подпапок фильтруется по доступу самой вьюхой: раньше вложенные
+  подпапки показывались все подряд, и пользователь видел названия папок,
+  открыть которые не мог.
+{% endcomment %}
+{% for folder in subfolders %}
+  {% comment %}
+    Предупреждение отличается от остальных модулей: документы приватного
+    доступа не могут существовать вне папки (права наследуются от неё),
+    поэтому при удалении подпапки они переезжают к родителю, а корневую
+    папку с документами удалить нельзя вовсе — см. DeleteDepartmentFolderView.
+  {% endcomment %}
+  {% include "includes/fm_folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=True can_delete=True folder_delete_url=folder.get_delete_url folder_note=folder.access_note folder_selectable=False folder_delete_warning="Документы из папки и вложенных в неё переедут в корзину родительской папки. Папку верхнего уровня с документами удалить нельзя — сначала перенесите их." %}
+{% endfor %}
+
+{% for item in documents %}
+  {% include "includes/deptdoc_card.html" %}
+{% endfor %}
+
+{% if not subfolders and not documents %}
+<div class="col-span-12 box p-8 text-center">
+  {% if active_filters %}
+    <div class="text-sm text-gray-600">По заданному фильтру ничего не найдено</div>
+    <a href="{{ request.path }}" class="text-sm text-theme-1 hover:underline">Сбросить фильтр</a>
+  {% elif not current_folder %}
+    <div class="text-sm text-gray-600">Вам пока не открыт доступ ни к одной папке</div>
+    <div class="text-xs text-gray-400 mt-1">Создайте свою папку и укажите, кто ещё должен её видеть</div>
+  {% else %}
+    <div class="text-sm text-gray-600">В этой папке пока пусто</div>
+    <div class="text-xs text-gray-400 mt-1">Перетащите документы сюда или нажмите «Загрузить документ»</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% include "includes/fm_pagination.html" %}

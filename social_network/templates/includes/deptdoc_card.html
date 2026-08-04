@@ -1,44 +1,12 @@
-{% load static %}
-{% comment %} Карточка документа отдела — разметка Midone («Directory & Files»), 1-в-1. {% endcomment %}
-<div class="intro-y col-span-6 sm:col-span-4 md:col-span-3 xl:col-span-2 xxl:col-span-2" data-deptdoc-id="{{ item.id }}">
-  <div class="file box rounded-md px-5 pt-8 pb-5 px-3 sm:px-5 relative zoom-in">
-    {# Чекбокс из макета: массовых операций пока нет, элемент визуальный #}
-    <div class="absolute left-0 top-0 mt-3 ml-3">
-      <input class="input border border-gray-500" type="checkbox">
-    </div>
-    <a href="{% url 'deptdocs_download' item.id %}" class="w-3/5 file__icon file__icon--file mx-auto">
-      <div class="file__icon__file-name">{{ item.file_object.extension }}</div>
-    </a>
-    <a href="{% url 'deptdocs_download' item.id %}" class="block font-medium mt-4 text-center truncate" title="{{ item.title }}">{{ item.title }}</a>
-    <div class="text-gray-600 text-xs text-center">{{ item.file_object.size|filesizeformat }}</div>
-    <div class="text-gray-600 text-xs text-center">
-      {% if item.uploaded_by %}{{ item.uploaded_by.last_name }} {{ item.uploaded_by.first_name }}{% endif %}
-    </div>
-    {% if can_upload %}
-    <div class="absolute top-0 right-0 mr-2 mt-2 dropdown ml-auto" x-data="{ open: false }">
-      <a class="w-5 h-5 block" href="javascript:;" x-on:click="open = !open">
-        {% include "includes/fm_icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
-      </a>
-      <div class="dropdown-box mt-5 absolute w-44 top-0 right-0 z-10" x-show="open" x-on:click.outside="open = false" x-cloak>
-        <div class="dropdown-box__content box p-2">
-          <a href="{% url 'deptdocs_download' item.id %}" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
-            {% include "includes/fm_icons.html" with icon='download' cls='w-4 h-4 mr-2' %} Скачать
-          </a>
-          {% if not is_trash %}
-          <a href="javascript:;" class="deptdoc-trash-btn flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md" data-doc-id="{{ item.id }}">
-            {% include "includes/fm_icons.html" with icon='trash' cls='w-4 h-4 mr-2' %} Удалить
-          </a>
-          {% else %}
-          <a href="javascript:;" class="deptdoc-restore-btn flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md" data-doc-id="{{ item.id }}">
-            {% include "includes/fm_icons.html" with icon='rotate-ccw' cls='w-4 h-4 mr-2' %} Восстановить
-          </a>
-          <a href="javascript:;" class="deptdoc-purge-btn flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md text-theme-6" data-doc-id="{{ item.id }}">
-            {% include "includes/fm_icons.html" with icon='x' cls='w-4 h-4 mr-2' %} Удалить окончательно
-          </a>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-</div>
+{% load fm_tags %}
+{% comment %}
+  Карточка документа приватного доступа. Разметка — в общем
+  includes/fm_file_card.html; права наследуются от папки
+  (DepartmentDocument.is_accessible_by → folder.allowed_users), фильтр
+  fm_can_manage вызывает именно её.
+
+  Раньше всё меню карточки пряталось за параметром can_upload, из-за чего
+  в единой корзине (storage/trash.html) его приходилось передавать
+  вручную, иначе у документа не было даже кнопки «Восстановить».
+{% endcomment %}
+{% include "includes/fm_file_card.html" with fm_title=item.title fm_download_url='deptdocs_download' fm_trash_url='deptdocs_trash_doc' fm_restore_url='deptdocs_restore' fm_purge_url='deptdocs_purge' fm_rename_type='document' fm_send_label='Переслать в обменник' fm_can_manage=item|fm_can_manage:request.user %}

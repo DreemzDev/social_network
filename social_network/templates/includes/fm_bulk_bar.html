@@ -1,0 +1,30 @@
+{% comment %}
+  Панель массовых действий — общая для трёх модулей. Появляется, когда
+  выбран хотя бы один объект (fm-actions.js: updateBulkBar).
+
+  Кнопки, работающие только с файлами, помечены data-fm-files-only и
+  гаснут, если выделены одни папки: раньше чекбокс на карточке папки
+  вообще не имел класса .fm-select, то есть выглядел рабочим, но молча
+  выпадал и из счётчика, и из массовых операций.
+
+  Параметры:
+    fm_bulk_move        — показывать кнопку массового перемещения
+    fm_bulk_move_label  — её подпись
+{% endcomment %}
+<div id="fm-bulk-bar" class="fm-bulk-bar hidden intro-y mt-3 flex flex-wrap items-center gap-3 rounded-md bg-theme-1/10 px-4 py-2 text-sm">
+  <span>Выбрано: <span class="fm-bulk-count font-medium">0</span></span>
+
+  {% if fm_bulk_move %}
+  <button type="button" id="fm-bulk-move" data-fm-files-only class="text-theme-1 hover:underline disabled:no-underline">
+    {{ fm_bulk_move_label|default:'Переместить' }}
+  </button>
+  {% endif %}
+
+  <button type="button" id="fm-bulk-trash" data-fm-files-only class="text-theme-6 hover:underline disabled:no-underline">
+    Удалить в корзину
+  </button>
+
+  <button type="button" id="fm-bulk-clear" class="ml-auto text-gray-500 hover:underline">Снять выделение</button>
+</div>
+
+<div id="fm-bulk-progress" class="hidden intro-y mt-3 text-sm text-gray-600"></div>

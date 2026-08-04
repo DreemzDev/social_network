@@ -7,7 +7,9 @@
   Нижний блок — цветные метки. Меток в моделях нет: перенесены визуально,
   как в макете, ссылки-заглушки.
 
-  Параметры: fm_active, fm_trash_url
+  Параметры: fm_active. fm_trash_url когда-то указывал на корзину своего
+  модуля — теперь корзина одна на всех (storage_trash, с табами), ссылка
+  ниже постоянная и параметр больше не нужен.
 {% endcomment %}
 <div class="intro-y box p-5 mt-6">
   <div class="mt-1">
@@ -15,19 +17,17 @@
       {% include "includes/fm_icons.html" with icon='send' cls='w-4 h-4 mr-2' %} Обменник
     </a>
     <a href="{% url 'catalog_root' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'catalog' %}bg-theme-1 text-white font-medium{% endif %}">
-      {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Каталог
+      {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Информационный каталог
     </a>
     <a href="{% url 'deptdocs_list' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'deptdocs' %}bg-theme-1 text-white font-medium{% endif %}">
-      {% include "includes/fm_icons.html" with icon='lock' cls='w-4 h-4 mr-2' %} Документы отдела
+      {% include "includes/fm_icons.html" with icon='lock' cls='w-4 h-4 mr-2' %} Приватный доступ
     </a>
-    <a href="{% url 'show_phones' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'phones' %}bg-theme-1 text-white font-medium{% endif %}">
-      {% include "includes/fm_icons.html" with icon='book-open' cls='w-4 h-4 mr-2' %} Справочник
-    </a>
-    {% if fm_trash_url %}
-    <a href="{{ fm_trash_url }}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'trash' %}bg-theme-1 text-white font-medium{% endif %}">
+    <a href="{% url 'storage_trash' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'trash' %}bg-theme-1 text-white font-medium{% endif %}">
       {% include "includes/fm_icons.html" with icon='trash' cls='w-4 h-4 mr-2' %} Корзина
     </a>
-    {% endif %}
+    <a href="{% url 'storage_dashboard' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'storage' %}bg-theme-1 text-white font-medium{% endif %}">
+      {% include "includes/fm_icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Занятое место
+    </a>
   </div>
   <div class="border-t border-gray-200 mt-5 pt-5">
     <a href="javascript:;" class="flex items-center px-3 py-2 rounded-md">

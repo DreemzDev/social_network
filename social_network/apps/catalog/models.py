@@ -24,6 +24,16 @@ class CatalogFolder(models.Model):
     def __str__(self):
         return self.name
 
+    def get_absolute_url(self) -> str:
+        from django.urls import reverse
+
+        return reverse('catalog_folder', args=[self.pk])
+
+    def get_delete_url(self) -> str:
+        from django.urls import reverse
+
+        return reverse('catalog_folder_delete', args=[self.pk])
+
 
 class CatalogDocument(models.Model):
     """Документ в информационном каталоге — доступен всем аутентифицированным

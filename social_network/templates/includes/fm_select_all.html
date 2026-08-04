@@ -1,0 +1,12 @@
+{% comment %}
+  «Выделить всё» — панель массовых действий была, а способа выбрать все
+  карточки страницы одним движением не было: при 24 карточках на странице
+  массовое удаление требовало 24 кликов, что обесценивало саму панель.
+
+  Состояние (в том числе промежуточное, когда выбрана часть) выставляется
+  в fm-actions.js: updateBulkBar.
+{% endcomment %}
+<label class="flex items-center text-sm text-gray-600 cursor-pointer select-none">
+  <input type="checkbox" id="fm-select-all" class="input border border-gray-500 mr-2">
+  Выделить всё
+</label>

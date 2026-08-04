@@ -57,6 +57,7 @@ urlpatterns = [
     path('', include('comments.urls')),
     path('', include('gallery.urls')),
     path('', include('phonebook.urls')),
+    path('', include('storage.urls')),
     path('', include('exchange.urls')),
     path('', include('catalog.urls')),
     path('', include('deptdocs.urls')),

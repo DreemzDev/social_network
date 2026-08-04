@@ -1,30 +1,42 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block breadcrumb %}Документы отдела — Корзина{% endblock breadcrumb %}
+{% block breadcrumb %}Приватный доступ — Корзина{% endblock breadcrumb %}
 
 {% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
+
+{% comment %}
+  Корзина только приватного доступа — см. комментарий в
+  exchange/trash.html: основная точка входа — единая /storage/trash/.
+{% endcomment %}
 
 {% block content %}
 <div class="fm-scope grid grid-cols-12 gap-6 mt-8">
   <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
-    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Документы отдела</h2>
-    {% include "includes/fm_menu.html" with fm_active='trash' fm_trash_url=trash_url %}
+    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Приватный доступ</h2>
+    {% include "includes/fm_menu.html" with fm_active='trash' %}
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
-    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск в корзине' %}
-
-    <div class="intro-y flex items-center mt-5">
-      <a href="{% url 'deptdocs_list' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
-        {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4 mr-1' %} Документы отдела
+    <div class="intro-y flex flex-wrap items-center justify-between gap-2 mt-2">
+      <div class="flex items-center">
+        <a href="{% url 'deptdocs_list' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
+          {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4 mr-1' %} Приватный доступ
+        </a>
+        <div class="mx-2 text-gray-400">/</div>
+        <div class="font-medium">Корзина</div>
+      </div>
+      <a href="{% url 'storage_trash' %}?tab=deptdocs" class="text-sm text-theme-1 hover:underline">
+        Все корзины на одной странице
       </a>
-      <div class="mx-2 text-gray-400">/</div>
-      <div class="font-medium">Корзина</div>
+    </div>
+
+    <div class="intro-y mt-3 text-xs text-gray-500">
+      Видны документы только из папок, к которым у вас есть доступ.
     </div>
 
     <div id="deptdocs-trash-grid" class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
       {% for item in documents %}
-      {% include "includes/deptdoc_card.html" with is_trash=True can_upload=True %}
+      {% include "includes/deptdoc_card.html" with is_trash=True %}
       {% empty %}
       <div class="col-span-12 box p-8 text-center text-sm text-gray-600">Корзина пуста</div>
       {% endfor %}
@@ -33,29 +45,11 @@
     {% include "includes/fm_pagination.html" %}
   </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  const grid = document.getElementById('deptdocs-trash-grid');
-  grid.addEventListener('click', function (e) {
-    const restoreBtn = e.target.closest('.deptdoc-restore-btn');
-    const purgeBtn = e.target.closest('.deptdoc-purge-btn');
-    const btn = restoreBtn || purgeBtn;
-    if (!btn) return;
-
-    const docId = btn.dataset.docId;
-    const card = grid.querySelector(`[data-deptdoc-id="${docId}"]`);
-    const url = restoreBtn ? `/deptdocs/restore/${docId}/` : `/deptdocs/purge/${docId}/`;
-
-    if (purgeBtn && !confirm('Удалить документ окончательно? Это действие нельзя отменить.')) return;
-
-    fetch(url, {
-      method: 'POST',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.success && card) card.remove(); });
-  });
-});
-</script>
 {% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/fm-actions.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () { FM.init({}); });
+</script>
+{% endblock extra_js %}

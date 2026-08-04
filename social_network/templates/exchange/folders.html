@@ -6,6 +6,10 @@
   Вёрстка Midone (simple-menu-file-manager.html), 1-в-1: левое меню и контент
   — единая сетка grid-cols-12, поэтому sidebar_wrapper из base.html не
   используется, весь блок рендерится в content.
+
+  Это список личных папок (= список сотрудников), а не файлов, поэтому
+  здесь нет ни сортировки по размеру, ни выделения, ни массовых действий:
+  чекбокс на карточке папки убран — он ничего не выбирал и не мог.
 {% endcomment %}
 {% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
 
@@ -13,19 +17,16 @@
 <div class="fm-scope grid grid-cols-12 gap-6 mt-8">
   <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
     <h2 class="intro-y text-lg font-medium mr-auto mt-2">Обменник</h2>
-    {% include "includes/fm_menu.html" with fm_active='exchange' fm_trash_url=trash_url %}
+    {% include "includes/fm_menu.html" with fm_active='exchange' %}
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10" x-data="{ uploadOpen: false }">
-    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск сотрудника' fm_upload_label='Загрузить файлы' %}
+    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск сотрудника' fm_upload_label='Загрузить файлы' fm_simple_search=True %}
 
     <div class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
       {% for person in folders %}
       <div class="intro-y col-span-6 sm:col-span-4 md:col-span-3 xl:col-span-2 xxl:col-span-2">
-        <div class="file box rounded-md px-5 pt-8 pb-5 px-3 sm:px-5 relative zoom-in">
-          <div class="absolute left-0 top-0 mt-3 ml-3">
-            <input class="input border border-gray-500" type="checkbox">
-          </div>
+        <div class="file box rounded-md pt-8 pb-5 px-3 sm:px-5 relative zoom-in">
           <a href="{% url 'exchange_folder' person.pk %}" class="w-3/5 file__icon file__icon--directory mx-auto"></a>
           <a href="{% url 'exchange_folder' person.pk %}" class="block font-medium mt-4 text-center truncate"
              title="{{ person.last_name }} {{ person.first_name }}">
@@ -36,7 +37,7 @@
             {% if person.pk == request.user.pk %} · моя{% endif %}
           </div>
           <div class="absolute top-0 right-0 mr-2 mt-2 dropdown ml-auto" x-data="{ open: false }">
-            <a class="w-5 h-5 block" href="javascript:;" x-on:click="open = !open">
+            <a class="w-5 h-5 block" href="javascript:;" x-on:click="open = !open" aria-label="Действия с папкой">
               {% include "includes/fm_icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
             </a>
             <div class="dropdown-box mt-5 absolute w-44 top-0 right-0 z-10" x-show="open" x-on:click.outside="open = false" x-cloak>
@@ -58,7 +59,7 @@
   </div>
 
   {# На списке папок загрузка требует выбрать, в чью папку класть файл #}
-  <div x-show="uploadOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="uploadOpen = false">
+  <div x-show="uploadOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="uploadOpen = false" x-on:keydown.escape.window="uploadOpen = false">
     <div class="w-full max-w-md box p-6">
       <h3 class="mb-4 text-lg font-medium">Загрузить файлы</h3>
       <form id="exchange-upload-form" method="post" enctype="multipart/form-data">
@@ -75,54 +76,75 @@
         <label class="mb-1 block text-xs text-gray-600">Файлы (можно несколько)</label>
         <input type="file" name="files" multiple required class="input w-full border mb-4 text-sm">
 
+        <div id="exchange-upload-progress" class="hidden mb-3">
+          <div class="h-2 rounded-full bg-gray-200 overflow-hidden">
+            <div id="exchange-upload-progress-bar" class="h-full bg-theme-1" style="width: 0%;"></div>
+          </div>
+          <div id="exchange-upload-progress-label" class="text-xs text-gray-500 mt-1">0%</div>
+        </div>
+
         <div id="exchange-upload-error" class="mb-3 hidden rounded-md bg-theme-31 px-3 py-2 text-sm text-theme-6"></div>
 
-        <p class="mb-4 text-xs text-gray-600">Файлы будут автоматически удалены через 7 дней.</p>
+        {% if exchange_ttl_days %}
+        <p class="mb-4 text-xs text-gray-600">Файлы будут автоматически удалены через {{ exchange_ttl_days }} дн. после загрузки.</p>
+        {% endif %}
 
         <div class="flex justify-end gap-2">
           <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="uploadOpen = false">Отмена</button>
-          <button type="submit" class="button text-white bg-theme-1">Загрузить</button>
+          <button type="submit" id="exchange-upload-submit" class="button text-white bg-theme-1">Загрузить</button>
         </div>
       </form>
     </div>
   </div>
 </div>
+{% endblock content %}
 
+{% block extra_js %}
+<script src="{% static 'js/fm-actions.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('exchange-upload-form');
-  const errorBox = document.getElementById('exchange-upload-error');
+  var root = document.querySelector('[x-data]');
+  var form = document.getElementById('exchange-upload-form');
+  var errorBox = document.getElementById('exchange-upload-error');
+  var progress = document.getElementById('exchange-upload-progress');
+  var bar = document.getElementById('exchange-upload-progress-bar');
+  var label = document.getElementById('exchange-upload-progress-label');
+  var submit = document.getElementById('exchange-upload-submit');
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     errorBox.classList.add('hidden');
 
-    const recipientId = form.recipient_id.value;
+    var recipientId = form.recipient_id.value;
     if (!recipientId) {
       errorBox.textContent = 'Выберите сотрудника';
       errorBox.classList.remove('hidden');
       return;
     }
 
-    fetch(`/exchange/upload/${recipientId}/`, {
-      method: 'POST',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-      body: new FormData(form),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) {
-          window.location.reload();
-        } else {
-          errorBox.textContent = data.error || 'Не удалось загрузить файл';
-          errorBox.classList.remove('hidden');
-        }
-      })
-      .catch(() => {
-        errorBox.textContent = 'Не удалось загрузить файл';
+    // Прогресс есть и здесь: на списке папок форма грузила файлы обычным
+    // fetch(), без индикатора, хотя грузиться может столько же, сколько и
+    // внутри папки.
+    progress.classList.remove('hidden');
+    submit.disabled = true;
+
+    FM.upload('/exchange/upload/' + recipientId + '/', new FormData(form), {
+      onProgress: function (percent) { bar.style.width = percent + '%'; label.textContent = percent + '%'; },
+      onSuccess: function (data) {
+        FM.toast('Загружено файлов: ' + (data.created || 1), 'success');
+        // Здесь перезагрузка оправдана: карточки показывают счётчик файлов
+        // у каждого сотрудника, и обновить нужно не список файлов, а весь
+        // список папок — частичной сетки (?partial=1) на этой странице нет.
+        window.location.reload();
+      },
+      onError: function (error) {
+        submit.disabled = false;
+        progress.classList.add('hidden');
+        errorBox.textContent = error;
         errorBox.classList.remove('hidden');
-      });
+      },
+    });
   });
 });
 </script>
-{% endblock content %}
+{% endblock extra_js %}

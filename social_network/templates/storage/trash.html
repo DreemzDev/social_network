@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block breadcrumb %}Файловый менеджер — Корзина{% endblock breadcrumb %}
+
+{% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
+
+{% block content %}
+<div class="fm-scope grid grid-cols-12 gap-6 mt-8" x-data="{ tab: '{{ active_tab }}' }">
+  <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
+    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Файловый менеджер</h2>
+    {% include "includes/fm_menu.html" with fm_active='trash' %}
+  </div>
+
+  <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
+    {% comment %}
+      Единая страница вместо трёх разных корзин по разным адресам — у
+      каждого модуля был свой /module/trash/ с одинаковым внешним видом,
+      и легко было открыть не ту и решить, что файл пропал. Табы
+      переключают видимость блоков без перезагрузки (Alpine), запросы на
+      восстановление/окончательное удаление идут на существующие
+      эндпоинты каждого модуля — эта страница их не дублирует.
+    {% endcomment %}
+    <div class="intro-y flex flex-wrap items-center border-b border-gray-200 mt-2">
+      {% for tab in tabs %}
+      <button type="button" class="px-4 py-2 text-sm border-b-2 -mb-px"
+              x-bind:class="tab === '{{ tab.key }}' ? 'border-theme-1 text-theme-1 font-medium' : 'border-transparent text-gray-500'"
+              x-on:click="tab = '{{ tab.key }}'">
+        {{ tab.label }} <span class="text-xs text-gray-400">({{ tab.count }})</span>
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="intro-y mt-3 text-xs text-gray-500">
+      Файлы удаляются окончательно автоматически через {{ trash_retention_days }} дн. после
+      удаления. Обменник — исключение: там файл живёт {{ exchange_ttl_days }} дн. с момента
+      загрузки, и попадание в корзину этот срок не продлевает.
+    </div>
+
+    {% for tab in tabs %}
+    {% comment %}
+      x-cloak есть у КАЖДОГО таба, включая первый: без него при заходе с
+      ?tab=catalog блок обменника успевал отрисоваться и моргал, прежде чем
+      Alpine его скрывал.
+    {% endcomment %}
+    <div x-show="tab === '{{ tab.key }}'" x-cloak id="{{ tab.key }}-trash-list"
+         class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
+      {% for item in tab.items %}
+        {% include tab.card with is_trash=True %}
+      {% empty %}
+      <div class="col-span-12 box p-8 text-center">
+        <div class="text-sm text-gray-600">{{ tab.empty_text }}</div>
+        <div class="text-xs text-gray-400 mt-1">Удалённые файлы можно вернуть отсюда в течение {{ trash_retention_days }} дн.</div>
+      </div>
+      {% endfor %}
+
+      {% if tab.truncated %}
+      {% comment %}
+        Страница показывает ограниченное число последних записей: корзина
+        каталога общая для всего портала, и без ограничения эта страница
+        рендерила бы все удалённые документы разом (у отдельных
+        TrashView paginate_by=24 был, а здесь не было вовсе).
+      {% endcomment %}
+      <div class="col-span-12 box p-4 text-center text-xs text-gray-500">
+        Показаны последние {{ tab.items|length }} из {{ tab.count }}.
+        <a href="{% url tab.full_url %}" class="text-theme-1 hover:underline">Открыть полный список</a>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/fm-actions.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Восстановление и окончательное удаление объявлены прямо на кнопках
+  // карточки (data-fm-action / data-fm-url) и обрабатываются общим
+  // делегатом fm-actions.js. Раньше здесь была своя функция
+  // wireTrashActions на три модуля, которая молча проглатывала любую
+  // ошибку: при 403 сервер отдаёт HTML, r.json() бросал исключение,
+  // .catch() не было — и кнопка просто не срабатывала без объяснений.
+  FM.init({});
+});
+</script>
+{% endblock extra_js %}

@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block breadcrumb %}Файловый менеджер — Хранилище{% endblock breadcrumb %}
+
+{% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
+
+{% block content %}
+<div class="fm-scope grid grid-cols-12 gap-6 mt-8">
+  <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
+    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Файловый менеджер</h2>
+    {% include "includes/fm_menu.html" with fm_active='storage' %}
+  </div>
+
+  <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
+    <h2 class="intro-y text-lg font-medium mt-2">Занятое место</h2>
+
+    <div class="intro-y box p-5 mt-5">
+      <div class="flex items-center justify-between">
+        <div class="font-medium">Моё использование</div>
+        <div class="text-sm text-gray-600">
+          {{ my_usage|filesizeformat }}{% if my_quota %} из {{ my_quota|filesizeformat }}{% endif %}
+        </div>
+      </div>
+      {% if my_quota %}
+      <div class="mt-3 h-2 rounded-full bg-gray-200 overflow-hidden">
+        <div class="h-full {% if my_usage_percent >= 90 %}bg-theme-6{% else %}bg-theme-1{% endif %}"
+             style="width: {{ my_usage_percent }}%;"></div>
+      </div>
+      <div class="text-xs text-gray-500 mt-1">
+        {{ my_usage_percent }}% от квоты в {{ my_quota|filesizeformat }} на пользователя
+      </div>
+      {% else %}
+      <div class="text-xs text-gray-500 mt-1">Квота не ограничена</div>
+      {% endif %}
+      <div class="text-xs text-gray-500 mt-2">
+        Считаются уникальные файлы: если один документ разослан нескольким
+        людям или лежит одновременно в обменнике и в каталоге — физически
+        он занимает место один раз.
+      </div>
+    </div>
+
+    {% if storage_stats %}
+    <div class="intro-y box p-5 mt-5">
+      <div class="font-medium mb-3">Хранилище целиком (видно только персоналу)</div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <div class="text-2xl font-medium">{{ storage_stats.active_size|filesizeformat }}</div>
+          <div class="text-xs text-gray-500">Активно: {{ storage_stats.active_count }} файл(ов)</div>
+        </div>
+        <div>
+          <div class="text-2xl font-medium">{{ storage_stats.orphan_size|filesizeformat }}</div>
+          <div class="text-xs text-gray-500">
+            Ожидает удаления: {{ storage_stats.orphan_count }} файл(ов)
+            (будет освобождено ближайшей ночной очисткой)
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <h2 class="intro-y text-lg font-medium mt-8">Корзины</h2>
+    <div class="text-xs text-gray-500 mt-1 mb-3">
+      Файлы в корзине удаляются автоматически через {{ trash_retention_days }} дней после удаления —
+      чистить руками не обязательно, но можно ускорить кнопкой ниже.
+    </div>
+
+    <div class="intro-y grid grid-cols-1 md:grid-cols-3 gap-4">
+      {% for trash in trash_summary %}
+      <div class="box p-5">
+        <div class="font-medium">{{ trash.label }}</div>
+        <div class="text-2xl font-medium mt-2">{{ trash.count }}</div>
+        <div class="text-xs text-gray-500">файл(ов) в корзине</div>
+        <div class="mt-4 flex items-center justify-between gap-2">
+          <a href="{% url 'storage_trash' %}?tab={{ trash.module }}" class="text-sm text-theme-1 hover:underline">Открыть корзину</a>
+          {% comment %}
+            Кнопка показывается персоналу и у обменника тоже. Раньше её
+            прятало условие «not trash.note», из-за чего ветка exchange в
+            RunTrashCleanupView была недостижима из интерфейса, хотя
+            задача cleanup_expired_exchange_files полезна сама по себе —
+            она удаляет файлы, у которых истёк срок хранения.
+          {% endcomment %}
+          {% if request.user.is_staff %}
+          <button type="button" class="storage-cleanup-btn button px-3 py-1 text-xs bg-gray-200 text-gray-700"
+                  data-module="{{ trash.module }}">
+            Очистить сейчас
+          </button>
+          {% endif %}
+        </div>
+        {% if trash.note %}
+        <div class="text-xs text-gray-400 mt-2">{{ trash.note }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div id="storage-cleanup-result" class="mt-4 hidden rounded-md bg-theme-31 px-3 py-2 text-sm"></div>
+  </div>
+</div>
+
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/fm-actions.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var resultBox = document.getElementById('storage-cleanup-result');
+
+  // Очистка ставится в очередь Celery и отслеживается тем же поллингом,
+  // что и массовые операции: раньше вьюха выполняла её синхронно, и на
+  // непустой корзине запрос висел до конца удаления без обратной связи.
+  document.querySelectorAll('.storage-cleanup-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      FM.confirm({
+        title: 'Очистить корзину сейчас?',
+        text: 'Записи, пролежавшие в корзине дольше срока хранения, будут удалены '
+            + 'окончательно у всех пользователей, а не только у вас.',
+        confirmLabel: 'Очистить',
+      }).then(function (confirmed) {
+        if (!confirmed) return;
+
+        btn.disabled = true;
+        resultBox.classList.remove('hidden');
+        resultBox.textContent = 'Очистка запущена…';
+
+        FM.post('/storage/cleanup/' + btn.dataset.module + '/', {}).then(function (result) {
+          if (!result.ok || result.data.success === false) {
+            btn.disabled = false;
+            resultBox.textContent = result.data.error || 'Не удалось выполнить очистку';
+            return;
+          }
+
+          FM.pollTask(result.data.task_id, {
+            onSuccess: function (payload) {
+              btn.disabled = false;
+              var purged = payload.result !== undefined ? payload.result : (payload.done || 0);
+              resultBox.textContent = 'Удалено окончательно: ' + purged;
+              FM.toast('Корзина очищена', 'success');
+            },
+            onError: function (error) {
+              btn.disabled = false;
+              resultBox.textContent = error;
+              FM.toast(error, 'error');
+            },
+          });
+        });
+      });
+    });
+  });
+});
+</script>
+{% endblock extra_js %}

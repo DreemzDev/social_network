@@ -5,104 +5,274 @@
 {% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
 
 {% block content %}
-<div class="fm-scope grid grid-cols-12 gap-6 mt-8" x-data="{ uploadOpen: false }">
+<div class="fm-scope grid grid-cols-12 gap-6 mt-8"
+     x-data="{ uploadOpen: false, folderOpen: false,
+               renameOpen: false, renameTarget: null, renameValue: '',
+               moveOpen: false, moveTarget: null, moveFolderId: '',
+               sendOpen: false, sendTarget: null }">
   <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
     <h2 class="intro-y text-lg font-medium mr-auto mt-2">Обменник</h2>
-    {% include "includes/fm_menu.html" with fm_active='exchange' fm_trash_url=trash_url %}
+    {% include "includes/fm_menu.html" with fm_active='exchange' %}
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
-    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск файлов' fm_upload_label='Загрузить файлы' %}
+    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск файлов' fm_upload_label='Загрузить файлы' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' %}
 
-    <div class="intro-y flex items-center mt-5">
-      <a href="{% url 'exchange_inbox' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
-        {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4 mr-1' %} Все папки
-      </a>
-      <div class="mx-2 text-gray-400">/</div>
-      <div class="font-medium">
-        {% if folder_owner.last_name or folder_owner.first_name %}{{ folder_owner.last_name }} {{ folder_owner.first_name }}{% else %}{{ folder_owner.username }}{% endif %}
-        {% if is_own_folder %}<span class="text-gray-500 text-sm">(моя папка)</span>{% endif %}
+    <div class="intro-y flex flex-wrap items-center justify-between gap-2 mt-5">
+      <div class="flex items-center flex-wrap">
+        <a href="{% url 'exchange_inbox' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
+          {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4 mr-1' %} Все папки
+        </a>
+        <div class="mx-2 text-gray-400">/</div>
+        <a href="{% url 'exchange_folder' folder_owner.pk %}" class="font-medium {% if current_folder %}text-gray-600 hover:text-theme-1{% endif %}">
+          {% if folder_owner.last_name or folder_owner.first_name %}{{ folder_owner.last_name }} {{ folder_owner.first_name }}{% else %}{{ folder_owner.username }}{% endif %}
+          {% if is_own_folder %}<span class="text-gray-500 text-sm">(моя папка)</span>{% endif %}
+        </a>
+        {% if current_folder %}
+        <div class="mx-2 text-gray-400">/</div>
+        <div class="font-medium">{{ current_folder.name }}</div>
+        {% endif %}
+      </div>
+
+      <div class="flex items-center gap-3">
+        {% include "includes/fm_select_all.html" %}
+        {% include "includes/fm_sort.html" %}
       </div>
     </div>
 
-    <div id="exchange-file-list" class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
-      {% for item in files %}
-      {% include "includes/exchange_file_card.html" %}
-      {% empty %}
-      <div class="col-span-12 box p-8 text-center text-sm text-gray-600">В этой папке пока пусто</div>
-      {% endfor %}
-    </div>
+    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в подпапку' %}
 
-    {% include "includes/fm_pagination.html" %}
+    {% comment %}
+      #fm-dropzone — область, на которую можно бросить файлы (fm-actions.js).
+      Раньше единственным способом загрузить файл была модалка с
+      <input type=file>; для файлового менеджера перетаскивание — базовый
+      ожидаемый жест, а не украшение.
+    {% endcomment %}
+    <div id="fm-dropzone" class="relative mt-5">
+      <div id="fm-drop-hint" class="fm-drop-hint absolute inset-0 z-20 text-sm font-medium text-theme-1">
+        Отпустите файлы, чтобы загрузить в эту папку
+      </div>
+      <div id="fm-grid" class="intro-y grid grid-cols-12 gap-3 sm:gap-6">
+        {% include "exchange/_grid.html" %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка новой папки -->
+  <div x-show="folderOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="folderOpen = false" x-on:keydown.escape.window="folderOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium">Новая папка</h3>
+      <form id="exchange-folder-form">
+        <input type="hidden" name="parent_id" value="{{ current_folder.id|default:'' }}">
+        <input type="text" name="name" required placeholder="Название папки" class="input w-full border mb-4" x-ref="folderName">
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="folderOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Создать</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Модалка переименования (файл или подпапка) -->
+  <div x-show="renameOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="renameOpen = false" x-on:keydown.escape.window="renameOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium">Переименовать</h3>
+      <form id="exchange-rename-form">
+        <input type="text" name="name" x-model="renameValue" required class="input w-full border mb-4">
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="renameOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Модалка перемещения файла между подпапками (одиночного и массового) -->
+  <div x-show="moveOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="moveOpen = false" x-on:keydown.escape.window="moveOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium" x-text="moveTarget === 'bulk' ? 'Переместить выбранные файлы' : 'Переместить в подпапку'"></h3>
+      <form id="exchange-move-form">
+        <select name="folder_id" x-model="moveFolderId" class="input w-full border mb-4">
+          <option value="">Корень папки «{{ folder_owner.last_name }} {{ folder_owner.first_name }}»</option>
+          {% for f in all_owner_subfolders %}
+          <option value="{{ f.id }}">{{ f.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="moveOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Переместить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Модалка пересылки в каталог -->
+  <div x-show="sendOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="sendOpen = false" x-on:keydown.escape.window="sendOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium">Переслать в информационный каталог</h3>
+      <p class="mb-4 text-sm text-gray-600">Файл появится в корне каталога, доступном всем сотрудникам.</p>
+      <form id="exchange-send-form">
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="sendOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Переслать</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- Модалка загрузки -->
-  <div x-show="uploadOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="uploadOpen = false">
+  <div x-show="uploadOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="uploadOpen = false" x-on:keydown.escape.window="uploadOpen = false">
     <div class="w-full max-w-md box p-6">
       <h3 class="mb-4 text-lg font-medium">
-        Загрузить в папку: {{ folder_owner.last_name }} {{ folder_owner.first_name }}
+        Загрузить в папку: {{ folder_owner.last_name }} {{ folder_owner.first_name }}{% if current_folder %} / {{ current_folder.name }}{% endif %}
       </h3>
       <form id="exchange-upload-form" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="folder_id" value="{{ current_folder.id|default:'' }}">
         <label class="mb-1 block text-xs text-gray-600">Файлы (можно несколько)</label>
         <input type="file" name="files" multiple required class="input w-full border mb-4 text-sm">
 
+        <div id="exchange-upload-progress" class="hidden mb-3">
+          <div class="h-2 rounded-full bg-gray-200 overflow-hidden">
+            <div id="exchange-upload-progress-bar" class="h-full bg-theme-1" style="width: 0%;"></div>
+          </div>
+          <div id="exchange-upload-progress-label" class="text-xs text-gray-500 mt-1">0%</div>
+        </div>
+
         <div id="exchange-upload-error" class="mb-3 hidden rounded-md bg-theme-31 px-3 py-2 text-sm text-theme-6"></div>
 
-        <p class="mb-4 text-xs text-gray-600">Файлы будут автоматически удалены через 7 дней.</p>
+        {% comment %}
+          Срок берётся из STORAGE_CATEGORY_TTL через контекст вьюхи, а не
+          вписан числом: при смене настройки текст в модалке иначе остался
+          бы врать пользователю.
+        {% endcomment %}
+        {% if exchange_ttl_days %}
+        <p class="mb-4 text-xs text-gray-600">Файлы будут автоматически удалены через {{ exchange_ttl_days }} дн. после загрузки.</p>
+        {% endif %}
 
         <div class="flex justify-end gap-2">
           <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="uploadOpen = false">Отмена</button>
-          <button type="submit" class="button text-white bg-theme-1">Загрузить</button>
+          <button type="submit" id="exchange-upload-submit" class="button text-white bg-theme-1">Загрузить</button>
         </div>
       </form>
     </div>
   </div>
 </div>
 
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/fm-actions.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('exchange-upload-form');
-  const errorBox = document.getElementById('exchange-upload-error');
+  var root = document.querySelector('.fm-scope');
+  var state = function () { return window.Alpine.$data(root); };
 
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    errorBox.classList.add('hidden');
-
-    fetch('{% url "exchange_upload" folder_owner.pk %}', {
-      method: 'POST',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-      body: new FormData(form),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) {
-          window.location.reload();
-        } else {
-          errorBox.textContent = data.error || 'Не удалось загрузить файл';
-          errorBox.classList.remove('hidden');
-        }
-      })
-      .catch(() => {
-        errorBox.textContent = 'Не удалось загрузить файл';
-        errorBox.classList.remove('hidden');
-      });
+  FM.init({
+    scope: 'exchange',
+    location: '{{ folder_owner.pk }}-{{ current_folder.id|default:0 }}',
+    userId: {{ request.user.pk }},
+    idField: 'file_ids',
+    bulkTrashUrl: '{% url "exchange_bulk_trash" %}',
+    bulkMoveUrl: '{% url "exchange_bulk_move" %}',
+    uploadUrl: '{% url "exchange_upload" folder_owner.pk %}',
+    uploadFileField: 'files',
+    uploadExtra: { folder_id: '{{ current_folder.id|default:"" }}' },
+    // Массовое перемещение переиспользует ту же модалку выбора папки, что и
+    // одиночное: раньше у обменника массового переноса не было вовсе, а у
+    // каталога папку назначения спрашивали через prompt() с ручным вводом id.
+    onBulkMove: function () {
+      var s = state();
+      s.moveTarget = 'bulk';
+      s.moveFolderId = '';
+      s.moveOpen = true;
+    },
   });
 
-  const list = document.getElementById('exchange-file-list');
-  list.addEventListener('click', function (e) {
-    const trashBtn = e.target.closest('.exchange-trash-btn');
-    if (!trashBtn) return;
+  document.getElementById('exchange-folder-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var form = e.target;
+    FM.action('{% url "exchange_folder_create" folder_owner.pk %}', {
+      name: form.name.value, parent_id: form.parent_id.value,
+    }, { successText: 'Папка создана' }).then(function (result) {
+      if (result.ok && result.data.success !== false) { state().folderOpen = false; form.reset(); }
+    });
+  });
 
-    const fileId = trashBtn.dataset.fileId;
-    const card = list.querySelector(`[data-exchange-file-id="${fileId}"]`);
+  var uploadForm = document.getElementById('exchange-upload-form');
+  uploadForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var errorBox = document.getElementById('exchange-upload-error');
+    var progress = document.getElementById('exchange-upload-progress');
+    var bar = document.getElementById('exchange-upload-progress-bar');
+    var label = document.getElementById('exchange-upload-progress-label');
+    var submit = document.getElementById('exchange-upload-submit');
 
-    fetch(`/exchange/trash-file/${fileId}/`, {
-      method: 'POST',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.success && card) card.remove(); });
+    errorBox.classList.add('hidden');
+    progress.classList.remove('hidden');
+    submit.disabled = true;
+
+    FM.upload('{% url "exchange_upload" folder_owner.pk %}', new FormData(uploadForm), {
+      onProgress: function (percent) { bar.style.width = percent + '%'; label.textContent = percent + '%'; },
+      onSuccess: function (data) {
+        submit.disabled = false;
+        progress.classList.add('hidden');
+        bar.style.width = '0%';
+        uploadForm.reset();
+        state().uploadOpen = false;
+        FM.toast('Загружено файлов: ' + (data.created || 1), 'success');
+        FM.refresh();
+      },
+      onError: function (error) {
+        submit.disabled = false;
+        progress.classList.add('hidden');
+        errorBox.textContent = error;
+        errorBox.classList.remove('hidden');
+      },
+    });
+  });
+
+  document.getElementById('exchange-rename-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var target = state().renameTarget;
+    var value = e.target.name.value.trim();
+    if (!target || !value) return;
+
+    var url = target.type === 'folder'
+      ? '/exchange/folder-rename/' + target.id + '/'
+      : '/exchange/rename/' + target.id + '/';
+
+    FM.action(url, { name: value }, { successText: 'Переименовано' }).then(function (result) {
+      if (result.ok && result.data.success !== false) state().renameOpen = false;
+    });
+  });
+
+  document.getElementById('exchange-move-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var s = state();
+    var folderId = e.target.folder_id.value;
+    if (!s.moveTarget) return;
+
+    if (s.moveTarget === 'bulk') {
+      s.moveOpen = false;
+      FM.runBulkMove(FM.selectedIds(), folderId);
+      return;
+    }
+
+    FM.action('/exchange/move/' + s.moveTarget + '/', { folder_id: folderId },
+      { successText: 'Файл перемещён' }).then(function (result) {
+      if (result.ok && result.data.success !== false) s.moveOpen = false;
+    });
+  });
+
+  document.getElementById('exchange-send-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var s = state();
+    if (!s.sendTarget) return;
+    FM.action('/exchange/send-to-catalog/' + s.sendTarget + '/', {},
+      { successText: 'Файл переслан в каталог', refresh: false }).then(function (result) {
+      if (result.ok && result.data.success !== false) s.sendOpen = false;
+    });
   });
 });
 </script>
-{% endblock content %}
+{% endblock extra_js %}

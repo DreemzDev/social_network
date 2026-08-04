@@ -1,25 +1,38 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block breadcrumb %}Каталог — Корзина{% endblock breadcrumb %}
+{% block breadcrumb %}Информационный каталог — Корзина{% endblock breadcrumb %}
 
 {% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
+
+{% comment %}
+  Корзина только каталога — см. комментарий в exchange/trash.html:
+  основная точка входа — единая /storage/trash/, этот адрес сохранён для
+  старых ссылок и перехода «Открыть полный список» из неё.
+{% endcomment %}
 
 {% block content %}
 <div class="fm-scope grid grid-cols-12 gap-6 mt-8">
   <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
-    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Каталог</h2>
-    {% include "includes/fm_menu.html" with fm_active='trash' fm_trash_url=trash_url %}
+    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Информационный каталог</h2>
+    {% include "includes/fm_menu.html" with fm_active='trash' %}
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
-    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск в корзине' %}
-
-    <div class="intro-y flex items-center mt-5">
-      <a href="{% url 'catalog_root' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
-        {% include "includes/fm_icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Каталог
+    <div class="intro-y flex flex-wrap items-center justify-between gap-2 mt-2">
+      <div class="flex items-center">
+        <a href="{% url 'catalog_root' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
+          {% include "includes/fm_icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Каталог
+        </a>
+        <div class="mx-2 text-gray-400">/</div>
+        <div class="font-medium">Корзина каталога</div>
+      </div>
+      <a href="{% url 'storage_trash' %}?tab=catalog" class="text-sm text-theme-1 hover:underline">
+        Все корзины на одной странице
       </a>
-      <div class="mx-2 text-gray-400">/</div>
-      <div class="font-medium">Корзина</div>
+    </div>
+
+    <div class="intro-y mt-3 text-xs text-gray-500">
+      Каталог общедоступен, поэтому здесь видно всё удалённое, а не только своё.
     </div>
 
     <div id="catalog-trash-grid" class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
@@ -33,29 +46,14 @@
     {% include "includes/fm_pagination.html" %}
   </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  const grid = document.getElementById('catalog-trash-grid');
-  grid.addEventListener('click', function (e) {
-    const restoreBtn = e.target.closest('.catalog-restore-btn');
-    const purgeBtn = e.target.closest('.catalog-purge-btn');
-    const btn = restoreBtn || purgeBtn;
-    if (!btn) return;
-
-    const docId = btn.dataset.docId;
-    const card = grid.querySelector(`[data-catalog-doc-id="${docId}"]`);
-    const url = restoreBtn ? `/catalog/restore/${docId}/` : `/catalog/purge/${docId}/`;
-
-    if (purgeBtn && !confirm('Удалить документ окончательно? Это действие нельзя отменить.')) return;
-
-    fetch(url, {
-      method: 'POST',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.success && card) card.remove(); });
-  });
-});
-</script>
 {% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/fm-actions.js' %}"></script>
+<script>
+// Кнопки объявлены на карточке (data-fm-action / data-fm-url), их
+// обрабатывает общий делегат fm-actions.js — он же показывает тост и
+// причину отказа вместо прежнего молчаливого проглатывания ошибки.
+document.addEventListener('DOMContentLoaded', function () { FM.init({}); });
+</script>
+{% endblock extra_js %}

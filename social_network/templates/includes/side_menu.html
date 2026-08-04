@@ -39,44 +39,12 @@
       <div class="side-menu__title">Справочник</div>
     </a>
   </li>
-  {% comment %}
-    Раскрывающийся раздел (паттерн Midone side-menu): вложенный <ul> скрыт
-    через CSS (.side-nav > ul ul { display: none }), раскрытие вешает
-    static/midone/js/app.js по клику на .side-menu — свой JS не нужен.
-    Если пользователь внутри раздела, подменю раскрыто сразу:
-    side-menu--open + side-menu__sub-open + style="display: block".
-  {% endcomment %}
   <li>
-    <a href="javascript:;"
-       class="side-menu {% if 'exchange' in request.path or 'catalog' in request.path or 'deptdocs' in request.path %}side-menu--open{% endif %}">
+    <a href="{% url 'exchange_inbox' %}"
+       class="side-menu {% if 'exchange' in request.path or 'catalog' in request.path or 'deptdocs' in request.path %}side-menu--active{% endif %}">
       <div class="side-menu__icon"> <i data-feather="hard-drive"></i> </div>
-      <div class="side-menu__title">
-        Файлы
-        <i data-feather="chevron-down"
-           class="side-menu__sub-icon {% if 'exchange' in request.path or 'catalog' in request.path or 'deptdocs' in request.path %}transform rotate-180{% endif %}"></i>
-      </div>
+      <div class="side-menu__title">Файловый менеджер</div>
     </a>
-    <ul class="{% if 'exchange' in request.path or 'catalog' in request.path or 'deptdocs' in request.path %}side-menu__sub-open{% endif %}"
-        {% if 'exchange' in request.path or 'catalog' in request.path or 'deptdocs' in request.path %}style="display: block;"{% endif %}>
-      <li>
-        <a href="{% url 'exchange_inbox' %}" class="side-menu {% if 'exchange' in request.path %}side-menu--active{% endif %}">
-          <div class="side-menu__icon"> <i data-feather="send"></i> </div>
-          <div class="side-menu__title">Обменник</div>
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'catalog_root' %}" class="side-menu {% if 'catalog' in request.path %}side-menu--active{% endif %}">
-          <div class="side-menu__icon"> <i data-feather="folder"></i> </div>
-          <div class="side-menu__title">Каталог</div>
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'deptdocs_list' %}" class="side-menu {% if 'deptdocs' in request.path %}side-menu--active{% endif %}">
-          <div class="side-menu__icon"> <i data-feather="lock"></i> </div>
-          <div class="side-menu__title">Документы отдела</div>
-        </a>
-      </li>
-    </ul>
   </li>
   <li class="side-nav__devider my-6"></li>
   <li>

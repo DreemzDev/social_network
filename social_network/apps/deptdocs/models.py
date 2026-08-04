@@ -37,6 +37,26 @@ class DepartmentFolder(models.Model):
     def __str__(self):
         return self.name
 
+    def get_absolute_url(self) -> str:
+        from django.urls import reverse
+
+        return reverse('deptdocs_folder', args=[self.pk])
+
+    def get_delete_url(self) -> str:
+        from django.urls import reverse
+
+        return reverse('deptdocs_folder_delete', args=[self.pk])
+
+    @property
+    def access_note(self) -> str:
+        """Подпись под карточкой папки вместо общего слова «папка».
+
+        У приватного доступа главный вопрос к папке — кто её видит; без
+        этого папки визуально неотличимы друг от друга и от папок
+        каталога, хотя смысл у них принципиально разный."""
+        count = self.allowed_users.count()
+        return f'доступ: {count} чел.'
+
     def is_accessible_by(self, user) -> bool:
         return self.allowed_users.filter(pk=user.pk).exists()
 

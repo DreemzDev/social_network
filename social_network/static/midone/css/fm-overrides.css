@@ -51,3 +51,59 @@
   border-radius: 0.25rem;
   padding: 0;
 }
+
+/*
+  Живое обновление списка (fm-actions.js: FM.refresh).
+
+  Сетка перерисовывается по чужому WebSocket-событию, поэтому обновление
+  должно быть заметным, но не дёргать вёрстку: без визуального признака
+  карточки просто «мигают» другими, и непонятно, что произошло. Меняется
+  только прозрачность — высота блока остаётся прежней, скролл не прыгает.
+*/
+.fm-scope .fm-grid--loading {
+  opacity: 0.55;
+  transition: opacity 0.15s linear;
+  pointer-events: none;
+}
+
+/* Карточка появляется плавно — тот же приём, что и у .intro-y в теме,
+   но применимый к узлам, вставленным после загрузки страницы. */
+.fm-scope .fm-card--new {
+  animation: fm-card-in 0.25s ease-out;
+}
+
+@keyframes fm-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/*
+  Подсказка при перетаскивании файлов на список.
+
+  Видимостью управляет собственный класс is-visible, а не утилита Tailwind
+  .hidden: обе задают display, и какая из них победит, зависит от порядка
+  правил в собранном CSS, а не от порядка классов в атрибуте. Своя пара
+  правил убирает эту зависимость.
+*/
+.fm-scope .fm-drop-hint {
+  display: none;
+  border: 2px dashed #3160d8;
+  background: rgba(49, 96, 216, 0.06);
+  border-radius: 0.5rem;
+}
+
+.fm-scope .fm-drop-hint.is-visible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Панель массовых действий не должна перекрывать содержимое на узком
+   экране — прижимаем её к низу окна только на мобильном. */
+@media (max-width: 640px) {
+  .fm-scope .fm-bulk-bar {
+    position: sticky;
+    bottom: 0.5rem;
+    z-index: 30;
+  }
+}

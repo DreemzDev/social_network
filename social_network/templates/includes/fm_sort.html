@@ -1,0 +1,26 @@
+{% load fm_tags %}
+{% comment %}
+  Дропдаун сортировки списка (?sort=), общий для трёх модулей файлового
+  менеджера. Опции — storage.utils.SORT_OPTIONS, активная — active_sort
+  (передаются из get_context_data каждой ListView).
+
+  Ссылки через {% fm_qs %}: смена сортировки сохраняет поиск и фильтр, но
+  сбрасывает page — после пересортировки оставаться на седьмой странице
+  бессмысленно, там уже другие файлы.
+{% endcomment %}
+<div class="dropdown" x-data="{ sortOpen: false }">
+  <button type="button" class="button box text-gray-700 text-sm flex items-center" x-on:click="sortOpen = !sortOpen">
+    {% include "includes/fm_icons.html" with icon='chevron-down' cls='w-4 h-4 mr-1' %}
+    {% for value, label in sort_options.items %}{% if active_sort == value %}{{ label }}{% endif %}{% endfor %}
+  </button>
+  <div class="dropdown-box mt-10 absolute w-48 z-20" x-show="sortOpen" x-on:click.outside="sortOpen = false" x-cloak>
+    <div class="dropdown-box__content box p-2">
+      {% for value, label in sort_options.items %}
+      <a href="{% fm_qs sort=value page=None %}"
+         class="fm-sort-link flex items-center p-2 rounded-md {% if active_sort == value %}bg-theme-1 text-white{% else %}hover:bg-gray-200{% endif %}">
+        {{ label }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>

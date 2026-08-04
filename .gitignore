@@ -10,3 +10,7 @@ nginx-1.28.0/
 packages/
 start_server.bat
 social_network/Midone-master/
+
+# Снапшот Redis: появляется в рабочем каталоге при запуске redis-server
+# (Channels + Celery), к исходникам отношения не имеет.
+dump.rdb

@@ -7,7 +7,7 @@ from django.conf import settings
 from django.core.files.base import File
 from django.core.files.storage import default_storage
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.utils import timezone
 
 from .exceptions import FileTooLargeError, QuotaExceededError
@@ -15,10 +15,30 @@ from .models import FileBlob, FileObject, StorageAuditLog
 
 CHUNK_SIZE = 1024 * 1024  # 1 МБ
 
-MAX_UPLOAD_SIZE = getattr(settings, 'STORAGE_MAX_UPLOAD_SIZE', 100 * 1024 * 1024)
-USER_QUOTA = getattr(settings, 'STORAGE_USER_QUOTA', None)
-ORPHAN_RETENTION_DAYS = getattr(settings, 'STORAGE_ORPHAN_RETENTION_DAYS', 7)
-CATEGORY_TTL = getattr(settings, 'STORAGE_CATEGORY_TTL', {})
+
+# Настройки читаются при каждом вызове, а не один раз при импорте модуля.
+#
+# Раньше это были константы уровня модуля (MAX_UPLOAD_SIZE = getattr(...)),
+# вычислявшиеся при загрузке приложения. Последствия: override_settings в
+# тестах на них не действовал вообще — тест квоты был вынужден подменять
+# атрибут модуля руками (services_module.USER_QUOTA = 100) и возвращать
+# его обратно в finally; а изменение квоты в settings требовало
+# перезапуска процесса, хотя ARCHITECTURE.md (раздел 9) обещает смену
+# «одной строкой без миграций».
+def _max_upload_size() -> int:
+    return getattr(settings, 'STORAGE_MAX_UPLOAD_SIZE', 100 * 1024 * 1024)
+
+
+def _user_quota():
+    return getattr(settings, 'STORAGE_USER_QUOTA', None)
+
+
+def _orphan_retention_days() -> int:
+    return getattr(settings, 'STORAGE_ORPHAN_RETENTION_DAYS', 7)
+
+
+def _category_ttl() -> dict:
+    return getattr(settings, 'STORAGE_CATEGORY_TTL', {})
 
 
 def _sha256(uploaded_file) -> str:
@@ -95,18 +115,40 @@ class StorageService:
         return total or 0
 
     @staticmethod
+    def get_storage_stats() -> dict:
+        """Сводка по всему хранилищу для dashboard'а (раздел «Занятое
+        место»): сколько реально занято на диске (ACTIVE + ORPHAN — сироты
+        физически ещё не удалены и тоже занимают место) и сколько будет
+        освобождено ближайшей ежедневной очисткой."""
+        active = FileBlob.objects.filter(status=FileBlob.Status.ACTIVE).aggregate(
+            total=Sum('size'), count=Count('pk'),
+        )
+        orphan = FileBlob.objects.filter(status=FileBlob.Status.ORPHAN).aggregate(
+            total=Sum('size'), count=Count('pk'),
+        )
+        return {
+            'active_size': active['total'] or 0,
+            'active_count': active['count'] or 0,
+            'orphan_size': orphan['total'] or 0,
+            'orphan_count': orphan['count'] or 0,
+            'total_size': (active['total'] or 0) + (orphan['total'] or 0),
+        }
+
+    @staticmethod
     @transaction.atomic
     def upload(uploaded_file, *, user, category) -> FileObject:
-        if uploaded_file.size > MAX_UPLOAD_SIZE:
+        max_upload_size = _max_upload_size()
+        if uploaded_file.size > max_upload_size:
             raise FileTooLargeError(
-                f'Файл превышает максимальный размер {MAX_UPLOAD_SIZE} байт'
+                f'Файл превышает максимальный размер {max_upload_size} байт'
             )
 
-        if USER_QUOTA is not None:
+        quota = _user_quota()
+        if quota is not None:
             current_usage = StorageService.get_usage(user)
-            if current_usage + uploaded_file.size > USER_QUOTA:
+            if current_usage + uploaded_file.size > quota:
                 raise QuotaExceededError(
-                    f'Загрузка превысит квоту пользователя ({USER_QUOTA} байт)'
+                    f'Загрузка превысит квоту пользователя ({quota} байт)'
                 )
 
         checksum = _sha256(uploaded_file)
@@ -161,6 +203,57 @@ class StorageService:
         )
 
     @staticmethod
+    def copy_reference(file_object: FileObject, *, user, category, original_name=None) -> FileObject:
+        """Создаёт новый FileObject на ТОТ ЖЕ blob — для копирования/пересылки
+        файла между модулями (например, документ каталога → обменник).
+
+        Не путать с upload(): здесь нет ни содержимого для загрузки, ни
+        записи на диск — дедупликация была бы избыточной, файл уже лежит на
+        диске под своим checksum. Копия — это просто вторая именованная
+        ссылка на тот же blob, ровно то отношение blob/object, ради которого
+        эти две модели разведены (ARCHITECTURE.md, раздел 2).
+
+        Квота пользователя всё равно проверяется: get_usage() считает по
+        уникальным blob'ам, так что если этот же blob уже "стоит" в квоте
+        пользователя (например, он сам его когда-то загрузил), повторное
+        копирование ничего не добавит — но если это чужой файл, который
+        пользователь не грузил, копия ляжет в его квоту как новое использование.
+        """
+        quota = _user_quota()
+        if quota is not None:
+            current_usage = StorageService.get_usage(user)
+            already_counted = FileObject.objects.filter(
+                uploaded_by=user, blob_id=file_object.blob_id
+            ).exists()
+            if not already_counted and current_usage + file_object.blob.size > quota:
+                raise QuotaExceededError(
+                    f'Копирование превысит квоту пользователя ({quota} байт)'
+                )
+
+        with transaction.atomic():
+            # Блокировка blob'а и перечитывание статуса — по той же причине,
+            # что и в upload(). Без неё параллельный detach() мог успеть
+            # перевести blob в ORPHAN между чтением file_object и созданием
+            # копии: ссылка получилась бы живой, а blob навсегда остался бы
+            # в статусе «ожидает удаления» и попадал в отчёт занятого места
+            # как подлежащий очистке. Файл при этом не терялся
+            # (purge_expired_orphans проверяет наличие ссылок), но состояние
+            # было заведомо неверным.
+            blob = FileBlob.objects.select_for_update().get(pk=file_object.blob_id)
+            if blob.status == FileBlob.Status.ORPHAN:
+                blob.status = FileBlob.Status.ACTIVE
+                blob.orphaned_at = None
+                blob.save(update_fields=['status', 'orphaned_at'])
+                _audit(StorageAuditLog.Action.RESTORE, checksum=blob.checksum, user=user)
+
+            return FileObject.objects.create(
+                blob=blob,
+                original_name=original_name or file_object.original_name,
+                category=category,
+                uploaded_by=user,
+            )
+
+    @staticmethod
     @transaction.atomic
     def detach(file_object: FileObject, *, user=None, consumer='') -> None:
         """Снимает ссылку на file_object. Если ссылок на blob больше не
@@ -204,7 +297,7 @@ class StorageService:
         транзакции с повторной проверкой статуса под блокировкой — за время
         обхода списка кандидатов blob мог быть воскрешён через upload()
         (ARCHITECTURE.md, раздел 5.3)."""
-        deadline = timezone.now() - timedelta(days=ORPHAN_RETENTION_DAYS)
+        deadline = timezone.now() - timedelta(days=_orphan_retention_days())
         candidate_ids = list(
             FileBlob.objects.filter(
                 status=FileBlob.Status.ORPHAN, orphaned_at__lte=deadline
@@ -242,7 +335,7 @@ class StorageService:
         защищает), но при этом отчитывалась об успехе. Удалять же чужие
         записи storage не должен — он не знает бизнес-логику потребителей
         (ARCHITECTURE.md, раздел 1)."""
-        return CATEGORY_TTL.get(category)
+        return _category_ttl().get(category)
 
     @staticmethod
     def get_download_response(file_object: FileObject, request, *, inline: bool = False):

@@ -139,9 +139,22 @@ CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/1'
 CELERY_TIMEZONE = 'Europe/Moscow'  # держать в синхроне с TIME_ZONE ниже
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+# Под manage.py test задачи выполняются синхронно в том же процессе — без
+# этого тесты массовых операций (bulk_move_documents, bulk_trash_documents)
+# требовали бы поднятого Redis и запущенного celery worker просто чтобы
+# проверить, что задача вообще что-то удаляет. .delay() при этом остаётся
+# тем же вызовом в проверяемом коде — .apply()/eager подменяет только
+# исполнение, тестировать приходится реальный путь, а не заглушку.
+CELERY_TASK_ALWAYS_EAGER = 'test' in sys.argv
+CELERY_TASK_EAGER_PROPAGATES = 'test' in sys.argv
+# Без этого AsyncResult(task_id).state в eager-режиме не видит финальный
+# SUCCESS — Celery по умолчанию не пишет результат eager-задачи в backend.
+CELERY_TASK_STORE_EAGER_RESULT = 'test' in sys.argv
+
 # Storage — единый сервис хранения файлов (apps/storage/ARCHITECTURE.md).
+STORAGE_TRASH_RETENTION_DAYS = 30                # сколько дней запись лежит в корзине до автоудаления
 STORAGE_MAX_UPLOAD_SIZE = 100 * 1024 * 1024      # 100 МБ на один файл
-STORAGE_USER_QUOTA = None                        # None = без квоты на пользователя
+STORAGE_USER_QUOTA = 2 * 1024 * 1024 * 1024       # 2 ГБ на пользователя, None = без квоты
 STORAGE_ORPHAN_RETENTION_DAYS = 7                # сколько blob лежит в ORPHAN до удаления
 
 # Срок хранения по категориям, в днях. None = бессрочно.

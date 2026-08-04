@@ -58,6 +58,8 @@ def notification_center(request):
             url = f'/profile/{n.task.user.username}/'
         elif n.post_id:
             url = f'/post/{n.post_id}/'
+        elif n.url:
+            url = n.url
         else:
             url = None
         items.append({

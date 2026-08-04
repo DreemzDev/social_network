@@ -1,69 +1,62 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block breadcrumb %}Каталог{% if current_folder %} — {{ current_folder.name }}{% endif %}{% endblock breadcrumb %}
+{% block breadcrumb %}Информационный каталог{% if current_folder %} — {{ current_folder.name }}{% endif %}{% endblock breadcrumb %}
 
 {% block sidebar_wrapper %}{% endblock sidebar_wrapper %}
 
 {% block content %}
-<div class="fm-scope grid grid-cols-12 gap-6 mt-8" x-data="{ uploadOpen: false, folderOpen: false }">
+<div class="fm-scope grid grid-cols-12 gap-6 mt-8"
+     x-data="{ uploadOpen: false, folderOpen: false, renameOpen: false, renameTarget: null, renameValue: '',
+               moveOpen: false, moveTarget: null, moveFolderId: '', sendOpen: false, sendTarget: null }">
   <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
-    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Каталог</h2>
-    {% include "includes/fm_menu.html" with fm_active='catalog' fm_trash_url=trash_url %}
+    <h2 class="intro-y text-lg font-medium mr-auto mt-2">Информационный каталог</h2>
+    {% include "includes/fm_menu.html" with fm_active='catalog' %}
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
     {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск документов' fm_upload_label='Загрузить документ' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' %}
 
-    <div class="intro-y flex items-center mt-5">
-      <a href="{% url 'catalog_root' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
-        {% include "includes/fm_icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Каталог
-      </a>
-      {% if current_folder %}
-      <div class="mx-2 text-gray-400">/</div>
-      <div class="font-medium">{{ current_folder.name }}</div>
-      {% endif %}
-    </div>
-
-    <div id="catalog-grid" class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
-      {% for folder in subfolders %}
-      <div class="intro-y col-span-6 sm:col-span-4 md:col-span-3 xl:col-span-2 xxl:col-span-2">
-        <div class="file box rounded-md px-5 pt-8 pb-5 px-3 sm:px-5 relative zoom-in">
-          <div class="absolute left-0 top-0 mt-3 ml-3">
-            <input class="input border border-gray-500" type="checkbox">
-          </div>
-          <a href="{% url 'catalog_folder' folder.id %}" class="w-3/5 file__icon file__icon--directory mx-auto"></a>
-          <a href="{% url 'catalog_folder' folder.id %}" class="block font-medium mt-4 text-center truncate" title="{{ folder.name }}">{{ folder.name }}</a>
-          <div class="text-gray-600 text-xs text-center">папка</div>
-          <div class="absolute top-0 right-0 mr-2 mt-2 dropdown ml-auto" x-data="{ open: false }">
-            <a class="w-5 h-5 block" href="javascript:;" x-on:click="open = !open">
-              {% include "includes/fm_icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
-            </a>
-            <div class="dropdown-box mt-5 absolute w-44 top-0 right-0 z-10" x-show="open" x-on:click.outside="open = false" x-cloak>
-              <div class="dropdown-box__content box p-2">
-                <a href="{% url 'catalog_folder' folder.id %}" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
-                  {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Открыть
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div class="intro-y flex flex-wrap items-center justify-between gap-2 mt-5">
+      <div class="flex items-center flex-wrap">
+        <a href="{% url 'catalog_root' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
+          {% include "includes/fm_icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Каталог
+        </a>
+        {% comment %}
+          Хлебная крошка теперь показывает весь путь от корня, а не только
+          текущую папку: в дереве «Кадры → Приказы → Приказы 2026» по одной
+          подписи нельзя было понять, где ты находишься, и вернуться можно
+          было только в корень.
+        {% endcomment %}
+        {% for ancestor in folder_path %}
+        <div class="mx-2 text-gray-400">/</div>
+        {% if forloop.last %}
+        <div class="font-medium">{{ ancestor.name }}</div>
+        {% else %}
+        <a href="{{ ancestor.get_absolute_url }}" class="text-gray-600 hover:text-theme-1">{{ ancestor.name }}</a>
+        {% endif %}
+        {% endfor %}
       </div>
-      {% endfor %}
 
-      {% for item in documents %}
-      {% include "includes/catalog_document_card.html" %}
-      {% endfor %}
-
-      {% if not subfolders and not documents %}
-      <div class="col-span-12 box p-8 text-center text-sm text-gray-600">Здесь пока пусто</div>
-      {% endif %}
+      <div class="flex items-center gap-3">
+        {% include "includes/fm_select_all.html" %}
+        {% include "includes/fm_sort.html" %}
+      </div>
     </div>
 
-    {% include "includes/fm_pagination.html" %}
+    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в папку' %}
+
+    <div id="fm-dropzone" class="relative mt-5">
+      <div id="fm-drop-hint" class="fm-drop-hint absolute inset-0 z-20 text-sm font-medium text-theme-1">
+        Отпустите файлы, чтобы загрузить в эту папку
+      </div>
+      <div id="fm-grid" class="intro-y grid grid-cols-12 gap-3 sm:gap-6">
+        {% include "catalog/_grid.html" %}
+      </div>
+    </div>
   </div>
 
   <!-- Модалка новой папки -->
-  <div x-show="folderOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="folderOpen = false">
+  <div x-show="folderOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="folderOpen = false" x-on:keydown.escape.window="folderOpen = false">
     <div class="w-full max-w-sm box p-6">
       <h3 class="mb-4 text-lg font-medium">Новая папка</h3>
       <form id="catalog-folder-form">
@@ -77,74 +70,204 @@
     </div>
   </div>
 
+  <!-- Модалка переименования (документ или папка) -->
+  <div x-show="renameOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="renameOpen = false" x-on:keydown.escape.window="renameOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium">Переименовать</h3>
+      <form id="catalog-rename-form">
+        <input type="text" name="name" x-model="renameValue" required class="input w-full border mb-4">
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="renameOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Модалка перемещения (одиночного и массового) -->
+  <div x-show="moveOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="moveOpen = false" x-on:keydown.escape.window="moveOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium" x-text="moveTarget === 'bulk' ? 'Переместить выбранные документы' : 'Переместить в папку'"></h3>
+      <form id="catalog-move-form">
+        {% comment %}
+          Выбор папки списком. Раньше при массовом переносе папку
+          назначения спрашивали через prompt() с ручным вводом ID —
+          пользователь портала этих идентификаторов не знает и знать не должен.
+        {% endcomment %}
+        <select name="folder_id" x-model="moveFolderId" class="input w-full border mb-4">
+          <option value="">Корень каталога</option>
+          {% for f in all_folders %}
+          <option value="{{ f.id }}">{{ f.indented_name }}</option>
+          {% endfor %}
+        </select>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="moveOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Переместить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Модалка пересылки в обменник -->
+  <div x-show="sendOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="sendOpen = false" x-on:keydown.escape.window="sendOpen = false">
+    <div class="w-full max-w-sm box p-6">
+      <h3 class="mb-4 text-lg font-medium">Переслать в обменник</h3>
+      <form id="catalog-send-form">
+        <label class="mb-1 block text-xs text-gray-600">Кому</label>
+        <select name="recipient_id" required class="input w-full border mb-4">
+          <option value="">Выберите сотрудника</option>
+          {% for person in all_users %}
+          <option value="{{ person.pk }}">{{ person.last_name }} {{ person.first_name }}</option>
+          {% endfor %}
+        </select>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="sendOpen = false">Отмена</button>
+          <button type="submit" class="button text-white bg-theme-1">Переслать</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Модалка загрузки -->
-  <div x-show="uploadOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="uploadOpen = false">
+  <div x-show="uploadOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="uploadOpen = false" x-on:keydown.escape.window="uploadOpen = false">
     <div class="w-full max-w-md box p-6">
-      <h3 class="mb-4 text-lg font-medium">Загрузить документ</h3>
+      <h3 class="mb-4 text-lg font-medium">Загрузить документ{% if current_folder %} в «{{ current_folder.name }}»{% endif %}</h3>
       <form id="catalog-upload-form" method="post" enctype="multipart/form-data">
         <input type="hidden" name="folder_id" value="{{ current_folder.id|default:'' }}">
         <label class="mb-1 block text-xs text-gray-600">Название</label>
         <input type="text" name="title" placeholder="Необязательно — по умолчанию имя файла" class="input w-full border mb-3">
         <label class="mb-1 block text-xs text-gray-600">Файл</label>
         <input type="file" name="file" required class="input w-full border mb-4 text-sm">
+        <div id="catalog-upload-progress" class="hidden mb-3">
+          <div class="h-2 rounded-full bg-gray-200 overflow-hidden">
+            <div id="catalog-upload-progress-bar" class="h-full bg-theme-1" style="width: 0%;"></div>
+          </div>
+          <div id="catalog-upload-progress-label" class="text-xs text-gray-500 mt-1">0%</div>
+        </div>
         <div id="catalog-upload-error" class="mb-3 hidden rounded-md bg-theme-31 px-3 py-2 text-sm text-theme-6"></div>
         <div class="flex justify-end gap-2">
           <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="uploadOpen = false">Отмена</button>
-          <button type="submit" class="button text-white bg-theme-1">Загрузить</button>
+          <button type="submit" id="catalog-upload-submit" class="button text-white bg-theme-1">Загрузить</button>
         </div>
       </form>
     </div>
   </div>
 </div>
 
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/fm-actions.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const folderForm = document.getElementById('catalog-folder-form');
-  folderForm.addEventListener('submit', function (e) {
-    e.preventDefault();
-    fetch('{% url "catalog_folder_create" %}', {
-      method: 'POST',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-      body: new FormData(folderForm),
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.success) window.location.reload(); });
+  var root = document.querySelector('.fm-scope');
+  var state = function () { return window.Alpine.$data(root); };
+
+  FM.init({
+    scope: 'catalog',
+    location: '{{ current_folder.id|default:0 }}',
+    userId: {{ request.user.pk }},
+    idField: 'doc_ids',
+    bulkTrashUrl: '{% url "catalog_bulk_trash" %}',
+    bulkMoveUrl: '{% url "catalog_bulk_move" %}',
+    uploadUrl: '{% url "catalog_upload" %}',
+    uploadFileField: 'file',
+    uploadExtra: { folder_id: '{{ current_folder.id|default:"" }}' },
+    onBulkMove: function () {
+      var s = state();
+      s.moveTarget = 'bulk';
+      s.moveFolderId = '';
+      s.moveOpen = true;
+    },
   });
 
-  const uploadForm = document.getElementById('catalog-upload-form');
-  const errorBox = document.getElementById('catalog-upload-error');
+  document.getElementById('catalog-folder-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var form = e.target;
+    FM.action('{% url "catalog_folder_create" %}', {
+      name: form.name.value, parent_id: form.parent_id.value,
+    }, { successText: 'Папка создана' }).then(function (result) {
+      if (result.ok && result.data.success !== false) { state().folderOpen = false; form.reset(); }
+    });
+  });
+
+  var uploadForm = document.getElementById('catalog-upload-form');
   uploadForm.addEventListener('submit', function (e) {
     e.preventDefault();
+    var errorBox = document.getElementById('catalog-upload-error');
+    var progress = document.getElementById('catalog-upload-progress');
+    var bar = document.getElementById('catalog-upload-progress-bar');
+    var label = document.getElementById('catalog-upload-progress-label');
+    var submit = document.getElementById('catalog-upload-submit');
+
     errorBox.classList.add('hidden');
-    fetch('{% url "catalog_upload" %}', {
-      method: 'POST',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-      body: new FormData(uploadForm),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) {
-          window.location.reload();
-        } else {
-          errorBox.textContent = data.error || 'Не удалось загрузить документ';
-          errorBox.classList.remove('hidden');
-        }
-      });
+    progress.classList.remove('hidden');
+    submit.disabled = true;
+
+    FM.upload('{% url "catalog_upload" %}', new FormData(uploadForm), {
+      onProgress: function (percent) { bar.style.width = percent + '%'; label.textContent = percent + '%'; },
+      onSuccess: function () {
+        submit.disabled = false;
+        progress.classList.add('hidden');
+        bar.style.width = '0%';
+        uploadForm.reset();
+        state().uploadOpen = false;
+        FM.toast('Документ загружен', 'success');
+        FM.refresh();
+      },
+      onError: function (error) {
+        submit.disabled = false;
+        progress.classList.add('hidden');
+        errorBox.textContent = error;
+        errorBox.classList.remove('hidden');
+      },
+    });
   });
 
-  const grid = document.getElementById('catalog-grid');
-  grid.addEventListener('click', function (e) {
-    const trashBtn = e.target.closest('.catalog-trash-btn');
-    if (!trashBtn) return;
-    const docId = trashBtn.dataset.docId;
-    const card = grid.querySelector(`[data-catalog-doc-id="${docId}"]`);
-    fetch(`/catalog/trash-doc/${docId}/`, {
-      method: 'POST',
-      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (data.success && card) card.remove(); });
+  document.getElementById('catalog-rename-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var target = state().renameTarget;
+    var value = e.target.name.value.trim();
+    if (!target || !value) return;
+
+    var url = target.type === 'folder'
+      ? '/catalog/folder/' + target.id + '/rename/'
+      : '/catalog/rename/' + target.id + '/';
+    var payload = target.type === 'folder' ? { name: value } : { title: value };
+
+    FM.action(url, payload, { successText: 'Переименовано' }).then(function (result) {
+      if (result.ok && result.data.success !== false) state().renameOpen = false;
+    });
+  });
+
+  document.getElementById('catalog-move-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var s = state();
+    var folderId = e.target.folder_id.value;
+    if (!s.moveTarget) return;
+
+    if (s.moveTarget === 'bulk') {
+      s.moveOpen = false;
+      FM.runBulkMove(FM.selectedIds(), folderId);
+      return;
+    }
+
+    FM.action('/catalog/move/' + s.moveTarget + '/', { folder_id: folderId },
+      { successText: 'Документ перемещён' }).then(function (result) {
+      if (result.ok && result.data.success !== false) s.moveOpen = false;
+    });
+  });
+
+  document.getElementById('catalog-send-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var s = state();
+    if (!s.sendTarget) return;
+    FM.action('/catalog/send-to-exchange/' + s.sendTarget + '/',
+      { recipient_id: e.target.recipient_id.value },
+      { successText: 'Документ переслан в обменник', refresh: false }).then(function (result) {
+      if (result.ok && result.data.success !== false) s.sendOpen = false;
+    });
   });
 });
 </script>
-{% endblock content %}
+{% endblock extra_js %}

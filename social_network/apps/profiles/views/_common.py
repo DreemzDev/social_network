@@ -22,11 +22,15 @@ def push_chat_event(user_id, event_type, **payload):
     async_to_sync(channel_layer.group_send)(str(user_id), {'type': event_type, **payload})
 
 
-def notify(recipient, kind, text, actor=None, task=None, post=None):
+def notify(recipient, kind, text, actor=None, task=None, post=None, url=''):
     """Создаёт запись уведомления и пушит её получателю через тот же канал,
-    что уже используется чатом."""
+    что уже используется чатом.
+
+    url — готовая ссылка для типов без своего FK-поля (например,
+    FILE_SHARED: файл может быть в обменнике, каталоге или приватном
+    доступе, заводить FK на все три модуля ради одной ссылки избыточно)."""
     notification = Notification.objects.create(
-        recipient=recipient, actor=actor, kind=kind, text=text, task=task, post=post,
+        recipient=recipient, actor=actor, kind=kind, text=text, task=task, post=post, url=url,
     )
     unread_count = Notification.objects.filter(recipient=recipient, is_read=False).count()
 
@@ -37,6 +41,7 @@ def notify(recipient, kind, text, actor=None, task=None, post=None):
         'created': notification.created.isoformat(),
         'task_id': task.id if task else None,
         'post_id': post.id if post else None,
+        'url': url or None,
     }, unread_count=unread_count)
 
     return notification
