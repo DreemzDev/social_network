@@ -56,6 +56,17 @@
              x-on:click="renameOpen = true; renameTarget = { type: 'folder', id: {{ folder_id }} }; renameValue = '{{ folder_name|escapejs }}'; open = false">
             {% include "includes/fm_icons.html" with icon='book-open' cls='w-4 h-4 mr-2' %} Переименовать
           </a>
+          {% comment %}
+            Перенос папки целиком, вместе с содержимым. Эндпоинты для этого
+            были у каталога и приватного доступа с самого начала, но в меню
+            карточки не выводились, и собранную не в той папке структуру
+            приходилось пересобирать руками. У обменника вьюха добавлена
+            заодно, чтобы поведение всех трёх модулей совпадало.
+          {% endcomment %}
+          <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
+             x-on:click="moveOpen = true; moveTarget = { type: 'folder', id: {{ folder_id }} }; moveFolderId = ''; open = false">
+            {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Переместить
+          </a>
           {% endif %}
           {% if can_delete %}
           <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md text-theme-6"

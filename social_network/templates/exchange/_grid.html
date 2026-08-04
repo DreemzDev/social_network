@@ -10,26 +10,33 @@
   пустое состояние и пагинация — иначе после удаления последнего файла на
   странице пагинация продолжала бы предлагать несуществующие страницы.
 {% endcomment %}
-{% for folder in subfolders %}
-  {% with can_manage=folder|fm_can_manage:request.user %}
-  {% include "includes/fm_folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=can_manage can_delete=can_manage folder_delete_url=folder.get_delete_url folder_selectable=False %}
-  {% endwith %}
-{% endfor %}
+{% comment %}
+  Сетка карточек и пагинация — соседи, а не вложенность: пагинация лежала
+  внутри grid-контейнера и потому становилась такой же ячейкой сетки, как
+  карточка, вставая сбоку от файлов вместо строки под списком.
+{% endcomment %}
+<div class="intro-y grid grid-cols-12 gap-3 sm:gap-6">
+  {% for folder in subfolders %}
+    {% with can_manage=folder|fm_can_manage:request.user %}
+    {% include "includes/fm_folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=can_manage can_delete=can_manage folder_delete_url=folder.get_delete_url folder_selectable=False %}
+    {% endwith %}
+  {% endfor %}
 
-{% for item in files %}
-  {% include "includes/exchange_file_card.html" %}
-{% endfor %}
+  {% for item in files %}
+    {% include "includes/exchange_file_card.html" %}
+  {% endfor %}
 
-{% if not subfolders and not files %}
-<div class="col-span-12 box p-8 text-center">
-  {% if active_filters %}
-    <div class="text-sm text-gray-600">По заданному фильтру ничего не найдено</div>
-    <a href="{{ request.path }}" class="text-sm text-theme-1 hover:underline">Сбросить фильтр</a>
-  {% else %}
-    <div class="text-sm text-gray-600">В этой папке пока пусто</div>
-    <div class="text-xs text-gray-400 mt-1">Перетащите файлы сюда или нажмите «Загрузить файлы»</div>
+  {% if not subfolders and not files %}
+  <div class="col-span-12 box p-8 text-center">
+    {% if active_filters %}
+      <div class="text-sm text-gray-600">По заданному фильтру ничего не найдено</div>
+      <a href="{{ request.path }}" class="text-sm text-theme-1 hover:underline">Сбросить фильтр</a>
+    {% else %}
+      <div class="text-sm text-gray-600">В этой папке пока пусто</div>
+      <div class="text-xs text-gray-400 mt-1">Перетащите файлы сюда или нажмите «Загрузить файлы»</div>
+    {% endif %}
+  </div>
   {% endif %}
 </div>
-{% endif %}
 
 {% include "includes/fm_pagination.html" %}

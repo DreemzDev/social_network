@@ -16,9 +16,13 @@
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
-    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск файлов' fm_upload_label='Загрузить файлы' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' %}
+    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск файлов' fm_upload_label='Загрузить файлы' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' fm_show_select_all=True %}
 
-    <div class="intro-y flex flex-wrap items-center justify-between gap-2 mt-5">
+    {% comment %}
+      Второй ряд — только хлебные крошки: выделение и сортировка переехали
+      наверх, в одну строку с поиском и кнопками действий.
+    {% endcomment %}
+    <div class="intro-y flex flex-wrap items-center gap-2 mt-5">
       <div class="flex items-center flex-wrap">
         <a href="{% url 'exchange_inbox' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
           {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4 mr-1' %} Все папки
@@ -32,11 +36,6 @@
         <div class="mx-2 text-gray-400">/</div>
         <div class="font-medium">{{ current_folder.name }}</div>
         {% endif %}
-      </div>
-
-      <div class="flex items-center gap-3">
-        {% include "includes/fm_select_all.html" %}
-        {% include "includes/fm_sort.html" %}
       </div>
     </div>
 
@@ -52,7 +51,7 @@
       <div id="fm-drop-hint" class="fm-drop-hint absolute inset-0 z-20 text-sm font-medium text-theme-1">
         Отпустите файлы, чтобы загрузить в эту папку
       </div>
-      <div id="fm-grid" class="intro-y grid grid-cols-12 gap-3 sm:gap-6">
+      <div id="fm-grid">
         {% include "exchange/_grid.html" %}
       </div>
     </div>
@@ -90,7 +89,9 @@
   <!-- Модалка перемещения файла между подпапками (одиночного и массового) -->
   <div x-show="moveOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="moveOpen = false" x-on:keydown.escape.window="moveOpen = false">
     <div class="w-full max-w-sm box p-6">
-      <h3 class="mb-4 text-lg font-medium" x-text="moveTarget === 'bulk' ? 'Переместить выбранные файлы' : 'Переместить в подпапку'"></h3>
+      <h3 class="mb-4 text-lg font-medium"
+          x-text="moveTarget === 'bulk' ? 'Переместить выбранные файлы'
+                  : (moveTarget && moveTarget.type === 'folder' ? 'Переместить папку' : 'Переместить в подпапку')"></h3>
       <form id="exchange-move-form">
         <select name="folder_id" x-model="moveFolderId" class="input w-full border mb-4">
           <option value="">Корень папки «{{ folder_owner.last_name }} {{ folder_owner.first_name }}»</option>
@@ -258,8 +259,17 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
-    FM.action('/exchange/move/' + s.moveTarget + '/', { folder_id: folderId },
-      { successText: 'Файл перемещён' }).then(function (result) {
+    // Одна модалка на файл и на папку: у папки свой эндпоинт и своё имя
+    // поля (parent_id — новый родитель в дереве, а не папка-контейнер).
+    var isFolder = s.moveTarget.type === 'folder';
+    var url = isFolder
+      ? '/exchange/folder-move/' + s.moveTarget.id + '/'
+      : '/exchange/move/' + s.moveTarget.id + '/';
+    var payload = isFolder ? { parent_id: folderId } : { folder_id: folderId };
+
+    FM.action(url, payload, {
+      successText: isFolder ? 'Папка перемещена' : 'Файл перемещён',
+    }).then(function (result) {
       if (result.ok && result.data.success !== false) s.moveOpen = false;
     });
   });

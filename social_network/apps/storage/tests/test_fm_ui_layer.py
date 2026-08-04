@@ -196,6 +196,98 @@ class DeptdocsBulkMoveTest(TestCase):
         self.assertEqual(document.folder_id, self.source.pk)
 
 
+class FolderMoveTest(TestCase):
+    """Перенос папок. У каталога и приватного доступа эндпоинты были с
+    самого начала, но в меню карточки не выводились — пользоваться ими
+    было нельзя; у обменника вьюхи не было вовсе."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='folder_move_user', password='pass12345')
+        self.client.force_login(self.user)
+
+    def test_exchange_subfolder_moves_under_another(self):
+        first = ExchangeFolder.objects.create(name='Первая', owner=self.user, created_by=self.user)
+        second = ExchangeFolder.objects.create(name='Вторая', owner=self.user, created_by=self.user)
+
+        response = self.client.post(
+            reverse('exchange_folder_move', args=[second.pk]), {'parent_id': first.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        second.refresh_from_db()
+        self.assertEqual(second.parent_id, first.pk)
+
+    def test_exchange_subfolder_moves_back_to_root(self):
+        parent = ExchangeFolder.objects.create(name='Родитель', owner=self.user, created_by=self.user)
+        child = ExchangeFolder.objects.create(
+            name='Вложенная', owner=self.user, parent=parent, created_by=self.user,
+        )
+
+        response = self.client.post(reverse('exchange_folder_move', args=[child.pk]), {'parent_id': ''})
+
+        self.assertEqual(response.status_code, 200)
+        child.refresh_from_db()
+        self.assertIsNone(child.parent_id)
+
+    def test_exchange_folder_cannot_move_into_itself(self):
+        """Иначе дерево self-FK замкнулось бы в цикл, и обход подпапок
+        завис бы вместе с воркером."""
+        folder = ExchangeFolder.objects.create(name='Папка', owner=self.user, created_by=self.user)
+
+        response = self.client.post(
+            reverse('exchange_folder_move', args=[folder.pk]), {'parent_id': folder.pk},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        folder.refresh_from_db()
+        self.assertIsNone(folder.parent_id)
+
+    def test_exchange_folder_cannot_move_into_own_descendant(self):
+        parent = ExchangeFolder.objects.create(name='Родитель', owner=self.user, created_by=self.user)
+        child = ExchangeFolder.objects.create(
+            name='Потомок', owner=self.user, parent=parent, created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse('exchange_folder_move', args=[parent.pk]), {'parent_id': child.pk},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        parent.refresh_from_db()
+        self.assertIsNone(parent.parent_id)
+
+    def test_exchange_folder_cannot_move_into_another_owner_folder(self):
+        """Тот же принцип, что и у файлов: перекладывание содержимого в
+        чужую личную папку выглядело бы для неё как подмена."""
+        stranger = User.objects.create_user(username='folder_move_stranger', password='x')
+        mine = ExchangeFolder.objects.create(name='Моя', owner=self.user, created_by=self.user)
+        foreign = ExchangeFolder.objects.create(name='Чужая', owner=stranger, created_by=stranger)
+
+        response = self.client.post(
+            reverse('exchange_folder_move', args=[mine.pk]), {'parent_id': foreign.pk},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        mine.refresh_from_db()
+        self.assertIsNone(mine.parent_id)
+
+    def test_deptdocs_folder_move_requires_access_to_target(self):
+        other = User.objects.create_user(username='folder_move_other', password='x')
+
+        mine = DepartmentFolder.objects.create(name='Моя', created_by=self.user)
+        mine.allowed_users.add(self.user)
+        foreign = DepartmentFolder.objects.create(name='Чужая', created_by=other)
+        foreign.allowed_users.add(other)
+
+        response = self.client.post(
+            reverse('deptdocs_folder_move', args=[mine.pk]), {'parent_id': foreign.pk},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        mine.refresh_from_db()
+        self.assertIsNone(mine.parent_id)
+
+
 class FmTemplateTagsTest(TestCase):
 
     def setUp(self):

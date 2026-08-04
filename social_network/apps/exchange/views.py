@@ -314,6 +314,66 @@ class RenameExchangeFolderView(LoginRequiredMixin, View):
         return JsonResponse({'success': True, 'name': folder.name})
 
 
+class MoveExchangeFolderView(LoginRequiredMixin, View):
+    """Перенос подпапки внутри одной и той же личной папки.
+
+    У каталога и приватного доступа перенос папок был с самого начала, у
+    обменника — нет, из-за чего собранную не в той подпапке структуру
+    приходилось пересоздавать руками.
+
+    Владелец не меняется по той же причине, что и у файлов
+    (MoveExchangeFileView): перенос содержимого в чужую личную папку
+    выглядел бы для неё как подмена без предупреждения."""
+
+    def post(self, request, folder_id):
+        folder = get_object_or_404(ExchangeFolder, pk=folder_id)
+        if not folder.can_be_deleted_by(request.user):
+            raise PermissionDenied
+
+        old_parent = folder.parent
+        new_parent_id = request.POST.get('parent_id') or None
+
+        if new_parent_id:
+            new_parent = get_object_or_404(
+                ExchangeFolder, pk=new_parent_id, owner_id=folder.owner_id,
+            )
+            if new_parent.pk == folder.pk or _is_descendant(new_parent, folder):
+                return JsonResponse(
+                    {'success': False,
+                     'error': 'Нельзя перенести папку в саму себя или во вложенную папку'},
+                    status=400,
+                )
+        else:
+            new_parent = None
+
+        folder.parent = new_parent
+        folder.save(update_fields=['parent'])
+
+        _notify_folder(old_parent, folder.owner_id, actor=request.user,
+                       action='folder_moved', text=f'перенёс папку «{folder.name}»')
+        if (old_parent.pk if old_parent else None) != (new_parent.pk if new_parent else None):
+            _notify_folder(new_parent, folder.owner_id, actor=request.user,
+                           action='folder_moved', text=f'перенёс сюда папку «{folder.name}»')
+
+        return JsonResponse({'success': True})
+
+
+def _is_descendant(candidate: ExchangeFolder, ancestor: ExchangeFolder) -> bool:
+    """True, если candidate лежит внутри поддерева ancestor. Без этой
+    проверки папку можно было бы перенести внутрь самой себя, и дерево
+    self-FK замкнулось бы в цикл, а обход подпапок — завис.
+
+    seen страхует от уже существующего в данных цикла."""
+    node = candidate
+    seen = set()
+    while node.parent_id is not None and node.pk not in seen:
+        seen.add(node.pk)
+        if node.parent_id == ancestor.pk:
+            return True
+        node = node.parent
+    return False
+
+
 class RenameExchangeFileView(LoginRequiredMixin, View):
     """Переименовывает FileObject.original_name — у ExchangeFile своего
     заголовка нет, имя всегда берётся из именованного объекта storage."""

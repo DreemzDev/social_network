@@ -1,0 +1,96 @@
+{% comment %}
+  «Кому это видно» — нижний блок левого меню файлового менеджера.
+
+  Раньше здесь стояли перенесённые из макета цветные метки («Важное»,
+  «Совещания», «Работа», «Проекты», «Отчёты», «Добавить метку») — шесть
+  ссылок в никуда: меток в моделях нет и не планируется.
+
+  Показывается вместо них то, чего в интерфейсе не хватало и что для
+  файлового менеджера важнее всего: границы видимости. У трёх разделов
+  они принципиально разные (обменник открыт всем, каталог общедоступен,
+  приватный доступ ограничен списком), а внешне разделы неотличимы — и
+  спутать «положу в общую папку» с «положу в закрытую» было очень легко.
+
+  Список допущенных выводится только у приватного доступа: у остальных
+  двух он равен «все сотрудники», перечислять там нечего.
+
+  Кнопка правки доступа появляется исключительно на странице папки
+  приватного доступа — она переключает Alpine-переменную accessOpen,
+  которая объявлена только в deptdocs/list.html. На других страницах
+  такой переменной нет, и кнопка там сломала бы Alpine-выражение.
+{% endcomment %}
+<div class="border-t border-gray-200 mt-5 pt-5">
+  <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">Кому видно</div>
+
+  {% if fm_active == 'exchange' %}
+    <div class="flex items-start mt-3 text-sm">
+      {% include "includes/fm_icons.html" with icon='users' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
+      <div>
+        <div>Всем сотрудникам</div>
+        <div class="text-xs text-gray-500 mt-1">
+          Обменник устроен как сетевая папка: содержимое видно всем, положить файл
+          можно в любую папку. Удалять может владелец папки или тот, кто загрузил.
+        </div>
+      </div>
+    </div>
+    {% if folder_owner %}
+    <div class="flex items-center mt-3 text-sm">
+      {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2 text-gray-500 flex-shrink-0' %}
+      <span class="truncate">
+        Папка: {% if folder_owner.last_name or folder_owner.first_name %}{{ folder_owner.last_name }} {{ folder_owner.first_name }}{% else %}{{ folder_owner.username }}{% endif %}
+      </span>
+    </div>
+    {% endif %}
+
+  {% elif fm_active == 'catalog' %}
+    <div class="flex items-start mt-3 text-sm">
+      {% include "includes/fm_icons.html" with icon='users' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
+      <div>
+        <div>Всем сотрудникам</div>
+        <div class="text-xs text-gray-500 mt-1">
+          Информационный каталог общедоступен: любой сотрудник видит все документы
+          и может их добавлять, переименовывать и удалять.
+        </div>
+      </div>
+    </div>
+
+  {% elif fm_active == 'deptdocs' %}
+    {% if current_folder %}
+      <div class="text-xs text-gray-500 mt-2">Папка «{{ current_folder.name }}»</div>
+      <div class="mt-2 max-h-48 overflow-y-auto">
+        {% for person in current_folder.allowed_users.all %}
+        <div class="flex items-center px-1 py-1 text-sm">
+          <div class="w-2 h-2 bg-theme-9 rounded-full mr-3 flex-shrink-0"></div>
+          <span class="truncate">
+            {% if person.last_name or person.first_name %}{{ person.last_name }} {{ person.first_name }}{% else %}{{ person.username }}{% endif %}
+            {% if person.pk == request.user.pk %}<span class="text-gray-400">(вы)</span>{% endif %}
+          </span>
+        </div>
+        {% empty %}
+        <div class="text-sm text-gray-500">Список доступа пуст</div>
+        {% endfor %}
+      </div>
+      <button type="button" class="button w-full justify-center block bg-gray-200 text-gray-600 mt-3 text-sm"
+              x-on:click="accessOpen = true">
+        Изменить доступ
+      </button>
+    {% else %}
+      <div class="flex items-start mt-3 text-sm">
+        {% include "includes/fm_icons.html" with icon='lock' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
+        <div>
+          <div>Только допущенным</div>
+          <div class="text-xs text-gray-500 mt-1">
+            Видны лишь папки, в список доступа которых вы включены. Откройте папку,
+            чтобы увидеть и изменить её список.
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <div class="text-xs text-gray-500 mt-2">
+      В корзине и в сводке по месту действуют те же права, что и в разделах:
+      каждый видит только то, к чему у него есть доступ.
+    </div>
+  {% endif %}
+</div>

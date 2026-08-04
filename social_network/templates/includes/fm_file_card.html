@@ -89,8 +89,13 @@
                x-on:click="renameOpen = true; renameTarget = { type: '{{ fm_rename_type|default:"file" }}', id: {{ item.id }} }; renameValue = '{{ fm_title|escapejs }}'; open = false">
               {% include "includes/fm_icons.html" with icon='book-open' cls='w-4 h-4 mr-2' %} Переименовать
             </a>
+            {% comment %}
+              moveTarget — всегда объект {type, id}, как и renameTarget:
+              одна и та же модалка переносит и файлы, и папки, и по «голому»
+              id отличить одно от другого было бы нельзя.
+            {% endcomment %}
             <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
-               x-on:click="moveOpen = true; moveTarget = {{ item.id }}; moveFolderId = ''; open = false">
+               x-on:click="moveOpen = true; moveTarget = { type: 'file', id: {{ item.id }} }; moveFolderId = ''; open = false">
               {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Переместить
             </a>
             {% endif %}

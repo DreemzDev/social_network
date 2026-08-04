@@ -75,9 +75,19 @@
     {% endif %}
   </form>
 
-  <div class="w-full sm:w-auto flex">
+  {% comment %}
+    Выделение и сортировка стоят здесь, в одной строке с поиском и
+    кнопками действий, а не отдельной полосой ниже: это управление тем же
+    списком, и разносить их по двум строкам значило заставлять глаз
+    прыгать между панелями ради одной операции. Второй ряд оставлен только
+    под хлебные крошки — они про навигацию, а не про список.
+  {% endcomment %}
+  <div class="w-full sm:w-auto flex flex-wrap items-center gap-2 mt-3 sm:mt-0">
+    {% if fm_show_select_all %}{% include "includes/fm_select_all.html" %}{% endif %}
+    {% if sort_options %}{% include "includes/fm_sort.html" %}{% endif %}
+
     {% if fm_upload_label %}
-    <button type="button" class="button text-white bg-theme-1 shadow-md mr-2" x-on:click="uploadOpen = true">{{ fm_upload_label }}</button>
+    <button type="button" class="button text-white bg-theme-1 shadow-md" x-on:click="uploadOpen = true">{{ fm_upload_label }}</button>
     {% endif %}
     {% if fm_extra_button_label %}
     <button type="button" class="button box text-gray-700 flex items-center" x-on:click="{{ fm_extra_button_action }}">

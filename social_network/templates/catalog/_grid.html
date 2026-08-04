@@ -8,24 +8,31 @@
   управлять папками может любой — fm_can_manage вернёт True, так как у
   CatalogFolder нет метода проверки прав.
 {% endcomment %}
-{% for folder in subfolders %}
-  {% include "includes/fm_folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=True can_delete=True folder_delete_url=folder.get_delete_url folder_selectable=False %}
-{% endfor %}
+{% comment %}
+  Сетка карточек и пагинация — соседи, а не вложенность: пагинация лежала
+  внутри grid-контейнера и потому становилась такой же ячейкой сетки, как
+  карточка, вставая сбоку от файлов вместо строки под списком.
+{% endcomment %}
+<div class="intro-y grid grid-cols-12 gap-3 sm:gap-6">
+  {% for folder in subfolders %}
+    {% include "includes/fm_folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=True can_delete=True folder_delete_url=folder.get_delete_url folder_selectable=False %}
+  {% endfor %}
 
-{% for item in documents %}
-  {% include "includes/catalog_document_card.html" %}
-{% endfor %}
+  {% for item in documents %}
+    {% include "includes/catalog_document_card.html" %}
+  {% endfor %}
 
-{% if not subfolders and not documents %}
-<div class="col-span-12 box p-8 text-center">
-  {% if active_filters %}
-    <div class="text-sm text-gray-600">По заданному фильтру ничего не найдено</div>
-    <a href="{{ request.path }}" class="text-sm text-theme-1 hover:underline">Сбросить фильтр</a>
-  {% else %}
-    <div class="text-sm text-gray-600">Здесь пока пусто</div>
-    <div class="text-xs text-gray-400 mt-1">Перетащите документы сюда или нажмите «Загрузить документ»</div>
+  {% if not subfolders and not documents %}
+  <div class="col-span-12 box p-8 text-center">
+    {% if active_filters %}
+      <div class="text-sm text-gray-600">По заданному фильтру ничего не найдено</div>
+      <a href="{{ request.path }}" class="text-sm text-theme-1 hover:underline">Сбросить фильтр</a>
+    {% else %}
+      <div class="text-sm text-gray-600">Здесь пока пусто</div>
+      <div class="text-xs text-gray-400 mt-1">Перетащите документы сюда или нажмите «Загрузить документ»</div>
+    {% endif %}
+  </div>
   {% endif %}
 </div>
-{% endif %}
 
 {% include "includes/fm_pagination.html" %}

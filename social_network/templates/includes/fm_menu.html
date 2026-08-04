@@ -4,8 +4,12 @@
   из app.js отрабатывает один раз при загрузке и не всегда успевает по
   элементам, отрисованным позже.
 
-  Нижний блок — цветные метки. Меток в моделях нет: перенесены визуально,
-  как в макете, ссылки-заглушки.
+  Нижний блок раньше повторял из макета цветные метки («Важное»,
+  «Совещания», «Работа»…). Меток в моделях нет и не планируется — это
+  были шесть ссылок в никуда, занимавших самое заметное место в меню.
+  Вместо них выводится то, что для файлового менеджера действительно
+  важно и нигде больше не показано: кому виден текущий раздел или папка.
+  У приватного доступа там же кнопка правки списка доступа.
 
   Параметры: fm_active. fm_trash_url когда-то указывал на корзину своего
   модуля — теперь корзина одна на всех (storage_trash, с табами), ссылка
@@ -29,29 +33,5 @@
       {% include "includes/fm_icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Занятое место
     </a>
   </div>
-  <div class="border-t border-gray-200 mt-5 pt-5">
-    <a href="javascript:;" class="flex items-center px-3 py-2 rounded-md">
-      <div class="w-2 h-2 bg-theme-11 rounded-full mr-3"></div>
-      Важное
-    </a>
-    <a href="javascript:;" class="flex items-center px-3 py-2 mt-2 rounded-md">
-      <div class="w-2 h-2 bg-theme-9 rounded-full mr-3"></div>
-      Совещания
-    </a>
-    <a href="javascript:;" class="flex items-center px-3 py-2 mt-2 rounded-md">
-      <div class="w-2 h-2 bg-theme-12 rounded-full mr-3"></div>
-      Работа
-    </a>
-    <a href="javascript:;" class="flex items-center px-3 py-2 mt-2 rounded-md">
-      <div class="w-2 h-2 bg-theme-11 rounded-full mr-3"></div>
-      Проекты
-    </a>
-    <a href="javascript:;" class="flex items-center px-3 py-2 mt-2 rounded-md">
-      <div class="w-2 h-2 bg-theme-6 rounded-full mr-3"></div>
-      Отчёты
-    </a>
-    <a href="javascript:;" class="flex items-center px-3 py-2 mt-2 rounded-md">
-      {% include "includes/fm_icons.html" with icon='plus' cls='w-4 h-4 mr-2' %} Добавить метку
-    </a>
-  </div>
+  {% include "includes/fm_access_panel.html" %}
 </div>
