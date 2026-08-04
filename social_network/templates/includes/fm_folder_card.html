@@ -20,8 +20,14 @@
 {% endcomment %}
 <div class="fm-card intro-y col-span-6 sm:col-span-4 md:col-span-3 xl:col-span-2 xxl:col-span-2"
      data-fm-kind="folder" data-fm-id="{{ folder_id }}">
-  {# px-3 sm:px-5 — в макете Midone перед ними стоял ещё и px-5, который
-     всё равно перебивался следующим же классом; убран как мёртвый. #}
+  {% comment %}
+    px-3 sm:px-5 — в макете Midone перед ними стоял ещё и px-5, который
+    всё равно перебивался следующим же классом; убран как мёртвый.
+
+    Именно {% comment %}, а не {# … #}: последний работает только в одну
+    строку, а многострочный Django комментарием не считает и выводит его
+    текстом прямо в карточку.
+  {% endcomment %}
   <div class="file box rounded-md pt-8 pb-5 px-3 sm:px-5 relative zoom-in">
     {% if folder_selectable %}
     <div class="absolute left-0 top-0 mt-3 ml-3">

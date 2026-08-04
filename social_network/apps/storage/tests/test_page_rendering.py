@@ -154,6 +154,52 @@ class FileManagerPageRenderingTest(TestCase):
         response = self.client.get(reverse('storage_trash'))
         self.assertEqual(response.status_code, 200)
 
+    def test_pages_do_not_leak_template_comment_syntax(self):
+        """Ни одна страница не должна показывать сырой синтаксис шаблона.
+
+        Регрессия: {# … #} в Django работает ТОЛЬКО в одну строку.
+        Многострочный комментарий этой формы Django комментарием не считает
+        и выводит текстом прямо в вёрстку — что и произошло с карточкой
+        папки, поломав раскладку в приватном доступе и каталоге. Проверка
+        на весь набор страниц, а не на один шаблон: ошибка тихая, глазами
+        ловится только при заходе на конкретную страницу.
+        """
+        exchange_folder = ExchangeFolder.objects.create(
+            name='Проект', owner=self.user, created_by=self.user,
+        )
+        self._exchange_file(folder=exchange_folder)
+        catalog_folder = CatalogFolder.objects.create(name='Приказы', created_by=self.user)
+        self._catalog_document(folder=catalog_folder)
+        dept_folder = self._dept_folder()
+        DepartmentFolder.objects.create(
+            name='Подпапка', parent=dept_folder, created_by=self.user,
+        ).allowed_users.add(self.user)
+        self._dept_document(dept_folder)
+
+        urls = [
+            reverse('exchange_inbox'),
+            reverse('exchange_folder', args=[self.user.pk]),
+            reverse('exchange_subfolder', args=[self.user.pk, exchange_folder.pk]),
+            reverse('exchange_trash'),
+            reverse('catalog_root'),
+            reverse('catalog_folder', args=[catalog_folder.pk]),
+            reverse('catalog_trash'),
+            reverse('deptdocs_list'),
+            reverse('deptdocs_folder', args=[dept_folder.pk]),
+            reverse('deptdocs_trash'),
+            reverse('storage_dashboard'),
+            reverse('storage_trash'),
+        ]
+
+        for url in urls:
+            with self.subTest(url=url):
+                body = self.client.get(url).content.decode()
+                for marker in ('{#', '#}', '{%', '%}', '{{', '}}'):
+                    self.assertNotIn(
+                        marker, body,
+                        f'на странице {url} в вывод попал синтаксис шаблона «{marker}»',
+                    )
+
 
 class PartialGridRenderingTest(TestCase):
     """?partial=1 отдаёт только сетку карточек — на этом построено живое
