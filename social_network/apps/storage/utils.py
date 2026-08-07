@@ -5,6 +5,7 @@ StorageService (это не про хранение файлов), но нужн
 from datetime import datetime, time
 
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -31,12 +32,82 @@ DEFAULT_PER_PAGE = 24
 # показывался для любого файла, включая .docx и .zip — браузер их всё равно
 # скачивает или показывает мусор, то есть пункт меню врал о том, что
 # произойдёт по клику.
+#
+# SVG отсюда убран намеренно: см. INLINE_UNSAFE_MIME_TYPES ниже.
 PREVIEWABLE_EXTENSIONS = {
     'PDF',
-    'PNG', 'JPG', 'JPEG', 'GIF', 'WEBP', 'BMP', 'SVG',
+    'PNG', 'JPG', 'JPEG', 'GIF', 'WEBP', 'BMP',
     'TXT', 'CSV', 'LOG', 'MD',
     'MP4', 'WEBM', 'MP3', 'WAV', 'OGG',
 }
+
+# Что безопасно отдавать с 'Content-Disposition: inline', то есть открывать
+# прямо в браузере в домене портала.
+#
+# PREVIEWABLE_EXTENSIONS выше — про интерфейс: показывать ли пункт
+# «Просмотр». Это здесь — про сервер: эндпоинты скачивания принимают
+# ?inline=1 для чего угодно, а не только для того, на что в меню есть
+# кнопка. Загруженный .html открывался бы как страница портала со всеми
+# правами текущего пользователя — то есть хранимая XSS через обычную
+# загрузку файла в обменник.
+#
+# Список именно белый. mime_type определяется по ИМЕНИ загруженного файла
+# (mimetypes.guess_type в StorageService.upload), то есть его выбирает
+# загрузивший; с чёрным списком любой не перечисленный активный формат
+# оказывался бы разрешён по умолчанию.
+INLINE_SAFE_MIME_PREFIXES = ('image/', 'video/', 'audio/')
+
+INLINE_SAFE_MIME_TYPES = frozenset({
+    'application/pdf',
+    'text/plain',
+    'text/csv',
+    'text/markdown',
+})
+
+# image/svg+xml формально подходит под префикс image/, но SVG — активный
+# документ: внутри работают <script> и обработчики событий, и открытый
+# inline он выполняется в домене портала наравне с обычной HTML-страницей.
+# Как картинка в <img> он безопасен, но здесь речь про переход по ссылке.
+INLINE_UNSAFE_MIME_TYPES = frozenset({'image/svg+xml'})
+
+
+def is_inline_safe(mime_type) -> bool:
+    """Можно ли отдать этот тип с 'Content-Disposition: inline'."""
+    mime = (mime_type or '').split(';')[0].strip().lower()
+    if mime in INLINE_UNSAFE_MIME_TYPES:
+        return False
+    return mime in INLINE_SAFE_MIME_TYPES or mime.startswith(INLINE_SAFE_MIME_PREFIXES)
+
+
+# Опрос статуса фоновой задачи идёт по task_id через общий эндпоинт
+# /storage/task-status/<id>/, который обслуживает все три модуля. Раньше он
+# отдавал статус любому аутентифицированному: uuid4 не угадаешь, но и
+# владения не проверялось. Теперь запустивший запоминается в своей сессии.
+#
+# Сессия, а не кеш: CACHES в проекте не сконфигурирован, то есть это
+# LocMemCache — память ОДНОГО процесса, теряется при перезапуске Daphne.
+# Сессии лежат в БД и переживают и перезапуск, и второй процесс.
+FM_TASK_SESSION_KEY = 'fm_task_ids'
+FM_TASK_HISTORY_LIMIT = 20
+
+
+def fm_task_response(request, task):
+    """Единственный правильный способ вернуть task_id фронту.
+
+    Собран как хелпер, а не как «не забудьте записать id в сессию» в
+    чек-листе: запусков семь штук в четырёх модулях, и забытая строчка
+    означала бы 403 у самого же владельца задачи. Здесь запомнить нельзя
+    забыть — ответ и запись делаются одним вызовом.
+    """
+    task_ids = [tid for tid in request.session.get(FM_TASK_SESSION_KEY, []) if tid != task.id]
+    request.session[FM_TASK_SESSION_KEY] = task_ids[-(FM_TASK_HISTORY_LIMIT - 1):] + [task.id]
+
+    return JsonResponse({'success': True, 'task_id': task.id})
+
+
+def owns_task(request, task_id) -> bool:
+    """Запускал ли текущий пользователь эту задачу (в этой сессии)."""
+    return task_id in request.session.get(FM_TASK_SESSION_KEY, [])
 
 
 def apply_sort(queryset, sort_param, *, name_field):

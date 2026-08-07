@@ -14,7 +14,13 @@ from storage.exceptions import FileTooLargeError, QuotaExceededError
 from storage.models import FileObject
 from storage.services import StorageService
 from storage.signals import attribute_deletion
-from storage.utils import PartialGridMixin, apply_filters, apply_sort, folder_ancestors
+from storage.utils import (
+    PartialGridMixin,
+    apply_filters,
+    apply_sort,
+    fm_task_response,
+    folder_ancestors,
+)
 
 from profiles.models import Notification
 from profiles.views._common import notify
@@ -475,7 +481,7 @@ class BulkTrashExchangeFilesView(LoginRequiredMixin, View):
                 action='files_trashed', actor=request.user, text='удалил файлы в корзину',
             )
 
-        return JsonResponse({'success': True, 'task_id': task.id})
+        return fm_task_response(request, task)
 
 
 class BulkMoveExchangeFilesView(LoginRequiredMixin, View):
@@ -520,7 +526,7 @@ class BulkMoveExchangeFilesView(LoginRequiredMixin, View):
 
         _notify_folder(folder, folder.owner_id if folder else request.user.pk,
                        actor=request.user, action='files_moved', text='переместил файлы')
-        return JsonResponse({'success': True, 'task_id': task.id})
+        return fm_task_response(request, task)
 
 
 class SendExchangeFileToCatalogView(LoginRequiredMixin, View):

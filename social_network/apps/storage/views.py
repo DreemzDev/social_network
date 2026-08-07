@@ -6,6 +6,7 @@ from django.views.generic import TemplateView, View
 
 from .models import FileObject
 from .services import StorageService
+from .utils import fm_task_response, owns_task
 
 # Сколько записей корзины показывать на сводной странице каждого таба.
 # Корзина каталога общая для всего портала, поэтому без ограничения эта
@@ -173,10 +174,20 @@ class TaskStatusView(LoginRequiredMixin, View):
     Polling, а не WebSocket: массовая операция — разовое действие с
     коротким временем жизни (секунды-десятки секунд для сотен файлов),
     заводить для этого отдельный WS-канал избыточно, когда уже есть
-    штатный celery.result.AsyncResult с тем же результатом."""
+    штатный celery.result.AsyncResult с тем же результатом.
+
+    Отдаётся только задача, запущенная этой же сессией (см.
+    utils.fm_task_response). Раньше статус получал любой аутентифицированный
+    по чужому task_id: угадать uuid4 нельзя, но идентификатор — не секрет,
+    он виден в трафике и в логах, а владения не проверялось вообще."""
 
     def get(self, request, task_id):
         from celery.result import AsyncResult
+
+        if not owns_task(request, task_id):
+            # 404, а не 403: чужой task_id для этой сессии не существует,
+            # и подтверждать его существование незачем.
+            return JsonResponse({'error': 'Задача не найдена'}, status=404)
 
         result = AsyncResult(task_id)
         payload = {'state': result.state}
@@ -231,5 +242,4 @@ class RunTrashCleanupView(LoginRequiredMixin, View):
         else:
             from exchange.tasks import cleanup_expired_exchange_files as task
 
-        async_result = task.delay()
-        return JsonResponse({'success': True, 'task_id': async_result.id})
+        return fm_task_response(request, task.delay())

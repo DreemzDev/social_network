@@ -304,23 +304,55 @@
     options = options || {};
     var intervalMs = options.intervalMs || 700;
 
+    /**
+     * Сколько ждать, пока задачу подхватит воркер. Состояние PENDING
+     * означает «в очереди, никто не взял»: при незапущенном Celery оно
+     * держится вечно, и опрос крутился бы бесконечно, показывая
+     * «Перемещение…» — то есть действие молча не работало бы, вопреки
+     * правилу «либо успех, либо причина отказа».
+     */
+    var pendingTimeoutMs = options.pendingTimeoutMs || 20000;
+    var startedAt = Date.now();
+
+    function fail(text) {
+      if (options.onError) options.onError(text);
+    }
+
     function poll() {
       fetch('/storage/task-status/' + taskId + '/')
-        .then(function (r) { return r.json(); })
-        .then(function (payload) {
+        .then(function (r) {
+          // Ответ разбирается вместе со статусом: на 404 (чужая или
+          // забытая задача) и 403 тело — это {error}, а не {state}, и
+          // прежняя версия уходила в ветку «неизвестное состояние» и
+          // опрашивала дальше без конца.
+          return r.json().catch(function () { return {}; }).then(function (payload) {
+            return { ok: r.ok, status: r.status, payload: payload };
+          });
+        })
+        .then(function (result) {
+          if (!result.ok) {
+            fail(result.payload.error || httpErrorText(result.status));
+            return;
+          }
+
+          var payload = result.payload;
+
           if (payload.state === 'PROGRESS') {
+            startedAt = Date.now();  // пошёл прогресс — отсчёт ожидания сбрасываем
             if (options.onProgress) options.onProgress(payload);
             setTimeout(poll, intervalMs);
           } else if (payload.state === 'SUCCESS') {
             if (options.onSuccess) options.onSuccess(payload);
           } else if (payload.state === 'FAILURE') {
-            if (options.onError) options.onError(payload.error || 'Задача завершилась с ошибкой');
+            fail(payload.error || 'Задача завершилась с ошибкой');
+          } else if (Date.now() - startedAt > pendingTimeoutMs) {
+            fail('Задача так и не начала выполняться. Возможно, служба фоновых задач не запущена.');
           } else {
             setTimeout(poll, intervalMs);
           }
         })
         .catch(function () {
-          if (options.onError) options.onError('Не удалось получить статус задачи');
+          fail('Не удалось получить статус задачи');
         });
     }
     poll();

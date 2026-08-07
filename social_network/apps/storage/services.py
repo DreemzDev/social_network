@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from .exceptions import FileTooLargeError, QuotaExceededError
 from .models import FileBlob, FileObject, StorageAuditLog
+from .utils import is_inline_safe
 
 CHUNK_SIZE = 1024 * 1024  # 1 МБ
 
@@ -345,20 +346,44 @@ class StorageService:
 
         inline=True — 'Content-Disposition: inline' вместо 'attachment', для
         файлов, которые должны открываться прямо в браузере/iframe (PDF
-        справочника), а не скачиваться."""
+        справочника), а не скачиваться. Просьба открыть inline тип, который
+        для этого небезопасен, молча понижается до вложения (см. ниже)."""
         from django.http import FileResponse, HttpResponse
 
         blob = file_object.blob
+
+        # Открыть в браузере можно только заведомо пассивный тип. Иначе
+        # загруженный .html (или .svg — там тоже работает <script>)
+        # открывался бы как страница в домене портала: обычная загрузка
+        # файла в обменник превращалась бы в хранимую XSS. Проверка стоит
+        # здесь, а не во вьюхах, потому что ?inline=1 пробрасывают все три
+        # модуля-потребителя плюс phonebook, и договорённость «каждый
+        # проверяет сам» разошлась бы при первом же новом потребителе.
+        #
+        # Отказ молчаливый, а не 403: в интерфейсе пункт «Просмотр» для
+        # таких типов не показывается вовсе (utils.PREVIEWABLE_EXTENSIONS),
+        # то есть сюда попадает только ссылка, собранная руками. Отдать
+        # файл вложением — ровно то, что и должно произойти по такой
+        # ссылке, ошибки здесь нет.
+        if inline and not is_inline_safe(blob.mime_type):
+            inline = False
+
         disposition_type = 'inline' if inline else 'attachment'
 
         if settings.DEBUG:
             response = FileResponse(
                 blob.file.open('rb'), as_attachment=not inline, filename=file_object.original_name,
             )
+            # Тот же заголовок ставит nginx на /protected/ (deploy/nginx/
+            # portal.conf), но полагаться только на конфиг веб-сервера
+            # нельзя: в разработке nginx'а нет, а на проде он может быть
+            # развёрнут не из этого файла.
+            response['X-Content-Type-Options'] = 'nosniff'
             return response
 
         response = HttpResponse()
         response['Content-Type'] = blob.mime_type or 'application/octet-stream'
+        response['X-Content-Type-Options'] = 'nosniff'
 
         # Имя файла: ASCII — как есть, иначе RFC 5987 (filename*=utf-8''...).
         # Подставить кириллицу напрямую нельзя: HttpResponse кодирует

@@ -1,4 +1,6 @@
 """Общие импорты и хелперы, используемые несколькими views-модулями."""
+import logging
+
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -7,6 +9,8 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from ..models import Notification
+
+logger = logging.getLogger(__name__)
 
 
 def clear_user_cache(user_pk):
@@ -17,9 +21,28 @@ def clear_user_cache(user_pk):
 
 def push_chat_event(user_id, event_type, **payload):
     """Отправляет событие в Channels-группу пользователя (группа — просто
-    str(user_id), см. apps/profiles/consumers.py:ExtendedChatConsumer)."""
+    str(user_id), см. apps/profiles/consumers.py:ExtendedChatConsumer).
+
+    Недоступность брокера НЕ роняет операцию. Все вызывающие места устроены
+    одинаково: сообщение/реакция/уведомление уже записаны в БД, а это —
+    доставка «живьём». Если Redis лёг, исключение отсюда превращало
+    успешно выполненное действие в 500: у отправителя ошибка, в базе
+    сообщение есть, повтор создаёт дубликат. Получатель в этом случае
+    просто увидит изменения при следующем открытии диалога — ровно как до
+    появления WebSocket.
+
+    Тот же приём и по той же причине — в storage/realtime.py: broadcast().
+    """
     channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(str(user_id), {'type': event_type, **payload})
+    if channel_layer is None:  # окружение без CHANNEL_LAYERS
+        return
+
+    try:
+        async_to_sync(channel_layer.group_send)(str(user_id), {'type': event_type, **payload})
+    except Exception:
+        logger.warning(
+            'Не удалось доставить событие %s пользователю %s', event_type, user_id, exc_info=True,
+        )
 
 
 def notify(recipient, kind, text, actor=None, task=None, post=None, url=''):

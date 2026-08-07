@@ -18,6 +18,7 @@ from storage.utils import (
     apply_filters,
     apply_sort,
     build_folder_choices,
+    fm_task_response,
     folder_ancestors,
 )
 
@@ -389,7 +390,7 @@ class BulkTrashDepartmentDocumentsView(LoginRequiredMixin, View):
             _notify_folder(folder_id, actor=request.user,
                            action='files_trashed', text='удалил документы в корзину')
 
-        return JsonResponse({'success': True, 'task_id': task.id})
+        return fm_task_response(request, task)
 
 
 class BulkMoveDepartmentDocumentsView(LoginRequiredMixin, View):
@@ -433,7 +434,7 @@ class BulkMoveDepartmentDocumentsView(LoginRequiredMixin, View):
         for source_id in source_folder_ids | {target_folder.pk}:
             _notify_folder(source_id, actor=request.user,
                            action='files_moved', text='переместил документы')
-        return JsonResponse({'success': True, 'task_id': task.id})
+        return fm_task_response(request, task)
 
 
 class SendDepartmentDocumentToExchangeView(LoginRequiredMixin, View):

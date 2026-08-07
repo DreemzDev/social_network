@@ -7,6 +7,8 @@
 загрузившего (папка равноправная, получателей несколько).
 """
 
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -92,4 +94,56 @@ class DeptdocsUploadNotificationTest(TestCase):
 
         self.assertFalse(
             Notification.objects.filter(recipient=outsider, kind=Notification.Kind.FILE_SHARED).exists()
+        )
+
+
+class NotifyBrokerFailureTest(TestCase):
+    """notify() не должен ронять операцию при недоступном брокере.
+
+    Раньше push_chat_event() звал group_send без обработки ошибок, и
+    падение Redis превращало успешно выполненное действие в 500: запись
+    Notification уже в БД, файл уже загружен, а пользователь видит ошибку
+    и повторяет загрузку — получая дубликат. Живые обновления файлового
+    менеджера (storage.realtime.broadcast) вели себя правильно с самого
+    начала, notify() — нет; здесь та же дисциплина распространена и на
+    него.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username='broker_owner', password='pass12345')
+        self.stranger = User.objects.create_user(username='broker_stranger', password='pass12345')
+
+    def test_upload_succeeds_when_broker_is_unreachable(self):
+        self.client.force_login(self.stranger)
+        uploaded = SimpleUploadedFile('broker.pdf', b'broker content', content_type='application/pdf')
+
+        with mock.patch('profiles.views._common.get_channel_layer') as get_layer:
+            get_layer.return_value.group_send.side_effect = ConnectionError('redis is down')
+
+            # Сбой не проглатывается бесследно — он уходит в лог, иначе
+            # «уведомления молча не приходят» было бы нечем диагностировать.
+            with self.assertLogs('profiles.views._common', level='WARNING'):
+                response = self.client.post(
+                    reverse('exchange_upload', args=[self.owner.pk]), {'files': [uploaded]},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['success'])
+
+    def test_notification_is_still_saved_when_broker_is_unreachable(self):
+        """Ключевое: доставка «живьём» пропала, а сама запись осталась —
+        получатель увидит её в центре уведомлений при следующем заходе."""
+        self.client.force_login(self.stranger)
+        uploaded = SimpleUploadedFile('broker2.pdf', b'broker content 2', content_type='application/pdf')
+
+        with mock.patch('profiles.views._common.get_channel_layer') as get_layer:
+            get_layer.return_value.group_send.side_effect = ConnectionError('redis is down')
+
+            with self.assertLogs('profiles.views._common', level='WARNING'):
+                self.client.post(reverse('exchange_upload', args=[self.owner.pk]), {'files': [uploaded]})
+
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.owner, kind=Notification.Kind.FILE_SHARED,
+            ).exists()
         )
