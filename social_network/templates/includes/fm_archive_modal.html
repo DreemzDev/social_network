@@ -1,0 +1,51 @@
+{% comment %}
+  Модалка «Загрузить архив» — одна на три модуля.
+
+  Разметка и обработчик общие намеренно: обычная загрузка файла в своё
+  время была скопирована в каждый шаблон, и три копии успели разойтись.
+  Обработчик живёт в fm-actions.js (initArchiveUpload) и включается,
+  только если страница передала archiveUploadUrl в FM.init — то есть
+  контрол либо работает, либо его нет (ARCHITECTURE.md, 12.4).
+
+  Параметры:
+    fm_archive_folder_id — куда распаковывать (пусто = корень раздела)
+    fm_archive_location  — название папки для заголовка, необязательно
+
+  Требует, чтобы у корневого блока страницы в x-data была переменная
+  archiveOpen.
+{% endcomment %}
+<div x-show="archiveOpen" x-cloak
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+     x-on:click.self="archiveOpen = false" x-on:keydown.escape.window="archiveOpen = false">
+  <div class="w-full max-w-md box p-6">
+    <h3 class="mb-1 text-lg font-medium">
+      Загрузить архив{% if fm_archive_location %} в «{{ fm_archive_location }}»{% endif %}
+    </h3>
+    <p class="mb-4 text-xs text-gray-600">
+      Файлы из архива появятся здесь по отдельности, папки внутри архива —
+      папками раздела. Сам архив на портале не сохраняется.
+    </p>
+
+    <form id="fm-archive-form" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="folder_id" value="{{ fm_archive_folder_id|default:'' }}">
+
+      <label class="mb-1 block text-xs text-gray-600">Архив ZIP</label>
+      <input type="file" name="archive" accept=".zip,application/zip" required
+             class="input w-full border mb-4 text-sm">
+
+      <div id="fm-archive-progress" class="hidden mb-3">
+        <div class="h-2 rounded-full bg-gray-200 overflow-hidden">
+          <div id="fm-archive-progress-bar" class="h-full bg-theme-1" style="width: 0%;"></div>
+        </div>
+        <div id="fm-archive-progress-label" class="text-xs text-gray-500 mt-1">0%</div>
+      </div>
+
+      <div id="fm-archive-error" class="mb-3 hidden rounded-md bg-theme-31 px-3 py-2 text-sm text-theme-6"></div>
+
+      <div class="flex justify-end gap-2">
+        <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="archiveOpen = false">Отмена</button>
+        <button type="submit" id="fm-archive-submit" class="button text-white bg-theme-1">Загрузить и распаковать</button>
+      </div>
+    </form>
+  </div>
+</div>

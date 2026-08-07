@@ -18,6 +18,7 @@ from storage.utils import (
     PartialGridMixin,
     apply_filters,
     apply_sort,
+    fm_archive_upload_view,
     fm_archive_view,
     fm_task_response,
     folder_ancestors,
@@ -483,6 +484,32 @@ class BulkTrashExchangeFilesView(LoginRequiredMixin, View):
             )
 
         return fm_task_response(request, task)
+
+
+class UploadExchangeArchiveView(LoginRequiredMixin, View):
+    """Загрузить zip и распаковать его в личную папку сотрудника.
+
+    Права те же, что и у обычной загрузки (UploadExchangeFileView): положить
+    архив в чужую личную папку можно так же, как отдельный файл — обменник
+    открыт на запись всем.
+    """
+
+    def post(self, request, user_id):
+        folder_owner = get_object_or_404(get_user_model(), pk=user_id)
+
+        folder_id = request.POST.get('folder_id') or None
+        if folder_id:
+            get_object_or_404(ExchangeFolder, pk=folder_id, owner=folder_owner)
+
+        from .tasks import import_exchange_archive
+
+        return fm_archive_upload_view(
+            request,
+            category=FileObject.Category.EXCHANGE,
+            launch=lambda archive: import_exchange_archive.delay(
+                archive.pk, folder_owner.pk, folder_id, request.user.pk,
+            ),
+        )
 
 
 class BulkDownloadExchangeFilesView(LoginRequiredMixin, View):

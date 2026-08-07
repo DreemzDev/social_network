@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="fm-scope grid grid-cols-12 gap-6 mt-8"
-     x-data="{ uploadOpen: false, folderOpen: false, accessOpen: false,
+     x-data="{ uploadOpen: false, archiveOpen: false, folderOpen: false, accessOpen: false,
                renameOpen: false, renameTarget: null, renameValue: '',
                moveOpen: false, moveTarget: null, moveFolderId: '',
                sendOpen: false, sendTarget: null }">
@@ -17,7 +17,7 @@
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
     {% if can_upload %}
-      {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск документов' fm_upload_label='Загрузить документ' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' fm_show_select_all=True %}
+      {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск документов' fm_upload_label='Загрузить документ' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' fm_archive_button=True fm_show_select_all=True %}
     {% else %}
       {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск документов' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' %}
     {% endif %}
@@ -211,6 +211,10 @@
       </form>
     </div>
   </div>
+
+  {% if current_folder %}
+  {% include "includes/fm_archive_modal.html" with fm_archive_folder_id=current_folder.id fm_archive_location=current_folder.name %}
+  {% endif %}
 </div>
 
 {% endblock content %}
@@ -230,6 +234,7 @@ document.addEventListener('DOMContentLoaded', function () {
     bulkTrashUrl: '{% url "deptdocs_bulk_trash" %}',
     bulkMoveUrl: '{% url "deptdocs_bulk_move" %}',
     bulkDownloadUrl: '{% url "deptdocs_bulk_download" %}',
+    {% if current_folder %}archiveUploadUrl: '{% url "deptdocs_upload_archive" %}',{% endif %}
     {% if current_folder %}
     uploadUrl: '{% url "deptdocs_upload" %}',
     uploadFileField: 'file',

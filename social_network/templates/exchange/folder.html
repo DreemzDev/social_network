@@ -6,7 +6,7 @@
 
 {% block content %}
 <div class="fm-scope grid grid-cols-12 gap-6 mt-8"
-     x-data="{ uploadOpen: false, folderOpen: false,
+     x-data="{ uploadOpen: false, archiveOpen: false, folderOpen: false,
                renameOpen: false, renameTarget: null, renameValue: '',
                moveOpen: false, moveTarget: null, moveFolderId: '',
                sendOpen: false, sendTarget: null }">
@@ -16,7 +16,7 @@
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
-    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск файлов' fm_upload_label='Загрузить файлы' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' fm_show_select_all=True %}
+    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск файлов' fm_upload_label='Загрузить файлы' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' fm_archive_button=True fm_show_select_all=True %}
 
     {% comment %}
       Второй ряд — только хлебные крошки: выделение и сортировка переехали
@@ -157,6 +157,8 @@
       </form>
     </div>
   </div>
+
+  {% include "includes/fm_archive_modal.html" with fm_archive_folder_id=current_folder.id fm_archive_location=current_folder.name %}
 </div>
 
 {% endblock content %}
@@ -176,6 +178,7 @@ document.addEventListener('DOMContentLoaded', function () {
     bulkTrashUrl: '{% url "exchange_bulk_trash" %}',
     bulkMoveUrl: '{% url "exchange_bulk_move" %}',
     bulkDownloadUrl: '{% url "exchange_bulk_download" %}',
+    archiveUploadUrl: '{% url "exchange_upload_archive" folder_owner.pk %}',
     uploadUrl: '{% url "exchange_upload" folder_owner.pk %}',
     uploadFileField: 'files',
     uploadExtra: { folder_id: '{{ current_folder.id|default:"" }}' },

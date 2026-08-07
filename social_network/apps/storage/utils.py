@@ -91,18 +91,22 @@ FM_TASK_SESSION_KEY = 'fm_task_ids'
 FM_TASK_HISTORY_LIMIT = 20
 
 
-def fm_task_response(request, task):
+def fm_task_response(request, task, **extra):
     """Единственный правильный способ вернуть task_id фронту.
 
     Собран как хелпер, а не как «не забудьте записать id в сессию» в
-    чек-листе: запусков семь штук в четырёх модулях, и забытая строчка
+    чек-листе: запусков восемь штук в четырёх модулях, и забытая строчка
     означала бы 403 у самого же владельца задачи. Здесь запомнить нельзя
     забыть — ответ и запись делаются одним вызовом.
+
+    extra — дополнительные поля ответа (например, сколько файлов в архиве),
+    чтобы вызывающему не приходилось собирать JsonResponse руками в обход
+    записи в сессию.
     """
     task_ids = [tid for tid in request.session.get(FM_TASK_SESSION_KEY, []) if tid != task.id]
     request.session[FM_TASK_SESSION_KEY] = task_ids[-(FM_TASK_HISTORY_LIMIT - 1):] + [task.id]
 
-    return JsonResponse({'success': True, 'task_id': task.id})
+    return JsonResponse({'success': True, 'task_id': task.id, **extra})
 
 
 def owns_task(request, task_id) -> bool:
@@ -154,6 +158,56 @@ def fm_archive_view(request, queryset, *, filename):
         })
 
     return StorageService.get_archive_response(file_objects, filename=filename)
+
+
+def fm_archive_upload_view(request, *, category, launch, field='archive'):
+    """Общая половина загрузки zip с распаковкой для трёх модулей.
+
+    Разное у модулей — только куда распаковывать и какую задачу запустить
+    (`launch`); проверки, приём файла и оформление ответа одинаковы.
+
+    Порядок шагов важен:
+
+    1. Архив проверяется СИНХРОННО, до постановки задачи. Читается только
+       оглавление, поэтому это дёшево даже на большом файле, зато «это не
+       архив», «архив под паролем» и «слишком много файлов» пользователь
+       видит сразу в ответ на загрузку, а не через опрос статуса задачи.
+    2. Сам архив кладётся в storage обычным upload(). Не во временный файл:
+       задачу выполняет другой процесс (воркер Celery), и ему нужно откуда-то
+       прочитать содержимое, а blobs/ — единственное место, где в этом
+       проекте лежат файлы (ARCHITECTURE.md, раздел 3). Заодно на архив
+       действуют те же STORAGE_MAX_UPLOAD_SIZE и квота, что и на любой
+       другой файл. Задача отвяжет его по завершении.
+    3. Ответ — тот же {'task_id': ...}, что и у массовых операций, поэтому
+       прогресс на фронте работает уже существующим FM.pollTask.
+    """
+    from .archives import inspect_archive
+    from .exceptions import FileTooLargeError, InvalidArchiveError, QuotaExceededError
+    from .services import StorageService
+
+    uploaded = request.FILES.get(field)
+    if not uploaded:
+        return JsonResponse({'success': False, 'error': 'Архив не выбран'}, status=400)
+
+    try:
+        entries = inspect_archive(uploaded)
+    except InvalidArchiveError as error:
+        return JsonResponse({'success': False, 'error': error.message}, status=400)
+
+    try:
+        archive_object = StorageService.upload(uploaded, user=request.user, category=category)
+    except FileTooLargeError:
+        return JsonResponse(
+            {'success': False, 'error': 'Файл архива слишком большой'}, status=400,
+        )
+    except QuotaExceededError:
+        return JsonResponse(
+            {'success': False, 'error': 'Превышена квота хранилища'}, status=400,
+        )
+
+    # total — сколько файлов ждать; фронт покажет это в подписи прогресса
+    # ещё до того, как задача доложит первый шаг.
+    return fm_task_response(request, launch(archive_object), total=len(entries))
 
 
 def apply_sort(queryset, sort_param, *, name_field):

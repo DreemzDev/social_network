@@ -14,6 +14,8 @@
 
   Параметры: fm_search_placeholder, fm_upload_label,
              fm_extra_button_label / fm_extra_button_action,
+             fm_archive_button — показывать «Загрузить архив» (действие
+             всегда одно: открыть общую модалку fm_archive_modal.html),
              fm_simple_search — страница умеет только ?q= (список папок
              обменника: там ищут сотрудника, а не файл, и полей «размер»
              или «кто загрузил» у папки нет).
@@ -88,6 +90,11 @@
 
     {% if fm_upload_label %}
     <button type="button" class="button text-white bg-theme-1 shadow-md" x-on:click="uploadOpen = true">{{ fm_upload_label }}</button>
+    {% endif %}
+    {% if fm_archive_button %}
+    <button type="button" class="button box text-gray-700 flex items-center" x-on:click="archiveOpen = true">
+      {% include "includes/fm_icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Загрузить архив
+    </button>
     {% endif %}
     {% if fm_extra_button_label %}
     <button type="button" class="button box text-gray-700 flex items-center" x-on:click="{{ fm_extra_button_action }}">

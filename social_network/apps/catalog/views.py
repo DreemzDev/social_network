@@ -17,6 +17,7 @@ from storage.utils import (
     apply_filters,
     apply_sort,
     build_folder_choices,
+    fm_archive_upload_view,
     fm_archive_view,
     fm_task_response,
     folder_ancestors,
@@ -348,6 +349,31 @@ class UploadCatalogDocumentView(LoginRequiredMixin, View):
         _notify_folder(folder_id, actor=request.user,
                        action='file_created', text='добавил документ')
         return JsonResponse({'success': True})
+
+
+class UploadCatalogArchiveView(LoginRequiredMixin, View):
+    """Загрузить zip и распаковать его в текущую папку каталога.
+
+    Отдельная кнопка, а не «если загрузили .zip — распаковать»: архив может
+    быть и обычным документом, который нужен на портале как есть
+    (например, комплект чертежей одним файлом). Догадываться за
+    пользователя тут нельзя — он должен сказать, чего хочет.
+    """
+
+    def post(self, request):
+        folder_id = request.POST.get('folder_id') or None
+        if folder_id:
+            get_object_or_404(CatalogFolder, pk=folder_id)
+
+        from .tasks import import_catalog_archive
+
+        return fm_archive_upload_view(
+            request,
+            category=FileObject.Category.CATALOG,
+            launch=lambda archive: import_catalog_archive.delay(
+                archive.pk, folder_id, request.user.pk,
+            ),
+        )
 
 
 class SendCatalogDocumentToExchangeView(LoginRequiredMixin, View):

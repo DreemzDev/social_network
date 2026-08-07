@@ -18,6 +18,7 @@ from storage.utils import (
     apply_filters,
     apply_sort,
     build_folder_choices,
+    fm_archive_upload_view,
     fm_archive_view,
     fm_task_response,
     folder_ancestors,
@@ -392,6 +393,30 @@ class BulkTrashDepartmentDocumentsView(LoginRequiredMixin, View):
                            action='files_trashed', text='удалил документы в корзину')
 
         return fm_task_response(request, task)
+
+
+class UploadDepartmentArchiveView(LoginRequiredMixin, View):
+    """Загрузить zip и распаковать его в папку приватного доступа.
+
+    folder_id обязателен, в отличие от каталога: документ вне папки не
+    наследует ничьих прав и не виден никому (DepartmentDocument), то есть
+    распаковка «в корень» молча спрятала бы всё загруженное.
+    """
+
+    def post(self, request):
+        folder = get_object_or_404(DepartmentFolder, pk=request.POST.get('folder_id') or 0)
+        if not folder.is_accessible_by(request.user):
+            raise PermissionDenied
+
+        from .tasks import import_deptdocs_archive
+
+        return fm_archive_upload_view(
+            request,
+            category=FileObject.Category.DOCUMENT,
+            launch=lambda archive: import_deptdocs_archive.delay(
+                archive.pk, folder.pk, request.user.pk,
+            ),
+        )
 
 
 class BulkDownloadDepartmentDocumentsView(LoginRequiredMixin, View):

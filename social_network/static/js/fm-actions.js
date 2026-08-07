@@ -180,6 +180,18 @@
   /* Обновление сетки                                                    */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * Состояние Alpine корневого блока страницы (.fm-scope) — тем же
+   * способом, каким его берут сами шаблоны. Нужно, чтобы закрыть модалку
+   * из общего обработчика: переменные вроде archiveOpen объявлены в
+   * x-data страницы, а не здесь.
+   */
+  function scopeState() {
+    var root = document.querySelector('.fm-scope');
+    if (!root || !window.Alpine || !window.Alpine.$data) return null;
+    try { return window.Alpine.$data(root); } catch (err) { return null; }
+  }
+
   function gridElement() {
     return document.getElementById('fm-grid');
   }
@@ -577,6 +589,7 @@
     }
 
     initBulkButtons();
+    initArchiveUpload();
     initDragAndDrop();
     connectRealtime();
     updateBulkBar();
@@ -685,6 +698,100 @@
       .catch(function () {
         FM.toast('Не удалось подготовить архив', 'error');
       });
+  }
+
+  /**
+   * Загрузка zip с распаковкой на сервере.
+   *
+   * Две фазы с разной природой прогресса, и обе надо показать: сначала
+   * файл едет на сервер (XHR даёт проценты), потом распаковывается в
+   * фоне (Celery даёт «файл N из M»). Без второй фазы пользователь видел
+   * бы «100%» и пустую папку — распаковка сотни документов идёт заметно
+   * дольше, чем сама загрузка.
+   */
+  function initArchiveUpload() {
+    var form = document.getElementById('fm-archive-form');
+    if (!form || !config.archiveUploadUrl) return;
+
+    var progress = document.getElementById('fm-archive-progress');
+    var bar = document.getElementById('fm-archive-progress-bar');
+    var label = document.getElementById('fm-archive-progress-label');
+    var errorBox = document.getElementById('fm-archive-error');
+    var submit = document.getElementById('fm-archive-submit');
+
+    function fail(text) {
+      submit.disabled = false;
+      progress.classList.add('hidden');
+      errorBox.textContent = text;
+      errorBox.classList.remove('hidden');
+    }
+
+    function finish(payload) {
+      submit.disabled = false;
+      progress.classList.add('hidden');
+      bar.style.width = '0%';
+      form.reset();
+
+      var scope = scopeState();
+      if (scope) scope.archiveOpen = false;
+
+      FM.toast(
+        'Распаковано файлов: ' + (payload.done || 0)
+          + (payload.folders ? ', папок: ' + payload.folders : ''),
+        'success'
+      );
+
+      // Пропущенное показывается отдельно и с причинами: «распаковано 8»
+      // вместо ожидаемых 10 без объяснения — это молчаливая потеря файлов.
+      if (payload.skipped) {
+        FM.toast(
+          'Пропущено файлов: ' + payload.skipped
+            + (payload.reasons && payload.reasons.length ? '. ' + payload.reasons.join('; ') : ''),
+          'info'
+        );
+      }
+
+      FM.refresh();
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      errorBox.classList.add('hidden');
+      progress.classList.remove('hidden');
+      bar.style.width = '0%';
+      label.textContent = 'Загрузка 0%';
+      submit.disabled = true;
+
+      FM.upload(config.archiveUploadUrl, new FormData(form), {
+        onProgress: function (percent) {
+          bar.style.width = percent + '%';
+          label.textContent = 'Загрузка ' + percent + '%';
+        },
+        onSuccess: function (data) {
+          if (!data.task_id) {
+            // Воркера нет или задача не поставилась — честно сказать, а не
+            // оставить полосу висеть на 100%.
+            fail('Архив загружен, но распаковка не запустилась');
+            return;
+          }
+
+          label.textContent = 'Распаковка' + (data.total ? ': 0 из ' + data.total : '…');
+
+          FM.pollTask(data.task_id, {
+            onProgress: function (payload) {
+              label.textContent = 'Распаковка: ' + payload.done + ' из ' + payload.total;
+              if (payload.total) {
+                bar.style.width = Math.round((payload.done / payload.total) * 100) + '%';
+              }
+            },
+            onSuccess: finish,
+            onError: fail,
+          });
+        },
+        onError: fail,
+      });
+    });
   }
 
   function initBulkButtons() {
