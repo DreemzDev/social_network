@@ -17,6 +17,7 @@ from storage.utils import (
     apply_filters,
     apply_sort,
     build_folder_choices,
+    fm_archive_view,
     fm_task_response,
     folder_ancestors,
 )
@@ -241,6 +242,22 @@ class MoveCatalogDocumentView(LoginRequiredMixin, View):
             _notify_folder(folder_id, actor=request.user,
                            action='file_moved', text='переместил сюда документ')
         return JsonResponse({'success': True})
+
+
+class BulkDownloadCatalogDocumentsView(LoginRequiredMixin, View):
+    """Скачать выбранные документы одним архивом.
+
+    Права тривиальны и совпадают с одиночным скачиванием: каталог
+    общедоступен всем аутентифицированным (ARCHITECTURE.md, раздел 8),
+    поэтому фильтр — только is_deleted=False.
+    """
+
+    def get(self, request):
+        return fm_archive_view(
+            request,
+            CatalogDocument.objects.filter(is_deleted=False),
+            filename='Информационный каталог.zip',
+        )
 
 
 class BulkMoveCatalogDocumentsView(LoginRequiredMixin, View):

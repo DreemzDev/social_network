@@ -16,6 +16,7 @@ from .views import (
     RestoreCatalogDocumentView,
     PurgeCatalogDocumentView,
     BulkMoveCatalogDocumentsView,
+    BulkDownloadCatalogDocumentsView,
     BulkTrashCatalogDocumentsView,
 )
 
@@ -37,4 +38,5 @@ urlpatterns = [
     path('catalog/purge/<int:doc_id>/', PurgeCatalogDocumentView.as_view(), name='catalog_purge'),
     path('catalog/bulk-move/', BulkMoveCatalogDocumentsView.as_view(), name='catalog_bulk_move'),
     path('catalog/bulk-trash/', BulkTrashCatalogDocumentsView.as_view(), name='catalog_bulk_trash'),
+    path('catalog/bulk-download/', BulkDownloadCatalogDocumentsView.as_view(), name='catalog_bulk_download'),
 ]

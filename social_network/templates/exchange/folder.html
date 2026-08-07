@@ -39,7 +39,7 @@
       </div>
     </div>
 
-    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в подпапку' %}
+    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в подпапку' fm_bulk_download=True %}
 
     {% comment %}
       #fm-dropzone — область, на которую можно бросить файлы (fm-actions.js).
@@ -175,6 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
     idField: 'file_ids',
     bulkTrashUrl: '{% url "exchange_bulk_trash" %}',
     bulkMoveUrl: '{% url "exchange_bulk_move" %}',
+    bulkDownloadUrl: '{% url "exchange_bulk_download" %}',
     uploadUrl: '{% url "exchange_upload" folder_owner.pk %}',
     uploadFileField: 'files',
     uploadExtra: { folder_id: '{{ current_folder.id|default:"" }}' },

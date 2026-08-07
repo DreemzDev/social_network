@@ -42,7 +42,7 @@
       </div>
     </div>
 
-    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в папку' %}
+    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в папку' fm_bulk_download=True %}
 
     <div id="fm-dropzone" class="relative mt-5">
       <div id="fm-drop-hint" class="fm-drop-hint absolute inset-0 z-20 text-sm font-medium text-theme-1">
@@ -171,6 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
     idField: 'doc_ids',
     bulkTrashUrl: '{% url "catalog_bulk_trash" %}',
     bulkMoveUrl: '{% url "catalog_bulk_move" %}',
+    bulkDownloadUrl: '{% url "catalog_bulk_download" %}',
     uploadUrl: '{% url "catalog_upload" %}',
     uploadFileField: 'file',
     uploadExtra: { folder_id: '{{ current_folder.id|default:"" }}' },

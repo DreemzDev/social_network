@@ -17,6 +17,7 @@ from .views import (
     RestoreExchangeFileView,
     PurgeExchangeFileView,
     BulkTrashExchangeFilesView,
+    BulkDownloadExchangeFilesView,
     BulkMoveExchangeFilesView,
 )
 
@@ -39,4 +40,5 @@ urlpatterns = [
     path('exchange/purge/<int:file_id>/', PurgeExchangeFileView.as_view(), name='exchange_purge'),
     path('exchange/bulk-trash/', BulkTrashExchangeFilesView.as_view(), name='exchange_bulk_trash'),
     path('exchange/bulk-move/', BulkMoveExchangeFilesView.as_view(), name='exchange_bulk_move'),
+    path('exchange/bulk-download/', BulkDownloadExchangeFilesView.as_view(), name='exchange_bulk_download'),
 ]

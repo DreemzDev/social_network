@@ -18,6 +18,7 @@ from storage.utils import (
     PartialGridMixin,
     apply_filters,
     apply_sort,
+    fm_archive_view,
     fm_task_response,
     folder_ancestors,
 )
@@ -482,6 +483,23 @@ class BulkTrashExchangeFilesView(LoginRequiredMixin, View):
             )
 
         return fm_task_response(request, task)
+
+
+class BulkDownloadExchangeFilesView(LoginRequiredMixin, View):
+    """Скачать выбранные файлы одним архивом.
+
+    Права те же, что и у одиночного скачивания (DownloadExchangeFileView):
+    содержимое обменника видно всем сотрудникам, ограничение только на
+    удаление и перенос. Поэтому фильтр здесь — лишь is_deleted=False;
+    выбирать файлы из корзины пачкой нельзя ровно так же, как и по одному.
+    """
+
+    def get(self, request):
+        return fm_archive_view(
+            request,
+            ExchangeFile.objects.filter(is_deleted=False),
+            filename='Обменник.zip',
+        )
 
 
 class BulkMoveExchangeFilesView(LoginRequiredMixin, View):

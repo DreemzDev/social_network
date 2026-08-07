@@ -11,7 +11,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Sum
 from django.utils import timezone
 
-from .exceptions import FileTooLargeError, QuotaExceededError
+from .exceptions import ArchiveTooLargeError, FileTooLargeError, QuotaExceededError
 from .models import FileBlob, FileObject, StorageAuditLog
 from .utils import is_inline_safe
 
@@ -41,6 +41,124 @@ def _orphan_retention_days() -> int:
 
 def _category_ttl() -> dict:
     return getattr(settings, 'STORAGE_CATEGORY_TTL', {})
+
+
+def _zip_max_files() -> int:
+    return getattr(settings, 'STORAGE_ZIP_MAX_FILES', 200)
+
+
+def _zip_max_total_size() -> int:
+    return getattr(settings, 'STORAGE_ZIP_MAX_TOTAL_SIZE', 1024 * 1024 * 1024)
+
+
+def _format_size(size: int) -> str:
+    for unit in ('Б', 'КБ', 'МБ', 'ГБ'):
+        if size < 1024 or unit == 'ГБ':
+            return f'{size:.0f} {unit}' if unit == 'Б' else f'{size:.1f} {unit}'
+        size /= 1024
+
+
+def _content_disposition(disposition_type: str, name: str) -> str:
+    """Значение заголовка Content-Disposition с корректно оформленным именем.
+
+    ASCII — обычный filename="...", иначе RFC 5987 (filename*=utf-8''...).
+    Подставить кириллицу напрямую нельзя: HttpResponse кодирует не-latin1
+    значение заголовка по RFC 2047 (=?utf-8?b?...?=), а Content-Disposition
+    этой формы не понимает — браузер сохранил бы файл под base64-строкой.
+    В ветке DEBUG то же самое делает за нас FileResponse, поэтому локально
+    баг не проявлялся: он есть только на прод-пути.
+    """
+    try:
+        name.encode('ascii')
+        file_expr = 'filename="{}"'.format(name.replace('\\', '\\\\').replace('"', r'\"'))
+    except UnicodeEncodeError:
+        file_expr = "filename*=utf-8''{}".format(quote(name))
+    return f'{disposition_type}; {file_expr}'
+
+
+class _ZipStreamBuffer:
+    """Файл-объект, который ничего не хранит: zipfile пишет сюда, а
+    генератор тут же забирает накопленное и отдаёт наружу.
+
+    tell() нужен: без него zipfile оборачивает поток в собственный _Tellable.
+    seek() намеренно НЕТ — по его отсутствию zipfile понимает, что поток
+    неперемотываемый, и записывает размеры и CRC в data descriptor ПОСЛЕ
+    содержимого, вместо того чтобы возвращаться и править уже отданный
+    заголовок. Именно это и делает потоковую сборку возможной.
+    """
+
+    def __init__(self):
+        self._chunks = []
+        self._position = 0
+
+    def write(self, data) -> int:
+        self._chunks.append(bytes(data))
+        self._position += len(data)
+        return len(data)
+
+    def tell(self) -> int:
+        return self._position
+
+    def flush(self) -> None:
+        pass
+
+    def take(self) -> bytes:
+        data = b''.join(self._chunks)
+        self._chunks = []
+        return data
+
+
+def _archive_name(original_name: str, used: set) -> str:
+    """Имя внутри архива: без путей и уникальное.
+
+    Путь отрезается, потому что original_name пришёл из браузера и в нём
+    может оказаться что угодно, вплоть до '../../'. Уникальность нужна
+    из-за дедупликации: два FileObject с одинаковым именем — норма, а два
+    одинаковых имени в zip оставили бы пользователю один файл вместо двух.
+    """
+    name = os.path.basename(str(original_name or '').replace('\\', '/')).strip()
+    name = name or 'файл'
+
+    stem, suffix = os.path.splitext(name)
+    candidate = name
+    index = 2
+    while candidate.lower() in used:
+        candidate = f'{stem} ({index}){suffix}'
+        index += 1
+
+    used.add(candidate.lower())
+    return candidate
+
+
+def _iter_zip(file_objects):
+    """Генератор байтов zip-архива. Память не растёт с размером архива:
+    в буфере одновременно живёт не больше одного прочитанного чанка."""
+    import zipfile
+
+    buffer = _ZipStreamBuffer()
+    used_names = set()
+
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_STORED) as archive:
+        for file_object in file_objects:
+            entry = zipfile.ZipInfo(
+                _archive_name(file_object.original_name, used_names),
+                date_time=timezone.localtime(file_object.uploaded_at).timetuple()[:6],
+            )
+            entry.compress_type = zipfile.ZIP_STORED
+
+            with archive.open(entry, 'w') as target, file_object.blob.file.open('rb') as source:
+                for chunk in iter(lambda: source.read(CHUNK_SIZE), b''):
+                    target.write(chunk)
+                    data = buffer.take()
+                    if data:
+                        yield data
+
+            data = buffer.take()
+            if data:
+                yield data
+
+    # Центральный каталог архива — пишется на выходе из with.
+    yield buffer.take()
 
 
 def _sha256(uploaded_file) -> str:
@@ -385,25 +503,87 @@ class StorageService:
         response['Content-Type'] = blob.mime_type or 'application/octet-stream'
         response['X-Content-Type-Options'] = 'nosniff'
 
-        # Имя файла: ASCII — как есть, иначе RFC 5987 (filename*=utf-8''...).
-        # Подставить кириллицу напрямую нельзя: HttpResponse кодирует
-        # не-latin1 значение заголовка по RFC 2047 (=?utf-8?b?...?=), а
-        # Content-Disposition этой формы не понимает — браузер сохранил бы
-        # файл под base64-строкой или под именем-хэшем из URL. В ветке
-        # DEBUG то же самое делает за нас FileResponse, поэтому локально
-        # баг не проявлялся: он есть только на прод-пути.
-        name = file_object.original_name
-        try:
-            name.encode('ascii')
-            file_expr = 'filename="{}"'.format(name.replace('\\', '\\\\').replace('"', r'\"'))
-        except UnicodeEncodeError:
-            file_expr = "filename*=utf-8''{}".format(quote(name))
-        response['Content-Disposition'] = f'{disposition_type}; {file_expr}'
+        response['Content-Disposition'] = _content_disposition(
+            disposition_type, file_object.original_name,
+        )
 
         internal_path = default_storage.path(blob.file.name)
         media_root = str(settings.MEDIA_ROOT)
         relative = os.path.relpath(internal_path, media_root).replace(os.sep, '/')
         response['X-Accel-Redirect'] = f'/protected/{relative}'
+        return response
+
+    @staticmethod
+    def get_archive_limits() -> tuple:
+        """(максимум файлов, максимум суммарного размера) для zip-выгрузки."""
+        return _zip_max_files(), _zip_max_total_size()
+
+    @staticmethod
+    def check_archive_request(file_objects) -> dict:
+        """Проверяет, что архив можно собрать, и возвращает его сводку.
+
+        Отдельный метод, а не проверка внутри get_archive_response(), потому
+        что фронт обязан узнать причину отказа ДО начала скачивания:
+        браузер уходит по ссылке на архив обычной навигацией, и ответ с
+        ошибкой в этот момент показать уже нечем — он просто заменит собой
+        страницу. Поэтому кнопка сначала спрашивает разрешение (?check=1),
+        и только потом переходит по ссылке.
+        """
+        max_files, max_total = StorageService.get_archive_limits()
+
+        count = len(file_objects)
+        if not count:
+            raise ArchiveTooLargeError('Нечего скачивать: не выбрано ни одного файла')
+
+        if count > max_files:
+            raise ArchiveTooLargeError(
+                f'Слишком много файлов: {count} при пределе {max_files}. '
+                f'Скачайте частями.'
+            )
+
+        # По уникальным blob'ам: дедупликация не уменьшает размер архива
+        # (каждый файл лежит в нём отдельной записью под своим именем),
+        # поэтому здесь считается именно сумма по объектам, а не по blob'ам,
+        # как в get_usage().
+        total_size = sum(file_object.blob.size for file_object in file_objects)
+        if total_size > max_total:
+            raise ArchiveTooLargeError(
+                f'Слишком большой архив: {_format_size(total_size)} при пределе '
+                f'{_format_size(max_total)}. Скачайте частями.'
+            )
+
+        return {'count': count, 'total_size': total_size}
+
+    @staticmethod
+    def get_archive_response(file_objects, *, filename: str):
+        """Отдаёт выбранные файлы одним zip, собирая его НА ЛЕТУ.
+
+        Права не проверяются здесь — вызывающий модуль обязан сузить список
+        до разрешённого (ARCHITECTURE.md, раздел 8), ровно как и для
+        get_download_response().
+
+        Почему стриминг, а не «собрать и отдать»: собранный в память архив
+        на сотню документов — это сотня мегабайт на КАЖДЫЙ параллельный
+        запрос, а собранный во временный файл требует места на диске,
+        уборки за собой и всё равно задерживает первый байт до конца
+        сборки. Здесь zipfile пишет в буфер-обманку, а генератор сразу
+        отдаёт накопленное наружу: память не растёт с размером архива.
+
+        ZIP_STORED, без сжатия: содержимое портала — это pdf/docx/xlsx и
+        картинки, то есть уже сжатые форматы, на которых deflate даёт
+        единицы процентов и стоит процессорного времени того же воркера,
+        который в это время держит соединение.
+        """
+        from django.http import StreamingHttpResponse
+
+        response = StreamingHttpResponse(
+            _iter_zip(file_objects), content_type='application/zip',
+        )
+        response['Content-Disposition'] = _content_disposition('attachment', filename)
+        response['X-Content-Type-Options'] = 'nosniff'
+        # Content-Length неизвестен: архив ещё не собран. Браузер покажет
+        # скачивание без процента — это цена того, что первый байт уходит
+        # сразу, а не после сборки всего архива.
         return response
 
     @staticmethod

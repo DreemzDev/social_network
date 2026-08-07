@@ -18,6 +18,7 @@ from storage.utils import (
     apply_filters,
     apply_sort,
     build_folder_choices,
+    fm_archive_view,
     fm_task_response,
     folder_ancestors,
 )
@@ -391,6 +392,27 @@ class BulkTrashDepartmentDocumentsView(LoginRequiredMixin, View):
                            action='files_trashed', text='удалил документы в корзину')
 
         return fm_task_response(request, task)
+
+
+class BulkDownloadDepartmentDocumentsView(LoginRequiredMixin, View):
+    """Скачать выбранные документы одним архивом.
+
+    Единственный из трёх модулей, где фильтр не сводится к is_deleted:
+    документ не хранит прав, а наследует их от folder.allowed_users, и
+    массовое скачивание обязано сузиться по тому же признаку, что и
+    одиночное (DownloadDepartmentDocumentView: is_accessible_by). Иначе
+    достаточно было бы перечислить id в query-строке, чтобы выгрузить
+    закрытые папки архивом.
+    """
+
+    def get(self, request):
+        return fm_archive_view(
+            request,
+            DepartmentDocument.objects.filter(
+                folder__allowed_users=request.user, is_deleted=False,
+            ).distinct(),
+            filename='Приватный доступ.zip',
+        )
 
 
 class BulkMoveDepartmentDocumentsView(LoginRequiredMixin, View):

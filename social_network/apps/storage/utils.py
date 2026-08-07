@@ -110,6 +110,52 @@ def owns_task(request, task_id) -> bool:
     return task_id in request.session.get(FM_TASK_SESSION_KEY, [])
 
 
+def fm_archive_view(request, queryset, *, filename):
+    """Общая половина массового скачивания одним zip для трёх модулей.
+
+    Разное у модулей ровно одно — queryset, уже суженный до того, что этому
+    пользователю разрешено видеть (права, как всегда, проверяет потребитель,
+    не storage). Всё остальное — разбор ?ids=, режим проверки ?check=1,
+    пределы и оформление ответа — одинаково, и три копии этого кода
+    разошлись бы, как уже разошлись когда-то карточки файлов.
+
+    Два режима одного адреса:
+      ?check=1  — JSON: можно ли собрать такой архив и что в него войдёт;
+      без него  — сам архив.
+
+    Развилка нужна потому, что за архивом браузер уходит обычной навигацией
+    (иначе весь zip пришлось бы держать в памяти вкладки), и показать
+    причину отказа в этот момент уже нечем — ответ просто заменит собой
+    страницу. Поэтому кнопка сначала спрашивает разрешение, и только
+    получив его, переходит по ссылке.
+    """
+    from .exceptions import ArchiveTooLargeError
+    from .services import StorageService
+
+    requested = [chunk for chunk in request.GET.get('ids', '').split(',') if chunk.isdigit()]
+
+    items = queryset.filter(pk__in=requested).select_related('file_object__blob')
+    file_objects = [item.file_object for item in items]
+
+    try:
+        summary = StorageService.check_archive_request(file_objects)
+    except ArchiveTooLargeError as error:
+        return JsonResponse({'success': False, 'error': error.message}, status=400)
+
+    if request.GET.get('check') == '1':
+        # skipped — то, что пользователь выбрал, но видеть не вправе (или
+        # уже удалено). Молча недодать файлов нельзя: человек получил бы
+        # архив и не узнал, что он неполный.
+        return JsonResponse({
+            'success': True,
+            'count': summary['count'],
+            'total_size': summary['total_size'],
+            'skipped': len(requested) - summary['count'],
+        })
+
+    return StorageService.get_archive_response(file_objects, filename=filename)
+
+
 def apply_sort(queryset, sort_param, *, name_field):
     """Применяет сортировку из query-параметра ?sort= к queryset документов.
 

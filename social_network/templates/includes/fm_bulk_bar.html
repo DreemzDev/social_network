@@ -8,8 +8,14 @@
   выпадал и из счётчика, и из массовых операций.
 
   Параметры:
-    fm_bulk_move        — показывать кнопку массового перемещения
-    fm_bulk_move_label  — её подпись
+    fm_bulk_move          — показывать кнопку массового перемещения
+    fm_bulk_move_label    — её подпись
+    fm_bulk_download      — показывать кнопку «Скачать архивом»
+
+  Кнопка скачивания рисуется только там, где вьюха задала
+  fm_bulk_download: контрол либо работает, либо его нет в разметке
+  (ARCHITECTURE.md, 12.4). На страницах корзины её нет — восстанавливать
+  и скачивать удалённое это разные вещи.
 {% endcomment %}
 <div id="fm-bulk-bar" class="fm-bulk-bar hidden intro-y mt-3 flex flex-wrap items-center gap-3 rounded-md bg-theme-1/10 px-4 py-2 text-sm">
   <span>Выбрано: <span class="fm-bulk-count font-medium">0</span></span>
@@ -17,6 +23,12 @@
   {% if fm_bulk_move %}
   <button type="button" id="fm-bulk-move" data-fm-files-only class="text-theme-1 hover:underline disabled:no-underline">
     {{ fm_bulk_move_label|default:'Переместить' }}
+  </button>
+  {% endif %}
+
+  {% if fm_bulk_download %}
+  <button type="button" id="fm-bulk-download" data-fm-files-only class="text-theme-1 hover:underline disabled:no-underline">
+    Скачать архивом
   </button>
   {% endif %}
 

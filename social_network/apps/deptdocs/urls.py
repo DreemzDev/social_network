@@ -17,6 +17,7 @@ from .views import (
     RestoreDepartmentDocumentView,
     PurgeDepartmentDocumentView,
     BulkTrashDepartmentDocumentsView,
+    BulkDownloadDepartmentDocumentsView,
     BulkMoveDepartmentDocumentsView,
 )
 
@@ -39,4 +40,5 @@ urlpatterns = [
     path('deptdocs/purge/<int:doc_id>/', PurgeDepartmentDocumentView.as_view(), name='deptdocs_purge'),
     path('deptdocs/bulk-trash/', BulkTrashDepartmentDocumentsView.as_view(), name='deptdocs_bulk_trash'),
     path('deptdocs/bulk-move/', BulkMoveDepartmentDocumentsView.as_view(), name='deptdocs_bulk_move'),
+    path('deptdocs/bulk-download/', BulkDownloadDepartmentDocumentsView.as_view(), name='deptdocs_bulk_download'),
 ]

@@ -643,6 +643,50 @@
     FM.navigate(select.value);
   });
 
+  /**
+   * Скачивание выбранного одним zip.
+   *
+   * Два шага, и это не перестраховка. Сам архив забирается обычной
+   * навигацией (window.location), потому что скачать его через fetch
+   * означало бы держать весь zip в памяти вкладки — на 1 ГБ это верное
+   * падение. Но у навигации нет способа показать ошибку: ответ с текстом
+   * отказа просто заменил бы собой страницу. Поэтому сначала спрашиваем
+   * разрешение (?check=1) и показываем причину отказа тостом, и лишь
+   * потом уходим по ссылке.
+   */
+  function bulkDownload(ids) {
+    var url = config.bulkDownloadUrl + '?ids=' + ids.join(',');
+
+    fetch(url + '&check=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (payload) {
+          return { ok: r.ok, status: r.status, payload: payload };
+        });
+      })
+      .then(function (result) {
+        if (!result.ok || result.payload.success === false) {
+          FM.toast(result.payload.error || httpErrorText(result.status), 'error');
+          return;
+        }
+
+        // Часть выбранного могла оказаться недоступной (чужая закрытая
+        // папка) или уже удалённой. Молча отдать неполный архив нельзя —
+        // человек не узнал бы, что в нём не всё.
+        if (result.payload.skipped > 0) {
+          // Именно 'info': FM.toast знает только error/info/success, и
+          // несуществующий тип молча отрисовался бы зелёной галочкой —
+          // предупреждение выглядело бы как «всё хорошо».
+          FM.toast('Пропущено файлов без доступа: ' + result.payload.skipped, 'info');
+        }
+
+        FM.toast('Готовим архив: файлов ' + result.payload.count, 'success');
+        window.location = url;
+      })
+      .catch(function () {
+        FM.toast('Не удалось подготовить архив', 'error');
+      });
+  }
+
   function initBulkButtons() {
     var trashBtn = document.getElementById('fm-bulk-trash');
     if (trashBtn && config.bulkTrashUrl) {
@@ -669,6 +713,15 @@
         var ids = selectedIds();
         if (!ids.length) return;
         config.onBulkMove(ids);
+      });
+    }
+
+    var downloadBtn = document.getElementById('fm-bulk-download');
+    if (downloadBtn && config.bulkDownloadUrl) {
+      downloadBtn.addEventListener('click', function () {
+        var ids = selectedIds();
+        if (!ids.length) return;
+        bulkDownload(ids);
       });
     }
 
