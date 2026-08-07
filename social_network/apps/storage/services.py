@@ -2,6 +2,7 @@ import hashlib
 import mimetypes
 import os
 from datetime import timedelta
+from urllib.parse import quote
 
 from django.conf import settings
 from django.core.files.base import File
@@ -358,7 +359,22 @@ class StorageService:
 
         response = HttpResponse()
         response['Content-Type'] = blob.mime_type or 'application/octet-stream'
-        response['Content-Disposition'] = f'{disposition_type}; filename="{file_object.original_name}"'
+
+        # Имя файла: ASCII — как есть, иначе RFC 5987 (filename*=utf-8''...).
+        # Подставить кириллицу напрямую нельзя: HttpResponse кодирует
+        # не-latin1 значение заголовка по RFC 2047 (=?utf-8?b?...?=), а
+        # Content-Disposition этой формы не понимает — браузер сохранил бы
+        # файл под base64-строкой или под именем-хэшем из URL. В ветке
+        # DEBUG то же самое делает за нас FileResponse, поэтому локально
+        # баг не проявлялся: он есть только на прод-пути.
+        name = file_object.original_name
+        try:
+            name.encode('ascii')
+            file_expr = 'filename="{}"'.format(name.replace('\\', '\\\\').replace('"', r'\"'))
+        except UnicodeEncodeError:
+            file_expr = "filename*=utf-8''{}".format(quote(name))
+        response['Content-Disposition'] = f'{disposition_type}; {file_expr}'
+
         internal_path = default_storage.path(blob.file.name)
         media_root = str(settings.MEDIA_ROOT)
         relative = os.path.relpath(internal_path, media_root).replace(os.sep, '/')

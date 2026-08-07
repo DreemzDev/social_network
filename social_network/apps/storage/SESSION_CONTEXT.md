@@ -39,6 +39,26 @@ cd c:/Users/User/Desktop/social_network/social_network
 ../.venv/Scripts/celery.exe -A social_network beat --loglevel=info
 ```
 
+```powershell
+# 5. nginx — только когда нужно проверить прод-путь отдачи файлов
+#    (X-Accel-Redirect, запрет /media/storage/). В обычной разработке не
+#    нужен: при DEBUG=True файл отдаёт сам Django.
+$nginx = "C:\Users\User\Desktop\social_network\social_network\nginx-1.28.0"
+& "$nginx\nginx.exe" -p $nginx -t          # проверить конфиг
+Start-Process "$nginx\nginx.exe" -ArgumentList "-p","." -WorkingDirectory $nginx
+& "$nginx\nginx.exe" -p $nginx -s stop     # остановить
+```
+
+Проверять прод-путь надо при `DEBUG=False`, иначе ветка с `X-Accel-Redirect`
+просто не выполняется. Менять `settings.py` ради этого не нужно — достаточно
+временного модуля рядом и переменных окружения:
+
+```bash
+# settings_prodcheck.py:  from social_network.settings import *  /  DEBUG = False
+DJANGO_SETTINGS_MODULE=settings_prodcheck PYTHONPATH="<каталог с модулем>;." \
+    ../.venv/Scripts/daphne.exe -b 127.0.0.1 -p 8000 social_network.asgi:application
+```
+
 Daphne **не перезагружается сам** при изменении Python-кода — после правки
 вьюх/моделей/urls его надо перезапускать. Шаблоны при `DEBUG=True`
 подхватываются без перезапуска (кеширующего загрузчика нет).
@@ -106,6 +126,15 @@ git status --porcelain
    `from django.db.models import Sum`). Ловилось только при заходе персонала
    (`is_staff`) на `/storage/` — обычные пользователи эту ветку не видели,
    баг был бы незаметен до первой жалобы. Исправлено импортом `Count`.
+6. **`Content-Disposition` с кириллицей ломался на прод-пути.** Имя
+   подставлялось в заголовок как есть, а `HttpResponse` кодирует значение
+   вне latin-1 по RFC 2047 (`=?utf-8?b?…?=`) — форму, которой
+   `Content-Disposition` не знает. Браузер сохранил бы файл под base64-строкой
+   или под именем-хэшем из URL. Задевало почти каждое скачивание (имена в
+   портале кириллические) и **только прод**: в ветке `DEBUG` заголовок
+   собирает `FileResponse`, который сам оформляет имя по RFC 5987. Найдено
+   при написании теста на `X-Accel-Redirect`, исправлено там же.
+   Тест: `test_x_accel_redirect.py`.
 
 Гонки на конкурентную загрузку/purge проверены на **реальном Postgres**
 (`storage/tests/test_concurrency.py`) — на SQLite `select_for_update` и
@@ -128,7 +157,7 @@ cd c:/Users/User/Desktop/social_network/social_network
 
 Голый `manage.py test` без аргументов находит **0 тестов** — discovery
 стартует из корня проекта и в `apps/` не заходит. Все реальные тесты в
-проекте лежат в `apps/storage/tests/` (**177 штук** на момент написания);
+проекте лежат в `apps/storage/tests/` (**192 штуки** на момент написания);
 `tests.py` в остальных приложениях — пустые заглушки Django. Тесты трогают
 `exchange`/`catalog`/`deptdocs`/`profiles.Notification` напрямую, поэтому
 метка `storage` тянет за собой их модели — так и задумано, отдельная
@@ -426,27 +455,56 @@ python-property, ORDER BY по нему на уровне SQL невозможе
   `grid grid-cols-12`.
 
 ### Осталось незакрытым (важно)
-- **nginx.conf не приведён в порядок.** В `social_network/nginx-1.28.0/conf/nginx.conf`
-  есть обычный `location /media/`, раздающий и `media/storage/blobs/`, и
-  нет `location /protected/`. Django-перехватчик `^media/storage/`
-  работает только при `DEBUG=True`. То есть в проде файлы либо не
-  скачиваются (некому обработать `X-Accel-Redirect`), либо скачиваются в
-  обход прав по прямой ссылке. Правильный конфиг выписан в
-  ARCHITECTURE.md, раздел 8 — применить и проверить.
 - `notify()` в `profiles/views/_common.py` не устойчив к падению Redis
   (см. раздел про тесты выше).
-- **В `media/storage/blobs/` лежит ~2862 файла-сироты** — мусор, накопленный
-  прежними прогонами тестов до изоляции `MEDIA_ROOT`. Ни одной ссылки в БД
-  на них нет. Убирается штатной командой, но она необратима, поэтому
-  оставлено на решение владельца:
-  ```bash
-  ../.venv/Scripts/python.exe manage.py storage_verify                    # отчёт
-  ../.venv/Scripts/python.exe manage.py storage_verify --delete-untracked # удалить
-  ```
 - `TaskStatusView` отдаёт статус задачи любому аутентифицированному по
   `task_id`, без проверки, он ли её запускал. Идентификаторы — uuid4, так
   что угадать нельзя, но владения не проверяется; в payload только
   счётчики.
+- **`?inline=1` доверяет MIME-типу из аплоада.** `blob.mime_type`
+  определяется по загруженному файлу, а `get_download_response(inline=True)`
+  отдаёт его как есть. Загруженный `.html` откроется в браузере как
+  страница в домене портала — то есть хранимая XSS. В интерфейсе пункт
+  «Просмотр» показывается только для типов из `fm_tags.is_previewable`, но
+  сам эндпоинт принимает `inline=1` для чего угодно. Чинится на стороне
+  Django (белый список MIME для inline), не в nginx.
+
+### nginx — закрыто
+
+Прод-конфигурация приведена в порядок. Канонический конфиг лежит **в git**:
+`social_network/deploy/nginx/portal.conf` (server-блок для
+`/etc/nginx/conf.d/` на Astra Linux; при разворачивании поменять `/srv/portal`
+на каталог с `manage.py`). Локальный `nginx-1.28.0/conf/nginx.conf` обновлён
+теми же правилами с путями этой машины — но учтите: **весь каталог
+`nginx-1.28.0/` в `.gitignore`**, поэтому правка только там не уезжает
+дальше одного компьютера. Именно поэтому и появился отдельный файл в
+репозитории.
+
+Что добавлено: internal-локейшн `/protected/` с `alias` на MEDIA_ROOT (не на
+`blobs/` — путь бы удвоился), `location /media/storage/ { deny all; }`,
+`map $http_upgrade $connection_upgrade` вместо прошитого
+`Connection "upgrade"` на всех проксируемых запросах, и
+`client_max_body_size 110M` вместо 100M — тело multipart-запроса длиннее
+самого файла, и при равных значениях файл ровно в 100 МБ
+(`STORAGE_MAX_UPLOAD_SIZE`) отбивал бы nginx своей страницей 413 вместо
+понятного сообщения от Django.
+
+Проверено не только тестами: под `nginx + daphne` с `DEBUG=False` прямая
+ссылка `/media/storage/blobs/<checksum>` отдаёт 403, `/protected/...` — 404,
+`/media/avatar/../storage/blobs/<checksum>` — 403 (nginx нормализует URI до
+выбора location), аватар по `/media/` — 200, а скачивание через
+`/catalog/download/<id>/` возвращает 200 с `Server: nginx` и sha256 тела,
+равным checksum blob'а. То есть файл отдаёт nginx, а не воркер Daphne.
+
+Тесты — `storage/tests/test_x_accel_redirect.py` (15 штук): заголовок при
+`DEBUG=False`, пустое тело ответа, имя файла, и отдельным классом — разбор
+самих конфигов nginx.
+
+### Сироты в media/storage/blobs — убраны
+Было 2887 файлов при 25 записях `FileBlob`. `storage_verify --delete-untracked`
+удалил 2862, осталось ровно 25, повторный `storage_verify` чист. Команда
+необратима — перед повторным применением стоит сверить, что число «лишних»
+совпадает с разницей «файлы на диске минус `FileBlob.objects.count()`».
 
 ### Проверено фактически (не по документации)
 Дедупликация работает физически, а не только на уровне записей: на боевой
@@ -591,7 +649,7 @@ select-all, drag&drop загрузка, хлебные крошки на вес�
 открываемых браузером типов, блок «Кому видно» — всё это в `main`.
 
 ### Куда развивать дальше (по убыванию пользы)
-1. **nginx** — единственный блокер прода, см. выше.
+1. **Белый список MIME для `?inline=1`** — см. «Осталось незакрытым».
 2. **Массовое скачивание zip** — самая заметная дыра в функциональности
    менеджера; требует стриминга (`StreamingHttpResponse` + `zipstream`),
    чтобы не собирать архив в память.
@@ -605,6 +663,13 @@ select-all, drag&drop загрузка, хлебные крошки на вес�
 6. **Версии файла** — точка расширения описана в ARCHITECTURE, раздел 13.
 
 ### Первое, за что стоит взяться
-**nginx** (см. «Осталось незакрытым»): это единственный известный пункт,
-из-за которого прод не заработает — файлы либо не скачаются, либо
-скачаются в обход прав.
+Известного блокера прода больше нет — nginx закрыт (см. раздел «nginx —
+закрыто»). Ближайший по важности пункт — белый список MIME для `?inline=1`:
+он маленький, целиком на стороне Django и закрывает хранимую XSS.
+
+Что стоит проверить руками перед реальным разворачиванием, потому что
+тестами это не покрыть: `DEBUG = False` в `settings.py` (сейчас там жёстко
+`True`, и именно по нему `get_download_response()` выбирает ветку с
+`X-Accel-Redirect`), `SECRET_KEY` и пароль БД из окружения, а не из файла,
+и подстановка реального пути вместо `/srv/portal` в
+`deploy/nginx/portal.conf`.
