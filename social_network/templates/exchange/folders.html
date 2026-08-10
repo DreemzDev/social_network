@@ -45,6 +45,16 @@
                 <a href="{% url 'exchange_folder' person.pk %}" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
                   {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Открыть
                 </a>
+                {% comment %}
+                  Папка верхнего уровня в обменнике — сам сотрудник, а не
+                  запись ExchangeFolder, поэтому у неё свой адрес скачивания:
+                  файлы в корне личной папки имеют folder=None и через
+                  обычный exchange_folder_download недостижимы.
+                {% endcomment %}
+                <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
+                   data-fm-action="download-archive" data-fm-url="{% url 'exchange_personal_download' person.pk %}">
+                  {% include "includes/fm_icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Скачать архивом
+                </a>
               </div>
             </div>
           </div>

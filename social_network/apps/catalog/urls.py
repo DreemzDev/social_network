@@ -16,6 +16,7 @@ from .views import (
     RestoreCatalogDocumentView,
     PurgeCatalogDocumentView,
     BulkMoveCatalogDocumentsView,
+    DownloadCatalogFolderView,
     UploadCatalogArchiveView,
     BulkDownloadCatalogDocumentsView,
     BulkTrashCatalogDocumentsView,
@@ -41,4 +42,5 @@ urlpatterns = [
     path('catalog/bulk-trash/', BulkTrashCatalogDocumentsView.as_view(), name='catalog_bulk_trash'),
     path('catalog/bulk-download/', BulkDownloadCatalogDocumentsView.as_view(), name='catalog_bulk_download'),
     path('catalog/upload-archive/', UploadCatalogArchiveView.as_view(), name='catalog_upload_archive'),
+    path('catalog/folder/<int:folder_id>/download-archive/', DownloadCatalogFolderView.as_view(), name='catalog_folder_download'),
 ]

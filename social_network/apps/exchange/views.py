@@ -20,8 +20,11 @@ from storage.utils import (
     apply_sort,
     fm_archive_upload_view,
     fm_archive_view,
+    fm_folder_archive_view,
     fm_task_response,
     folder_ancestors,
+    folder_subtree,
+    folder_subtree_ids,
 )
 
 from profiles.models import Notification
@@ -195,7 +198,7 @@ class DeleteExchangeFolderView(LoginRequiredMixin, View):
         name = folder.name
 
         with transaction.atomic():
-            subtree_ids = self._subtree_ids(folder)
+            subtree_ids = folder_subtree_ids(folder)
             # folder=None обязательно, а не только is_deleted=True:
             # ExchangeFile.folder — CASCADE, и без отвязки от папки
             # folder.delete() всё равно снёс бы записи физически, сколько
@@ -215,20 +218,6 @@ class DeleteExchangeFolderView(LoginRequiredMixin, View):
             action='folder_deleted', text=f'удалил папку «{name}»',
         )
         return JsonResponse({'success': True})
-
-    @staticmethod
-    def _subtree_ids(folder) -> list:
-        """Id папки и всех вложенных. Обход в ширину по уровням: дерево
-        подпапок неглубокое, и несколько запросов по parent_id дешевле и
-        понятнее рекурсивного CTE."""
-        ids = [folder.pk]
-        level = [folder.pk]
-        while level:
-            level = list(
-                ExchangeFolder.objects.filter(parent_id__in=level).values_list('pk', flat=True)
-            )
-            ids.extend(level)
-        return ids
 
 
 class UploadExchangeFileView(LoginRequiredMixin, View):
@@ -484,6 +473,55 @@ class BulkTrashExchangeFilesView(LoginRequiredMixin, View):
             )
 
         return fm_task_response(request, task)
+
+
+class DownloadExchangeFolderView(LoginRequiredMixin, View):
+    """Скачать подпапку обменника целиком одним архивом.
+
+    Содержимое обменника видно всем сотрудникам, поэтому сужать поддерево
+    не по чему — как и у одиночного скачивания.
+    """
+
+    def get(self, request, folder_id):
+        folder = get_object_or_404(ExchangeFolder, pk=folder_id)
+        paths = folder_subtree(folder)
+
+        files = ExchangeFile.objects.filter(
+            folder_id__in=paths, is_deleted=False,
+        ).select_related('file_object__blob')
+
+        return fm_folder_archive_view(
+            request,
+            items=[(paths[item.folder_id], item.file_object) for item in files],
+            filename=f'{folder.name}.zip',
+        )
+
+
+class DownloadExchangePersonalFolderView(LoginRequiredMixin, View):
+    """Скачать личную папку сотрудника целиком.
+
+    Отдельная вьюха, потому что папка верхнего уровня в обменнике — это сам
+    сотрудник, а не запись ExchangeFolder: у файлов в корне личной папки
+    folder=None, и через DownloadExchangeFolderView они недостижимы в
+    принципе.
+    """
+
+    def get(self, request, user_id):
+        owner = get_object_or_404(get_user_model(), pk=user_id)
+
+        paths = {None: ()}
+        for root in ExchangeFolder.objects.filter(owner=owner, parent__isnull=True):
+            paths.update(folder_subtree(root))
+
+        files = ExchangeFile.objects.filter(
+            owner=owner, is_deleted=False,
+        ).select_related('file_object__blob')
+
+        return fm_folder_archive_view(
+            request,
+            items=[(paths.get(item.folder_id, ()), item.file_object) for item in files],
+            filename=f'{owner.get_full_name() or owner.username}.zip',
+        )
 
 
 class UploadExchangeArchiveView(LoginRequiredMixin, View):

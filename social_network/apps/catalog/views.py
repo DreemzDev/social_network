@@ -19,8 +19,11 @@ from storage.utils import (
     build_folder_choices,
     fm_archive_upload_view,
     fm_archive_view,
+    fm_folder_archive_view,
     fm_task_response,
     folder_ancestors,
+    folder_subtree,
+    folder_subtree_ids,
 )
 
 from profiles.models import Notification
@@ -133,7 +136,7 @@ class DeleteCatalogFolderView(LoginRequiredMixin, View):
         name = folder.name
 
         with transaction.atomic():
-            subtree_ids = _subtree_ids(CatalogFolder, folder)
+            subtree_ids = folder_subtree_ids(folder)
             # folder=None обязательно, а не только is_deleted=True:
             # CatalogDocument.folder — CASCADE, и без отвязки удаление
             # папки снесло бы документы физически, мимо корзины.
@@ -148,17 +151,6 @@ class DeleteCatalogFolderView(LoginRequiredMixin, View):
         _notify_folder(parent_id, actor=request.user,
                        action='folder_deleted', text=f'удалил папку «{name}»')
         return JsonResponse({'success': True})
-
-
-def _subtree_ids(model, folder) -> list:
-    """Id папки и всех вложенных. Обход по уровням: деревья разделов
-    неглубокие, несколько запросов по parent_id проще рекурсивного CTE."""
-    ids = [folder.pk]
-    level = [folder.pk]
-    while level:
-        level = list(model.objects.filter(parent_id__in=level).values_list('pk', flat=True))
-        ids.extend(level)
-    return ids
 
 
 class MoveCatalogFolderView(LoginRequiredMixin, View):
@@ -258,6 +250,28 @@ class BulkDownloadCatalogDocumentsView(LoginRequiredMixin, View):
             request,
             CatalogDocument.objects.filter(is_deleted=False),
             filename='Информационный каталог.zip',
+        )
+
+
+class DownloadCatalogFolderView(LoginRequiredMixin, View):
+    """Скачать папку целиком одним архивом, вместе с вложенными.
+
+    Права те же, что и на весь каталог: он общедоступен всем
+    аутентифицированным, поэтому сужать поддерево не по чему.
+    """
+
+    def get(self, request, folder_id):
+        folder = get_object_or_404(CatalogFolder, pk=folder_id)
+        paths = folder_subtree(folder)
+
+        documents = CatalogDocument.objects.filter(
+            folder_id__in=paths, is_deleted=False,
+        ).select_related('file_object__blob')
+
+        return fm_folder_archive_view(
+            request,
+            items=[(paths[document.folder_id], document.file_object) for document in documents],
+            filename=f'{folder.name}.zip',
         )
 
 

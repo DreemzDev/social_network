@@ -108,29 +108,40 @@ class _ZipStreamBuffer:
         return data
 
 
-def _archive_name(original_name: str, used: set) -> str:
-    """Имя внутри архива: без путей и уникальное.
+def _archive_name(path: tuple, original_name: str, used: set) -> str:
+    """Полное имя записи внутри архива: <путь>/<файл>, уникальное.
 
-    Путь отрезается, потому что original_name пришёл из браузера и в нём
-    может оказаться что угодно, вплоть до '../../'. Уникальность нужна
-    из-за дедупликации: два FileObject с одинаковым именем — норма, а два
-    одинаковых имени в zip оставили бы пользователю один файл вместо двух.
+    Имя файла отрезается от пути, потому что original_name пришёл из
+    браузера и в нём может оказаться что угодно, вплоть до '../../'.
+    Каталоги берутся не оттуда, а из дерева папок модуля (path), поэтому
+    им доверять можно — но и они прогоняются через ту же чистку, чтобы
+    разделитель из названия папки не превратился во вложенность.
+
+    Уникальность проверяется по ПОЛНОМУ пути, а не по имени: два файла с
+    одинаковым названием в разных папках — норма и разводить их не нужно,
+    а два одинаковых имени в одной папке оставили бы пользователю один
+    файл вместо двух (дедупликация делает такие пары обычным делом).
     """
-    name = os.path.basename(str(original_name or '').replace('\\', '/')).strip()
-    name = name or 'файл'
+    def clean(value):
+        return os.path.basename(str(value or '').replace('\\', '/')).strip()
+
+    directory = '/'.join(filter(None, (clean(part) for part in path)))
+    name = clean(original_name) or 'файл'
 
     stem, suffix = os.path.splitext(name)
-    candidate = name
     index = 2
+    candidate = f'{directory}/{name}' if directory else name
+
     while candidate.lower() in used:
-        candidate = f'{stem} ({index}){suffix}'
+        numbered = f'{stem} ({index}){suffix}'
+        candidate = f'{directory}/{numbered}' if directory else numbered
         index += 1
 
     used.add(candidate.lower())
     return candidate
 
 
-def _iter_zip(file_objects):
+def _iter_zip(items):
     """Генератор байтов zip-архива. Память не растёт с размером архива:
     в буфере одновременно живёт не больше одного прочитанного чанка."""
     import zipfile
@@ -139,9 +150,9 @@ def _iter_zip(file_objects):
     used_names = set()
 
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_STORED) as archive:
-        for file_object in file_objects:
+        for path, file_object in items:
             entry = zipfile.ZipInfo(
-                _archive_name(file_object.original_name, used_names),
+                _archive_name(path, file_object.original_name, used_names),
                 date_time=timezone.localtime(file_object.uploaded_at).timetuple()[:6],
             )
             entry.compress_type = zipfile.ZIP_STORED
@@ -519,8 +530,13 @@ class StorageService:
         return _zip_max_files(), _zip_max_total_size()
 
     @staticmethod
-    def check_archive_request(file_objects) -> dict:
+    def check_archive_request(items) -> dict:
         """Проверяет, что архив можно собрать, и возвращает его сводку.
+
+        items — последовательность пар (путь, FileObject), где путь это
+        кортеж каталогов внутри архива. У массового скачивания выбранного
+        путь пустой (файлы ложатся в корень архива), у скачивания папки —
+        её дерево.
 
         Отдельный метод, а не проверка внутри get_archive_response(), потому
         что фронт обязан узнать причину отказа ДО начала скачивания:
@@ -531,7 +547,7 @@ class StorageService:
         """
         max_files, max_total = StorageService.get_archive_limits()
 
-        count = len(file_objects)
+        count = len(items)
         if not count:
             raise ArchiveTooLargeError('Нечего скачивать: не выбрано ни одного файла')
 
@@ -545,7 +561,7 @@ class StorageService:
         # (каждый файл лежит в нём отдельной записью под своим именем),
         # поэтому здесь считается именно сумма по объектам, а не по blob'ам,
         # как в get_usage().
-        total_size = sum(file_object.blob.size for file_object in file_objects)
+        total_size = sum(file_object.blob.size for _path, file_object in items)
         if total_size > max_total:
             raise ArchiveTooLargeError(
                 f'Слишком большой архив: {_format_size(total_size)} при пределе '
@@ -555,7 +571,7 @@ class StorageService:
         return {'count': count, 'total_size': total_size}
 
     @staticmethod
-    def get_archive_response(file_objects, *, filename: str):
+    def get_archive_response(items, *, filename: str):
         """Отдаёт выбранные файлы одним zip, собирая его НА ЛЕТУ.
 
         Права не проверяются здесь — вызывающий модуль обязан сузить список
@@ -577,7 +593,7 @@ class StorageService:
         from django.http import StreamingHttpResponse
 
         response = StreamingHttpResponse(
-            _iter_zip(file_objects), content_type='application/zip',
+            _iter_zip(items), content_type='application/zip',
         )
         response['Content-Disposition'] = _content_disposition('attachment', filename)
         response['X-Content-Type-Options'] = 'nosniff'

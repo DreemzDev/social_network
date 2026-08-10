@@ -18,7 +18,7 @@
 <div class="intro-y grid grid-cols-12 gap-3 sm:gap-6">
   {% for folder in subfolders %}
     {% with can_manage=folder|fm_can_manage:request.user %}
-    {% include "includes/fm_folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=can_manage can_delete=can_manage folder_delete_url=folder.get_delete_url folder_selectable=False %}
+    {% include "includes/fm_folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=can_manage can_delete=can_manage folder_delete_url=folder.get_delete_url folder_download_url=folder.get_download_url folder_selectable=False %}
     {% endwith %}
   {% endfor %}
 

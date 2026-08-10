@@ -620,6 +620,14 @@
     var url = button.dataset.fmUrl;
     if (!url) return;
 
+    // Скачивание архива выбивается из общего правила «действие = POST +
+    // тост + обновление сетки»: это GET в два шага (сначала спросить
+    // разрешение, потом уйти по ссылке), и обновлять после него нечего.
+    if (button.dataset.fmAction === 'download-archive') {
+      downloadArchive(url);
+      return;
+    }
+
     var successText = button.dataset.fmSuccess || 'Готово';
     // На странице корзины обновлять нечего — там нет сетки с ?partial=1,
     // поэтому карточка просто убирается из своего списка.
@@ -667,10 +675,10 @@
    * разрешение (?check=1) и показываем причину отказа тостом, и лишь
    * потом уходим по ссылке.
    */
-  function bulkDownload(ids) {
-    var url = config.bulkDownloadUrl + '?ids=' + ids.join(',');
+  function downloadArchive(url) {
+    var separator = url.indexOf('?') === -1 ? '?' : '&';
 
-    fetch(url + '&check=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    fetch(url + separator + 'check=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (payload) {
           return { ok: r.ok, status: r.status, payload: payload };
@@ -828,7 +836,7 @@
       downloadBtn.addEventListener('click', function () {
         var ids = selectedIds();
         if (!ids.length) return;
-        bulkDownload(ids);
+        downloadArchive(config.bulkDownloadUrl + '?ids=' + ids.join(','));
       });
     }
 

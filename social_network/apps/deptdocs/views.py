@@ -20,8 +20,11 @@ from storage.utils import (
     build_folder_choices,
     fm_archive_upload_view,
     fm_archive_view,
+    fm_folder_archive_view,
     fm_task_response,
     folder_ancestors,
+    folder_subtree,
+    folder_subtree_ids,
 )
 
 from profiles.models import Notification
@@ -228,7 +231,7 @@ class DeleteDepartmentFolderView(LoginRequiredMixin, View):
 
         parent = folder.parent
         name = folder.name
-        subtree_ids = _subtree_ids(folder)
+        subtree_ids = folder_subtree_ids(folder)
         documents = DepartmentDocument.objects.filter(folder_id__in=subtree_ids)
 
         if parent is None and documents.exists():
@@ -252,17 +255,6 @@ class DeleteDepartmentFolderView(LoginRequiredMixin, View):
         _notify_folder(parent.pk if parent else None, actor=request.user,
                        action='folder_deleted', text=f'удалил папку «{name}»')
         return JsonResponse({'success': True})
-
-
-def _subtree_ids(folder) -> list:
-    ids = [folder.pk]
-    level = [folder.pk]
-    while level:
-        level = list(
-            DepartmentFolder.objects.filter(parent_id__in=level).values_list('pk', flat=True)
-        )
-        ids.extend(level)
-    return ids
 
 
 class MoveDepartmentFolderView(LoginRequiredMixin, View):
@@ -393,6 +385,37 @@ class BulkTrashDepartmentDocumentsView(LoginRequiredMixin, View):
                            action='files_trashed', text='удалил документы в корзину')
 
         return fm_task_response(request, task)
+
+
+class DownloadDepartmentFolderView(LoginRequiredMixin, View):
+    """Скачать папку целиком одним архивом.
+
+    Единственный из трёх модулей, где обход поддерева обязан считаться с
+    правами на КАЖДУЮ папку: allowed_users задаётся на папке, поэтому
+    вложенная может быть закрыта при открытой родительской. Ветка с
+    закрытой папкой обрывается целиком — иначе архив стал бы способом
+    выгрузить то, что в интерфейсе даже не показывается.
+    """
+
+    def get(self, request, folder_id):
+        folder = get_object_or_404(DepartmentFolder, pk=folder_id)
+        if not folder.is_accessible_by(request.user):
+            raise PermissionDenied
+
+        paths = folder_subtree(
+            folder,
+            queryset=DepartmentFolder.objects.filter(allowed_users=request.user).distinct(),
+        )
+
+        documents = DepartmentDocument.objects.filter(
+            folder_id__in=paths, is_deleted=False,
+        ).select_related('file_object__blob')
+
+        return fm_folder_archive_view(
+            request,
+            items=[(paths[document.folder_id], document.file_object) for document in documents],
+            filename=f'{folder.name}.zip',
+        )
 
 
 class UploadDepartmentArchiveView(LoginRequiredMixin, View):

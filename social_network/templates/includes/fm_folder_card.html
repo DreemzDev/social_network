@@ -12,6 +12,9 @@
     can_rename      — показывать «Переименовать» (открывает модалку родителя)
     can_delete      — показывать «Удалить папку»
     folder_delete_url — адрес удаления (нужен при can_delete)
+    folder_download_url — адрес скачивания папки архивом; без него пункта
+                      «Скачать архивом» в меню нет (контрол либо работает,
+                      либо его нет в разметке, ARCHITECTURE.md 12.4)
     folder_selectable — участвует ли папка в массовом выделении
 
   Чекбокс НЕ рисуется, если папку нельзя выбрать: в первой редакции он
@@ -41,7 +44,7 @@
     <a href="{{ folder_url }}" class="block font-medium mt-4 text-center truncate" title="{{ folder_name }}">{{ folder_name }}</a>
     <div class="text-gray-600 text-xs text-center">{{ folder_note|default:'папка' }}</div>
 
-    {% if can_rename or can_delete %}
+    {% if can_rename or can_delete or folder_download_url %}
     <div class="absolute top-0 right-0 mr-2 mt-2 dropdown ml-auto" x-data="{ open: false }">
       <a class="w-5 h-5 block" href="javascript:;" x-on:click="open = !open" aria-label="Действия с папкой">
         {% include "includes/fm_icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
@@ -66,6 +69,19 @@
           <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
              x-on:click="moveOpen = true; moveTarget = { type: 'folder', id: {{ folder_id }} }; moveFolderId = ''; open = false">
             {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Переместить
+          </a>
+          {% endif %}
+          {% if folder_download_url %}
+          {% comment %}
+            Скачать папку целиком, вместе с вложенными: тот же механизм, что
+            и у массового скачивания выбранного, но с путями внутри архива
+            (ARCHITECTURE.md, 8.1). Обработчик общий — data-fm-action ловит
+            делегат на document, поэтому пункт работает и после живой
+            перерисовки сетки, когда карточка пересоздана.
+          {% endcomment %}
+          <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
+             data-fm-action="download-archive" data-fm-url="{{ folder_download_url }}">
+            {% include "includes/fm_icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Скачать архивом
           </a>
           {% endif %}
           {% if can_delete %}

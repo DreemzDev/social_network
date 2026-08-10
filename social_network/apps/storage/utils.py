@@ -133,16 +133,35 @@ def fm_archive_view(request, queryset, *, filename):
     страницу. Поэтому кнопка сначала спрашивает разрешение, и только
     получив его, переходит по ссылке.
     """
+    requested = [chunk for chunk in request.GET.get('ids', '').split(',') if chunk.isdigit()]
+
+    rows = queryset.filter(pk__in=requested).select_related('file_object__blob')
+    # Путь пустой: выбранные файлы ложатся в корень архива — они могли
+    # прийти из разных папок, и восстанавливать их вложенность здесь не
+    # просили. У скачивания папки (fm_folder_archive_view) путь как раз есть.
+    items = [((), row.file_object) for row in rows]
+
+    return _archive_download(request, items, filename=filename, requested=len(requested))
+
+
+def fm_folder_archive_view(request, *, items, filename):
+    """Вторая половина того же: скачать папку целиком, с вложенностью.
+
+    items — пары (путь, FileObject), путь собирает вызывающий модуль через
+    folder_subtree(). Права проверяет он же: у приватного доступа обход
+    обязан обрываться на закрытой подпапке, у остальных двух сужать нечего.
+    """
+    return _archive_download(request, items, filename=filename, requested=len(items))
+
+
+def _archive_download(request, items, *, filename, requested):
+    """Проверка пределов, режим ?check=1 и сам ответ — общее для обоих
+    способов собрать архив."""
     from .exceptions import ArchiveTooLargeError
     from .services import StorageService
 
-    requested = [chunk for chunk in request.GET.get('ids', '').split(',') if chunk.isdigit()]
-
-    items = queryset.filter(pk__in=requested).select_related('file_object__blob')
-    file_objects = [item.file_object for item in items]
-
     try:
-        summary = StorageService.check_archive_request(file_objects)
+        summary = StorageService.check_archive_request(items)
     except ArchiveTooLargeError as error:
         return JsonResponse({'success': False, 'error': error.message}, status=400)
 
@@ -154,10 +173,52 @@ def fm_archive_view(request, queryset, *, filename):
             'success': True,
             'count': summary['count'],
             'total_size': summary['total_size'],
-            'skipped': len(requested) - summary['count'],
+            'skipped': requested - summary['count'],
         })
 
-    return StorageService.get_archive_response(file_objects, filename=filename)
+    return StorageService.get_archive_response(items, filename=filename)
+
+
+def folder_subtree(folder, *, queryset=None) -> dict:
+    """{id папки: путь от скачиваемой папки} для неё самой и всех вложенных.
+
+    Обход в ширину по уровням: деревья разделов неглубокие, и несколько
+    запросов по parent_id проще и понятнее рекурсивного CTE.
+
+    queryset ограничивает, какие папки вообще видны. Нужно приватному
+    доступу: allowed_users задаётся НА ПАПКЕ, поэтому вложенная может быть
+    закрыта при открытой родительской, и обход обязан обрывать такую ветку
+    целиком, а не только пропускать саму папку.
+
+    Путь — кортеж названий, начиная с самой folder: он же станет
+    вложенностью каталогов внутри zip, поэтому в архиве папка приезжает
+    вместе со своим именем, а не вываливается содержимым в корень.
+    """
+    model = type(folder)
+    base = queryset if queryset is not None else model._default_manager.all()
+
+    paths = {folder.pk: (folder.name,)}
+    level = [folder.pk]
+
+    while level:
+        children = list(base.filter(parent_id__in=level).values_list('pk', 'parent_id', 'name'))
+        level = []
+        for pk, parent_id, name in children:
+            # Защита от цикла в дереве: перенос папки в саму себя закрыт
+            # проверкой _is_descendant, но данные могли прийти и в обход её
+            # (админка, ручной SQL), а зациклившийся обход тут повесил бы
+            # воркер намертво.
+            if pk in paths:
+                continue
+            paths[pk] = paths[parent_id] + (name,)
+            level.append(pk)
+
+    return paths
+
+
+def folder_subtree_ids(folder, *, queryset=None) -> list:
+    """Id папки и всех вложенных — частый случай folder_subtree()."""
+    return list(folder_subtree(folder, queryset=queryset))
 
 
 def fm_archive_upload_view(request, *, category, launch, field='archive'):

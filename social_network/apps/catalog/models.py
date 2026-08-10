@@ -29,6 +29,14 @@ class CatalogFolder(models.Model):
 
         return reverse('catalog_folder', args=[self.pk])
 
+    def get_download_url(self) -> str:
+        """Скачать папку целиком архивом. Рядом с get_delete_url по той же
+        причине: карточка папки общая на три модуля и адреса берёт с
+        модели, а не собирает {% url %} с именем маршрута каждого."""
+        from django.urls import reverse
+
+        return reverse('catalog_folder_download', args=[self.pk])
+
     def get_delete_url(self) -> str:
         from django.urls import reverse
 
