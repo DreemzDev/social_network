@@ -18,6 +18,7 @@ from storage.utils import (
     PartialGridMixin,
     apply_filters,
     apply_sort,
+    build_folder_choices,
     fm_archive_upload_view,
     fm_archive_view,
     fm_folder_archive_view,
@@ -43,6 +44,89 @@ def _notify_folder(folder, owner_id, *, actor, action, text):
         realtime.exchange_location(owner_id, folder.pk if folder else None),
         action=action, actor=actor, text=text,
     )
+
+
+def _notify_new_owner(new_owner, *, actor, text):
+    """Владельцу личной папки — что в неё что-то приехало не его руками.
+
+    Тот же Kind.FILE_SHARED и та же ссылка, что и у загрузки
+    (UploadExchangeFileView): для владельца папки разницы между «положили
+    файл» и «перенесли файл» нет — содержимое его папки изменилось без его
+    участия, и узнать об этом он должен так же.
+    """
+    if new_owner.pk == actor.pk:
+        return
+
+    notify(
+        new_owner, Notification.Kind.FILE_SHARED,
+        f'{actor.get_full_name() or actor.username} {text}',
+        actor=actor,
+        url=reverse('exchange_folder', args=[new_owner.pk]),
+    )
+
+
+def _move_destination(request, *, default_owner_id, folder_param='folder_id'):
+    """Разбирает «куда переносим»: чья личная папка и подпапка внутри неё.
+
+    Возвращает (owner, folder); owner=None означает «владельца не менять»
+    (корень своей же личной папки), folder=None — корень личной папки.
+
+    Владельца назначения задаёт сама подпапка: она всегда знает, в чьей
+    личной папке заведена. owner_id нужен там, где подпапки нет — в корне
+    личной папки (ExchangeFile.folder=None, одним id такое место не
+    назвать); присланный вместе с подпапкой, он обязан с ней совпасть.
+    Пара «личная папка одного + подпапка другого» — либо подделанный
+    запрос, либо рассинхрон интерфейса, и в обоих случаях дала бы файл,
+    невидимый нигде: список фильтруется по owner И folder одновременно.
+
+    Без обоих параметров владелец берётся из default_owner_id — так перенос
+    внутри одной личной папки остаётся ровно тем же запросом, что и был до
+    появления переноса между сотрудниками.
+    """
+    owner_id = request.POST.get('owner_id') or None
+    folder_id = request.POST.get(folder_param) or None
+
+    if folder_id:
+        folders = ExchangeFolder.objects.select_related('owner')
+        folder = (
+            get_object_or_404(folders, pk=folder_id, owner_id=owner_id) if owner_id
+            else get_object_or_404(folders, pk=folder_id)
+        )
+        return folder.owner, folder
+
+    owner_id = owner_id or default_owner_id
+    return (get_object_or_404(get_user_model(), pk=owner_id) if owner_id else None), None
+
+
+def _move_targets(current_owner):
+    """Дерево «сотрудник → его подпапки» для селекта перемещения.
+
+    Раньше в селекте были только подпапки текущей личной папки: перенос
+    между сотрудниками был запрещён, и предлагать чужие папки было незачем.
+    Теперь перенос разрешён (MoveExchangeFileView), а контрол обязан
+    предлагать ровно то, что действительно сработает (ARCHITECTURE.md 12.4).
+
+    Корневая «папка» обменника — это сам сотрудник, а не запись
+    ExchangeFolder, поэтому список строится от пользователей, а не одним
+    build_folder_choices по всем папкам: отступы внутри личной папки считает
+    он же, но каждой личной папке — отдельно.
+
+    Два запроса на весь список независимо от числа сотрудников: папки
+    группируются по owner_id в Python.
+    """
+    folders_by_owner = {}
+    for folder in ExchangeFolder.objects.all():
+        folders_by_owner.setdefault(folder.owner_id, []).append(folder)
+
+    return [
+        {
+            'owner_id': user.pk,
+            'title': user.get_full_name() or user.username,
+            'is_current': user.pk == current_owner.pk,
+            'folders': build_folder_choices(folders_by_owner.get(user.pk, [])),
+        }
+        for user in get_user_model().objects.order_by('last_name', 'first_name')
+    ]
 
 
 class ExchangeFolderListView(LoginRequiredMixin, ListView):
@@ -130,11 +214,11 @@ class ExchangeFolderView(PartialGridMixin, LoginRequiredMixin, ListView):
             owner=self.folder_owner, parent=self.current_folder
         )
         context['trash_url'] = reverse('storage_trash')
-        # Плоский список ВСЕХ подпапок этой личной папки (не только на
-        # текущем уровне) — для селекта перемещения файла: переносят обычно
-        # в известную подпапку, искать её в плоском списке проще, чем
-        # разворачивать многоуровневое дерево ради разового выбора.
-        context['all_owner_subfolders'] = ExchangeFolder.objects.filter(owner=self.folder_owner)
+        # Куда можно перенести файл или подпапку: личные папки всех
+        # сотрудников со своими подпапками. Плоский список подпапок только
+        # текущей личной папки, стоявший здесь раньше, соответствовал
+        # прежнему запрету на перенос между сотрудниками.
+        context['move_targets'] = _move_targets(self.folder_owner)
         # Срок хранения — из политики storage, а не числом в шаблоне:
         # при смене STORAGE_CATEGORY_TTL текст в модалке загрузки иначе
         # продолжил бы обещать старый срок.
@@ -312,45 +396,65 @@ class RenameExchangeFolderView(LoginRequiredMixin, View):
 
 
 class MoveExchangeFolderView(LoginRequiredMixin, View):
-    """Перенос подпапки внутри одной и той же личной папки.
+    """Перенос подпапки — в том числе в личную папку другого сотрудника.
 
     У каталога и приватного доступа перенос папок был с самого начала, у
     обменника — нет, из-за чего собранную не в той подпапке структуру
     приходилось пересоздавать руками.
 
-    Владелец не меняется по той же причине, что и у файлов
-    (MoveExchangeFileView): перенос содержимого в чужую личную папку
-    выглядел бы для неё как подмена без предупреждения."""
+    Смена владельца — по той же причине и с теми же последствиями, что и у
+    файлов (MoveExchangeFileView). Владелец меняется у ВСЕГО поддерева,
+    иначе перенос сломал бы видимость: список файлов фильтруется по owner и
+    folder сразу, и файл со старым владельцем в переехавшей папке пропал бы
+    из интерфейса, оставшись в базе."""
 
     def post(self, request, folder_id):
         folder = get_object_or_404(ExchangeFolder, pk=folder_id)
         if not folder.can_be_deleted_by(request.user):
             raise PermissionDenied
 
+        source_owner_id = folder.owner_id
         old_parent = folder.parent
-        new_parent_id = request.POST.get('parent_id') or None
+        new_owner, new_parent = _move_destination(
+            request, default_owner_id=source_owner_id, folder_param='parent_id',
+        )
 
-        if new_parent_id:
-            new_parent = get_object_or_404(
-                ExchangeFolder, pk=new_parent_id, owner_id=folder.owner_id,
+        if new_parent is not None and (
+            new_parent.pk == folder.pk or _is_descendant(new_parent, folder)
+        ):
+            return JsonResponse(
+                {'success': False,
+                 'error': 'Нельзя перенести папку в саму себя или во вложенную папку'},
+                status=400,
             )
-            if new_parent.pk == folder.pk or _is_descendant(new_parent, folder):
-                return JsonResponse(
-                    {'success': False,
-                     'error': 'Нельзя перенести папку в саму себя или во вложенную папку'},
-                    status=400,
-                )
-        else:
-            new_parent = None
 
-        folder.parent = new_parent
-        folder.save(update_fields=['parent'])
+        with transaction.atomic():
+            folder.parent = new_parent
+            folder.owner = new_owner
+            folder.save(update_fields=['parent', 'owner'])
 
-        _notify_folder(old_parent, folder.owner_id, actor=request.user,
+            if new_owner.pk != source_owner_id:
+                subtree_ids = folder_subtree_ids(folder)
+                ExchangeFolder.objects.filter(pk__in=subtree_ids).update(owner=new_owner)
+                # Без is_deleted=False: у лежащего в корзине файла folder
+                # сохранён, и восстановление вернёт его в эту же папку. Не
+                # смени ему владельца — вернулся бы файл, невидимый ни в
+                # одной папке.
+                ExchangeFile.objects.filter(folder_id__in=subtree_ids).update(owner=new_owner)
+
+        _notify_folder(old_parent, source_owner_id, actor=request.user,
                        action='folder_moved', text=f'перенёс папку «{folder.name}»')
-        if (old_parent.pk if old_parent else None) != (new_parent.pk if new_parent else None):
-            _notify_folder(new_parent, folder.owner_id, actor=request.user,
+        if (source_owner_id, old_parent.pk if old_parent else None) != (
+            new_owner.pk, new_parent.pk if new_parent else None
+        ):
+            _notify_folder(new_parent, new_owner.pk, actor=request.user,
                            action='folder_moved', text=f'перенёс сюда папку «{folder.name}»')
+
+        if new_owner.pk != source_owner_id:
+            _notify_new_owner(
+                new_owner, actor=request.user,
+                text=f'перенёс папку «{folder.name}» в вашу папку обменника',
+            )
 
         return JsonResponse({'success': True})
 
@@ -395,35 +499,56 @@ class RenameExchangeFileView(LoginRequiredMixin, View):
 
 
 class MoveExchangeFileView(LoginRequiredMixin, View):
-    """Перемещение между подпапками внутри ОДНОЙ И ТОЙ ЖЕ личной папки —
-    менять owner здесь не предполагается: перекладывание файла из папки
-    одного сотрудника в папку другого выглядело бы для пострадавшего как
-    подмена содержимого его личной папки без предупреждения. Для передачи
-    в другую личную папку — заново положить файл (upload) или переслать
-    через copy_reference из другого модуля."""
+    """Перемещение файла в любую папку обменника, включая личную папку
+    другого сотрудника.
+
+    Раньше перенос был ограничен подпапками той же личной папки: считалось,
+    что чужой файл, появившийся в личной папке, выглядит для её владельца
+    как подмена содержимого без предупреждения. Ограничение снято по
+    решению владельца портала, и оно действительно расходилось с остальным
+    обменником: положить файл в чужую папку загрузкой было можно с самого
+    начала, а запрет на перенос заставлял делать то же самое в два
+    действия — скачать и загрузить заново, создав второй FileObject там,
+    где хватало смены папки.
+
+    Перенос в чужую папку — это смена owner, а не только folder: список
+    файлов фильтруется по обоим полям сразу, и файл со старым владельцем в
+    новой папке не был бы виден никому. Отсюда последствие, принятое
+    явно: вместе с владельцем переходит право удаления
+    (ExchangeFile.can_be_deleted_by) — прежний владелец папки его теряет,
+    загрузивший сохраняет. Владельца папки-назначения уведомляем, как это
+    делает загрузка."""
 
     def post(self, request, file_id):
         exchange_file = get_object_or_404(ExchangeFile, pk=file_id, is_deleted=False)
         if not exchange_file.can_be_deleted_by(request.user):
             raise PermissionDenied
 
-        folder_id = request.POST.get('folder_id') or None
-        folder = (
-            get_object_or_404(ExchangeFolder, pk=folder_id, owner=exchange_file.owner)
-            if folder_id else None
-        )
-
+        source_owner_id = exchange_file.owner_id
         source_folder = exchange_file.folder
+        new_owner, folder = _move_destination(request, default_owner_id=source_owner_id)
+
+        exchange_file.owner = new_owner
         exchange_file.folder = folder
-        exchange_file.save(update_fields=['folder'])
+        exchange_file.save(update_fields=['owner', 'folder'])
 
         # Обновиться должны обе папки: и та, откуда файл ушёл, и та, куда
         # приехал — иначе у смотрящего на папку-источник он так и висел бы.
-        _notify_folder(source_folder, exchange_file.owner_id, actor=request.user,
+        # С переносом между сотрудниками это ещё и разные личные папки,
+        # поэтому в location идёт владелец до переноса, а не после.
+        _notify_folder(source_folder, source_owner_id, actor=request.user,
                        action='file_moved', text='переместил файл')
-        if (source_folder.pk if source_folder else None) != (folder.pk if folder else None):
-            _notify_folder(folder, exchange_file.owner_id, actor=request.user,
+        if (source_owner_id, source_folder.pk if source_folder else None) != (
+            new_owner.pk, folder.pk if folder else None
+        ):
+            _notify_folder(folder, new_owner.pk, actor=request.user,
                            action='file_moved', text='переместил сюда файл')
+
+        if new_owner.pk != source_owner_id:
+            _notify_new_owner(
+                new_owner, actor=request.user,
+                text='переместил файл в вашу папку обменника',
+            )
 
         return JsonResponse({'success': True})
 
@@ -568,47 +693,71 @@ class BulkDownloadExchangeFilesView(LoginRequiredMixin, View):
 
 
 class BulkMoveExchangeFilesView(LoginRequiredMixin, View):
-    """Массовое перемещение между подпапками одной личной папки.
+    """Массовое перемещение — по тем же правилам, что и поштучное
+    (MoveExchangeFileView), включая перенос в личную папку другого
+    сотрудника со сменой владельца.
 
     Раньше массового переноса у обменника не было вовсе — в панели
     выделения оставалось только удаление, хотя выделять файлы пачкой уже
-    было можно. Целевая подпапка обязана принадлежать тому же владельцу,
-    что и переносимые файлы: иначе через bulk можно было бы сделать то,
-    что запрещено в MoveExchangeFileView — переложить файл в чужую личную
-    папку."""
+    было можно. Затем он повторял тогдашний запрет на чужую папку; теперь
+    запрет снят в обеих вьюхах сразу — разойдись они, массовая операция
+    стала бы обходным путём вокруг поштучной или наоборот."""
 
     def post(self, request):
         file_ids = request.POST.getlist('file_ids')
         if not file_ids:
             return JsonResponse({'success': False, 'error': 'Ничего не выбрано'}, status=400)
 
-        folder_id = request.POST.get('folder_id') or None
-        folder = get_object_or_404(ExchangeFolder, pk=folder_id) if folder_id else None
+        # default_owner_id=None: у выделения нет одного «текущего владельца»,
+        # поэтому без явного owner_id и без папки владелец не меняется
+        # вообще — файлы просто переезжают в корень своей же личной папки.
+        new_owner, folder = _move_destination(request, default_owner_id=None)
 
-        allowed_qs = ExchangeFile.objects.filter(
-            Q(owner=request.user) | Q(uploaded_by=request.user),
-            pk__in=file_ids, is_deleted=False,
+        allowed = list(
+            ExchangeFile.objects.filter(
+                Q(owner=request.user) | Q(uploaded_by=request.user),
+                pk__in=file_ids, is_deleted=False,
+            ).values_list('pk', 'owner_id', 'folder_id')
         )
-        if folder is not None:
-            allowed_qs = allowed_qs.filter(owner_id=folder.owner_id)
-
-        allowed_ids = list(allowed_qs.values_list('pk', flat=True))
-        if not allowed_ids:
+        if not allowed:
             # 200 с сообщением, а не 403 — см. BulkTrashExchangeFilesView.
             return JsonResponse({
                 'success': True, 'task_id': None, 'done': 0,
-                'message': 'Ничего не перемещено: нет прав на выбранные файлы '
-                           'или папка назначения принадлежит другому сотруднику',
+                'message': 'Ничего не перемещено: нет прав на выбранные файлы',
             })
 
         from storage.tasks import bulk_move_documents
 
         task = bulk_move_documents.delay(
-            'exchange', 'ExchangeFile', allowed_ids, 'folder_id', folder.pk if folder else None,
+            'exchange', 'ExchangeFile', [pk for pk, _, _ in allowed],
+            'folder_id', folder.pk if folder else None,
+            extra_updates={'owner_id': new_owner.pk} if new_owner else None,
         )
 
-        _notify_folder(folder, folder.owner_id if folder else request.user.pk,
-                       actor=request.user, action='files_moved', text='переместил файлы')
+        # Обновить надо и папки-источники, и папку-назначение. Источники
+        # раньше не обновлялись вовсе — файл продолжал висеть у соседа,
+        # смотрящего на ту папку, откуда его унесли.
+        target_folder_id = folder.pk if folder else None
+        locations = {(owner_id, folder_id) for _, owner_id, folder_id in allowed}
+        if new_owner is not None:
+            locations.add((new_owner.pk, target_folder_id))
+        else:
+            locations |= {(owner_id, target_folder_id) for _, owner_id, _ in allowed}
+
+        for owner_id, folder_id in locations:
+            realtime.broadcast(
+                realtime.SCOPE_EXCHANGE, realtime.exchange_location(owner_id, folder_id),
+                action='files_moved', actor=request.user, text='переместил файлы',
+            )
+
+        if new_owner is not None and any(owner_id != new_owner.pk for _, owner_id, _ in allowed):
+            moved = len(allowed)
+            _notify_new_owner(
+                new_owner, actor=request.user,
+                text='переместил файлы в вашу папку обменника'
+                     + (f' ({moved} шт.)' if moved > 1 else ''),
+            )
+
         return fm_task_response(request, task)
 
 

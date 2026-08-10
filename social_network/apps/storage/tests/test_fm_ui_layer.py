@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from deptdocs.models import DepartmentDocument, DepartmentFolder
 from exchange.models import ExchangeFile, ExchangeFolder
+from profiles.models import Notification
 from storage import realtime
 from storage.models import FileObject
 from storage.services import StorageService
@@ -114,9 +115,9 @@ class ExchangeBulkMoveTest(TestCase):
         self.assertEqual(first.folder_id, self.folder.pk)
         self.assertEqual(second.folder_id, self.folder.pk)
 
-    def test_bulk_move_rejects_folder_of_another_owner(self):
-        """Одиночное перемещение не пускает файл в чужую личную папку —
-        массовое не должно давать обходной путь."""
+    def test_bulk_move_into_another_owner_folder_changes_owner(self):
+        """Массовое перемещение идёт по тем же правилам, что и одиночное:
+        разойдись они, одно стало бы обходным путём вокруг другого."""
         stranger = User.objects.create_user(username='bulk_move_stranger', password='x')
         foreign_folder = ExchangeFolder.objects.create(
             name='Чужая', owner=stranger, created_by=stranger,
@@ -128,8 +129,45 @@ class ExchangeBulkMoveTest(TestCase):
         })
 
         self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.json()['task_id'])
         my_file.refresh_from_db()
+        self.assertEqual(my_file.folder_id, foreign_folder.pk)
+        self.assertEqual(my_file.owner_id, stranger.pk)
+        self.assertTrue(Notification.objects.filter(recipient=stranger).exists())
+
+    def test_bulk_move_into_another_owner_root(self):
+        """Корень чужой личной папки — owner_id без folder_id: владелец и
+        папка меняются одним update() (storage.tasks.bulk_move_documents,
+        extra_updates), иначе между двумя запросами файл не виден ни в
+        папке-источнике, ни в папке-назначении."""
+        stranger = User.objects.create_user(username='bulk_move_root', password='x')
+        my_file = self._file('bm4.pdf')
+        my_file.folder = self.folder
+        my_file.save(update_fields=['folder'])
+
+        response = self.client.post(reverse('exchange_bulk_move'), {
+            'file_ids': [my_file.pk], 'owner_id': stranger.pk, 'folder_id': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        my_file.refresh_from_db()
+        self.assertEqual(my_file.owner_id, stranger.pk)
+        self.assertIsNone(my_file.folder_id)
+
+    def test_bulk_move_keeps_owner_when_destination_is_own_root(self):
+        """Без owner_id и без папки владелец не меняется вообще — у
+        выделения нет одного «текущего владельца», и подставлять его было бы
+        не из чего."""
+        my_file = self._file('bm5.pdf')
+        my_file.folder = self.folder
+        my_file.save(update_fields=['folder'])
+
+        response = self.client.post(reverse('exchange_bulk_move'), {
+            'file_ids': [my_file.pk], 'folder_id': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        my_file.refresh_from_db()
+        self.assertEqual(my_file.owner_id, self.user.pk)
         self.assertIsNone(my_file.folder_id)
 
     def test_bulk_move_without_rights_answers_200_with_message(self):
@@ -150,6 +188,46 @@ class ExchangeBulkMoveTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()['success'])
         self.assertIn('нет прав', response.json()['message'].lower())
+
+
+class ExchangeMoveTargetsTest(TestCase):
+    """Что предлагает селект перемещения.
+
+    Контрол обязан предлагать ровно то, что сработает (ARCHITECTURE.md,
+    12.4). Пока перенос между сотрудниками был запрещён, в списке стояли
+    только подпапки текущей личной папки; теперь — личные папки всех
+    сотрудников со своими подпапками."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='move_targets_user', password='pass12345', last_name='Иванов',
+        )
+        self.other = User.objects.create_user(
+            username='move_targets_other', password='x', last_name='Петров',
+        )
+        self.client.force_login(self.user)
+
+    def test_targets_include_every_employee(self):
+        response = self.client.get(reverse('exchange_folder', args=[self.user.pk]))
+
+        targets = {target['title']: target for target in response.context['move_targets']}
+        self.assertIn('Петров', targets)
+        self.assertFalse(targets['Петров']['is_current'])
+        self.assertTrue(targets['Иванов']['is_current'])
+
+    def test_foreign_subfolder_option_carries_its_owner(self):
+        """Своя подпапка — голый id, чужая — пара «owner:folder»: корень
+        личной папки подпапкой не является и одним id не называется, а
+        двоеточие в значении заодно служит признаком «папка чужая» для
+        предупреждения в модалке."""
+        mine = ExchangeFolder.objects.create(name='Моя', owner=self.user, created_by=self.user)
+        theirs = ExchangeFolder.objects.create(name='Чужая', owner=self.other, created_by=self.other)
+
+        response = self.client.get(reverse('exchange_folder', args=[self.user.pk]))
+
+        self.assertContains(response, f'value="{mine.pk}"')
+        self.assertContains(response, f'value="{self.other.pk}:{theirs.pk}"')
+        self.assertContains(response, f'value="{self.other.pk}:"')
 
 
 class DeptdocsBulkMoveTest(TestCase):
@@ -256,20 +334,72 @@ class FolderMoveTest(TestCase):
         parent.refresh_from_db()
         self.assertIsNone(parent.parent_id)
 
-    def test_exchange_folder_cannot_move_into_another_owner_folder(self):
-        """Тот же принцип, что и у файлов: перекладывание содержимого в
-        чужую личную папку выглядело бы для неё как подмена."""
+    def test_exchange_folder_moves_into_another_owner_folder_with_its_subtree(self):
+        """Перенос в чужую личную папку разрешён и меняет владельца ВСЕГО
+        поддерева. Оставь вложенным файлам прежнего владельца — они пропали
+        бы из интерфейса: список фильтруется по owner и folder сразу."""
         stranger = User.objects.create_user(username='folder_move_stranger', password='x')
         mine = ExchangeFolder.objects.create(name='Моя', owner=self.user, created_by=self.user)
+        nested = ExchangeFolder.objects.create(
+            name='Вложенная', owner=self.user, parent=mine, created_by=self.user,
+        )
         foreign = ExchangeFolder.objects.create(name='Чужая', owner=stranger, created_by=stranger)
+
+        uploaded = SimpleUploadedFile('inside.pdf', b'inside content', content_type='application/pdf')
+        file_object = StorageService.upload(
+            uploaded, user=self.user, category=FileObject.Category.EXCHANGE,
+        )
+        inside = ExchangeFile.objects.create(
+            file_object=file_object, owner=self.user, folder=nested, uploaded_by=self.user,
+        )
 
         response = self.client.post(
             reverse('exchange_folder_move', args=[mine.pk]), {'parent_id': foreign.pk},
         )
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
         mine.refresh_from_db()
-        self.assertIsNone(mine.parent_id)
+        nested.refresh_from_db()
+        inside.refresh_from_db()
+        self.assertEqual(mine.parent_id, foreign.pk)
+        self.assertEqual(mine.owner_id, stranger.pk)
+        self.assertEqual(nested.owner_id, stranger.pk)
+        self.assertEqual(inside.owner_id, stranger.pk)
+
+    def test_exchange_folder_move_takes_trashed_files_along(self):
+        """У файла в корзине folder сохранён, и восстановление вернёт его в
+        эту же папку. Не смени владельца — вернулся бы файл, невидимый ни в
+        одной личной папке."""
+        stranger = User.objects.create_user(username='folder_move_trash', password='x')
+        mine = ExchangeFolder.objects.create(name='Моя', owner=self.user, created_by=self.user)
+
+        uploaded = SimpleUploadedFile('trashed.pdf', b'trashed content', content_type='application/pdf')
+        file_object = StorageService.upload(
+            uploaded, user=self.user, category=FileObject.Category.EXCHANGE,
+        )
+        trashed = ExchangeFile.objects.create(
+            file_object=file_object, owner=self.user, folder=mine,
+            uploaded_by=self.user, is_deleted=True,
+        )
+
+        self.client.post(
+            reverse('exchange_folder_move', args=[mine.pk]), {'owner_id': stranger.pk},
+        )
+
+        trashed.refresh_from_db()
+        self.assertEqual(trashed.owner_id, stranger.pk)
+
+    def test_exchange_folder_move_to_another_owner_notifies_them(self):
+        stranger = User.objects.create_user(username='folder_move_notify', password='x')
+        mine = ExchangeFolder.objects.create(name='Моя', owner=self.user, created_by=self.user)
+
+        self.client.post(
+            reverse('exchange_folder_move', args=[mine.pk]), {'owner_id': stranger.pk},
+        )
+
+        notification = Notification.objects.filter(recipient=stranger).first()
+        self.assertIsNotNone(notification)
+        self.assertEqual(notification.kind, Notification.Kind.FILE_SHARED)
 
     def test_deptdocs_folder_move_requires_access_to_target(self):
         other = User.objects.create_user(username='folder_move_other', password='x')

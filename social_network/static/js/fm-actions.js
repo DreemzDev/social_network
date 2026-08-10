@@ -850,9 +850,14 @@
     }
   }
 
-  FM.runBulkMove = function (ids, folderId) {
+  /* extra — дополнительные поля запроса сверх папки назначения. Нужны
+     обменнику: там папка назначения может принадлежать другому сотруднику,
+     и вместе с ней уходит owner_id — перенос в чужую личную папку меняет
+     владельца файла, а не только папку. */
+  FM.runBulkMove = function (ids, folderId, extra) {
     var payload = { folder_id: folderId };
     payload[config.idField || 'doc_ids'] = ids;
+    Object.keys(extra || {}).forEach(function (key) { payload[key] = extra[key]; });
     return runBulk(config.bulkMoveUrl, payload, 'Перемещение');
   };
 

@@ -47,9 +47,17 @@ def bulk_trash_documents(self, app_label, model_name, doc_ids, user_id, extra_fi
 
 
 @shared_task(bind=True)
-def bulk_move_documents(self, app_label, model_name, doc_ids, folder_field, folder_id, extra_filter=None):
+def bulk_move_documents(self, app_label, model_name, doc_ids, folder_field, folder_id,
+                        extra_filter=None, extra_updates=None):
     """Массовое перемещение в другую папку в фоне — тот же принцип
-    батчинга и прогресса, что и в bulk_trash_documents."""
+    батчинга и прогресса, что и в bulk_trash_documents.
+
+    extra_updates — поля, которые обязаны смениться вместе с папкой, тем же
+    update(). Нужны обменнику: перенос в личную папку другого сотрудника
+    меняет ещё и владельца (ExchangeFile.owner), а список файлов
+    фильтруется по owner И folder сразу — смени их двумя запросами, и в
+    промежутке файл не виден ни в папке-источнике, ни в папке-назначении.
+    """
     from django.apps import apps
 
     model = apps.get_model(app_label, model_name)
@@ -67,7 +75,9 @@ def bulk_move_documents(self, app_label, model_name, doc_ids, folder_field, fold
 
     for start in range(0, len(ids_to_process), batch_size):
         batch_ids = ids_to_process[start:start + batch_size]
-        moved += model._default_manager.filter(pk__in=batch_ids).update(**{folder_field: folder_id})
+        moved += model._default_manager.filter(pk__in=batch_ids).update(
+            **{folder_field: folder_id}, **(extra_updates or {})
+        )
         self.update_state(state='PROGRESS', meta={'done': moved, 'total': total})
 
     return {'done': moved, 'total': total}

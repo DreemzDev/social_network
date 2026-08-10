@@ -39,7 +39,7 @@
       </div>
     </div>
 
-    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в подпапку' fm_bulk_download=True %}
+    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить' fm_bulk_download=True %}
 
     {% comment %}
       #fm-dropzone — область, на которую можно бросить файлы (fm-actions.js).
@@ -86,19 +86,53 @@
     </div>
   </div>
 
-  <!-- Модалка перемещения файла между подпапками (одиночного и массового) -->
+  <!-- Модалка перемещения файла или папки (одиночного и массового) -->
   <div x-show="moveOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" x-on:click.self="moveOpen = false" x-on:keydown.escape.window="moveOpen = false">
     <div class="w-full max-w-sm box p-6">
       <h3 class="mb-4 text-lg font-medium"
           x-text="moveTarget === 'bulk' ? 'Переместить выбранные файлы'
-                  : (moveTarget && moveTarget.type === 'folder' ? 'Переместить папку' : 'Переместить в подпапку')"></h3>
+                  : (moveTarget && moveTarget.type === 'folder' ? 'Переместить папку' : 'Переместить')"></h3>
       <form id="exchange-move-form">
-        <select name="folder_id" x-model="moveFolderId" class="input w-full border mb-4">
-          <option value="">Корень папки «{{ folder_owner.last_name }} {{ folder_owner.first_name }}»</option>
-          {% for f in all_owner_subfolders %}
-          <option value="{{ f.id }}">{{ f.name }}</option>
+        {% comment %}
+          Список — личные папки всех сотрудников, а не подпапки только этой:
+          перенос между сотрудниками разрешён (MoveExchangeFileView).
+
+          Значение опции: id подпапки, если она в ТЕКУЩЕЙ личной папке, и
+          пара «owner:folder», если в чужой. Пара нужна потому, что корень
+          личной папки подпапкой не является (folder=None) и одним id не
+          назывется; двоеточие в значении заодно и есть признак «папка
+          чужая» — по нему предупреждение ниже показывается без второго
+          источника правды. Разбирает пару JS, на сервер уходят два
+          отдельных поля — owner_id и folder_id.
+        {% endcomment %}
+        <select name="destination" x-model="moveFolderId" class="input w-full border mb-4">
+          {% for target in move_targets %}
+          <optgroup label="{{ target.title }}">
+            {% if target.is_current %}
+            <option value="">Корень папки</option>
+            {% for f in target.folders %}
+            <option value="{{ f.pk }}">{{ f.indented_name }}</option>
+            {% endfor %}
+            {% else %}
+            <option value="{{ target.owner_id }}:">Корень папки</option>
+            {% for f in target.folders %}
+            <option value="{{ target.owner_id }}:{{ f.pk }}">{{ f.indented_name }}</option>
+            {% endfor %}
+            {% endif %}
+          </optgroup>
           {% endfor %}
         </select>
+
+        {% comment %}
+          Смена владельца — не косметика: вместе с ней переходит право
+          удаления, и прежний владелец папки его теряет. Сказать об этом до
+          нажатия «Переместить» дешевле, чем объяснять потом.
+        {% endcomment %}
+        <p x-show="moveFolderId.indexOf(':') !== -1" x-cloak class="mb-4 text-xs text-gray-600">
+          Выбрана папка другого сотрудника: содержимое перейдёт в его личную папку —
+          вместе с владельцем перейдёт и право удаления. Владелец получит уведомление.
+        </p>
+
         <div class="flex justify-end gap-2">
           <button type="button" class="button bg-gray-200 text-gray-600" x-on:click="moveOpen = false">Отмена</button>
           <button type="submit" class="button text-white bg-theme-1">Переместить</button>
@@ -254,12 +288,20 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('exchange-move-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var s = state();
-    var folderId = e.target.folder_id.value;
     if (!s.moveTarget) return;
+
+    // «owner:folder» — папка другого сотрудника, голый id — подпапка этой
+    // же личной папки (см. комментарий у селекта). Без owner_id сервер
+    // оставляет владельца прежним, поэтому для своих папок его слать не
+    // нужно вовсе.
+    var chosen = e.target.destination.value.split(':');
+    var foreign = chosen.length > 1;
+    var folderId = foreign ? chosen[1] : chosen[0];
+    var ownerId = foreign ? chosen[0] : '';
 
     if (s.moveTarget === 'bulk') {
       s.moveOpen = false;
-      FM.runBulkMove(FM.selectedIds(), folderId);
+      FM.runBulkMove(FM.selectedIds(), folderId, foreign ? { owner_id: ownerId } : null);
       return;
     }
 
@@ -270,6 +312,7 @@ document.addEventListener('DOMContentLoaded', function () {
       ? '/exchange/folder-move/' + s.moveTarget.id + '/'
       : '/exchange/move/' + s.moveTarget.id + '/';
     var payload = isFolder ? { parent_id: folderId } : { folder_id: folderId };
+    if (foreign) payload.owner_id = ownerId;
 
     FM.action(url, payload, {
       successText: isFolder ? 'Папка перемещена' : 'Файл перемещён',
