@@ -269,14 +269,14 @@
 
     <!-- masck telephones -->
     <script>
-    //Код jQuery, установливающий маску для ввода телефона элементу input
-    //1. После загрузки страницы,  когда все элементы будут доступны выполнить...
-    $("#id_phone_pts").mask("999-99",{autoclear: false});
-    $("#id_phone_city").mask("8 (999) 999-99-99",{autoclear: false});
-    $("#id_phone_zs").mask("999-9999",{autoclear: false});
-    $("#id_phone_9").mask("99-99",{autoclear: false});
-    $("#id_phone_hc").mask("9-99-99",{autoclear: false});
-
+    // Маска приходит с самим полем (data-phone-mask), а не задаётся здесь по
+    // id: виды связи теперь ведутся в справочнике PhoneType, и пять
+    // прошитых масок означали бы, что шестой вид номера молча остаётся без
+    // маски, а удалённый — ломает этот скрипт.
+    $("[data-phone-mask]").each(function () {
+        var mask = $(this).data("phone-mask");
+        if (mask) { $(this).mask(mask, { autoclear: false }); }
+    });
     </script>
     <!-- like ajax -->
     <script>

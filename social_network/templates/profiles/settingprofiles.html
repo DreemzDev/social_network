@@ -79,27 +79,23 @@
         </div>
 
         <!-- Контакты -->
+        {% comment %}
+          Поля собираются из справочника видов связи (PhoneType), а не
+          перечисляются здесь: раньше пять телефонов были прописаны в
+          модели, в форме и в этом шаблоне, и шестой вид связи требовал
+          правки всех трёх мест.
+        {% endcomment %}
         <div x-cloak x-show="tab === 'contacts'" class="space-y-4 p-4">
+          {% for phone_type, field in phones_form.rows %}
           <div>
-            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон ПТС</label>
-            {{ form.phone_pts }}
+            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300" for="{{ field.id_for_label }}">Телефон {{ phone_type.name }}</label>
+            {{ field }}
           </div>
-          <div>
-            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон (город)</label>
-            {{ form.phone_city }}
-          </div>
-          <div>
-            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон ЗС</label>
-            {{ form.phone_zs }}
-          </div>
-          <div>
-            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон АТС-9</label>
-            {{ form.phone_9 }}
-          </div>
-          <div>
-            <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Телефон HiCom</label>
-            {{ form.phone_hc }}
-          </div>
+          {% empty %}
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            Виды телефонных номеров ещё не заведены — их добавляет администратор портала.
+          </p>
+          {% endfor %}
         </div>
 
         <!-- Служебная информация -->
@@ -108,13 +104,34 @@
             <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Номер кабинета</label>
             {{ form.cab }}
           </div>
+          {% comment %}
+            Подразделения здесь нет намеренно: это место в структуре
+            организации, а не самоописание — его назначает администратор.
+            Должность показывается только та, что помечена в справочнике как
+            самоназначаемая (плюс своя текущая), поэтому назначить себя
+            начальником организации через эту форму нельзя. Если выбирать
+            нечего, формы поля не будет вовсе.
+          {% endcomment %}
           <div>
             <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Подразделение</label>
-            {{ form.cat }}
+            <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-base text-gray-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-300">
+              {{ user.cat|default:"Не назначено" }}
+              <span class="block text-xs text-gray-400">Назначает администратор портала</span>
+            </div>
           </div>
           <div>
             <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Должность</label>
-            {{ form.position }}
+            {% if form.position %}
+              {{ form.position }}
+              {% for error in form.position.errors %}
+              <p class="mt-1 text-sm text-[#E11D48]">{{ error }}</p>
+              {% endfor %}
+            {% else %}
+            <div class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-base text-gray-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-300">
+              {{ user.position|default:"Не назначена" }}
+              <span class="block text-xs text-gray-400">Назначает администратор портала</span>
+            </div>
+            {% endif %}
           </div>
           <div>
             <label class="mb-1 block text-base font-medium text-gray-700 dark:text-gray-300">Звание</label>

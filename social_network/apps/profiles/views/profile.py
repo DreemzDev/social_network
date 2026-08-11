@@ -13,7 +13,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from category.models import Category
 from phonebook.models import Phonebook
 from phonebook.forms import UpdateBookForm
-from profiles.forms import AddProfileForm, SettingProfileForm, ChangePasswordForm, SecurityAnswerForm
+from profiles.forms import (
+    AddProfileForm, SettingProfileForm, ChangePasswordForm, SecurityAnswerForm, UserPhonesForm,
+)
 
 
 class AddProfile(LoginRequiredMixin, UpdateView):
@@ -44,7 +46,25 @@ class SettingProfile(LoginRequiredMixin, UpdateView, DetailView):
         context = super().get_context_data(**kwargs)
         context.setdefault('password_form', ChangePasswordForm(self.request.user))
         context.setdefault('security_form', SecurityAnswerForm(instance=self.request.user))
+        context.setdefault('phones_form', UserPhonesForm(self.request.user))
         return context
+
+    def form_valid(self, form):
+        """Телефоны сохраняются вместе с профилем, одной кнопкой.
+
+        Отдельная форма — потому что их набор задаётся справочником
+        PhoneType и в полях модели User больше не существует; для
+        пользователя же это тот же самый блок «Телефоны», что и раньше.
+        """
+        phones_form = UserPhonesForm(self.object, self.request.POST)
+        if not phones_form.is_valid():
+            return self.render_to_response(
+                self.get_context_data(form=form, phones_form=phones_form)
+            )
+
+        response = super().form_valid(form)
+        phones_form.save()
+        return response
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()

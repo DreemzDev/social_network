@@ -143,22 +143,15 @@
         </div>
       </div>
 
+      {% comment %}
+        Виды связи приходят из справочника (PhoneType), а не перечисляются
+        здесь: раньше пять подписей были вшиты в разметку, и добавление
+        шестого вида означало правку шаблона.
+      {% endcomment %}
       <div class="grid min-w-0 flex-1 grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-300 sm:grid-cols-3 md:grid-cols-5">
-        {% if p.phone_city %}
-        <div><span class="text-gray-400">Город:</span> {{ p.phone_city }}</div>
-        {% endif %}
-        {% if p.phone_hc %}
-        <div><span class="text-gray-400">HiCom:</span> {{ p.phone_hc }}</div>
-        {% endif %}
-        {% if p.phone_pts %}
-        <div><span class="text-gray-400">ПТС:</span> {{ p.phone_pts }}</div>
-        {% endif %}
-        {% if p.phone_9 %}
-        <div><span class="text-gray-400">АТС-9:</span> {{ p.phone_9 }}</div>
-        {% endif %}
-        {% if p.phone_zs %}
-        <div><span class="text-gray-400">ЗС:</span> {{ p.phone_zs }}</div>
-        {% endif %}
+        {% for phone in p.phones.all %}
+        <div><span class="text-gray-400">{{ phone.type.name }}:</span> {{ phone.number }}</div>
+        {% endfor %}
       </div>
     </div>
     {% empty %}

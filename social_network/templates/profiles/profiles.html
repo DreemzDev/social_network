@@ -44,21 +44,9 @@
           {% if user.cab %}
           <span class="inline-flex items-center gap-1.5"><i data-feather="map-pin" class="h-4 w-4"></i> Каб. {{ user.cab }}</span>
           {% endif %}
-          {% if user.phone_pts %}
-          <span class="inline-flex items-center gap-1.5"><i data-feather="phone" class="h-4 w-4"></i> ПТС: {{ user.phone_pts }}</span>
-          {% endif %}
-          {% if user.phone_city %}
-          <span class="inline-flex items-center gap-1.5"><i data-feather="phone" class="h-4 w-4"></i> Город: {{ user.phone_city }}</span>
-          {% endif %}
-          {% if user.phone_zs %}
-          <span class="inline-flex items-center gap-1.5"><i data-feather="phone" class="h-4 w-4"></i> ЗС: {{ user.phone_zs }}</span>
-          {% endif %}
-          {% if user.phone_9 %}
-          <span class="inline-flex items-center gap-1.5"><i data-feather="phone" class="h-4 w-4"></i> АТС-9: {{ user.phone_9 }}</span>
-          {% endif %}
-          {% if user.phone_hc %}
-          <span class="inline-flex items-center gap-1.5"><i data-feather="phone" class="h-4 w-4"></i> HiCom: {{ user.phone_hc }}</span>
-          {% endif %}
+          {% for phone in user.phones.all %}
+          <span class="inline-flex items-center gap-1.5"><i data-feather="phone" class="h-4 w-4"></i> {{ phone.type.name }}: {{ phone.number }}</span>
+          {% endfor %}
         </div>
       </div>
     </div>
