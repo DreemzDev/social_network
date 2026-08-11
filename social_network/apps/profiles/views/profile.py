@@ -7,12 +7,13 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.shortcuts import redirect
-from django.views.generic import DetailView, ListView, UpdateView, FormView, View
+from django.views.generic import DetailView, ListView, UpdateView, FormView, TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 from category.models import Category
 from phonebook.models import Phonebook
 from phonebook.forms import UpdateBookForm
+from profiles.models import Position
 from profiles.forms import (
     AddProfileForm, SettingProfileForm, ChangePasswordForm, SecurityAnswerForm, UserPhonesForm,
 )
@@ -174,12 +175,83 @@ class ShowPhones(ListView, FormView):
 
     def get_queryset(self):
         query = self.request.GET.get('q', '')
-        return get_user_model().objects.filter(Q(first_name__icontains=query) | Q(last_name__icontains=query))
+        # prefetch — телефоны выводятся циклом по каждому сотруднику: без него
+        # справочник делал бы запрос на каждую строку списка.
+        return get_user_model().objects.filter(
+            Q(first_name__icontains=query) | Q(last_name__icontains=query)
+        ).select_related('cat').prefetch_related('phones__type')
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context["cats"] = Category.objects.all()
         context["books"] = Phonebook.objects.all()
+        return context
+
+
+class OrgStructureView(LoginRequiredMixin, TemplateView):
+    """Структура организации — дерево должностей с теми, кто их занимает.
+
+    До этой страницы иерархия существовала только в админке: сотрудник
+    видел свою должность, но не видел, кому подчиняется и кто возглавляет
+    отдел. Ради этого `Position.parent` и заводился — поле, которое видно
+    одному администратору, ничем не отличается от отсутствующего.
+
+    Дерево собирается в Python одним проходом по двум запросам, а не
+    рекурсией по БД: должностей в организации десятки, и рекурсивный CTE
+    ради них — из пушки по воробьям (тот же приём, что у
+    `storage.utils.build_folder_choices`).
+
+    Вакансии показываются наравне с занятыми должностями: пустая клетка в
+    структуре — это факт об организации, а не ошибка отображения.
+    """
+
+    template_name = 'profiles/structure.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        positions = (
+            Position.objects.select_related('department')
+            .prefetch_related('holders')
+            .order_by('order', 'name')
+        )
+
+        children = {}
+        for position in positions:
+            children.setdefault(position.parent_id, []).append(position)
+
+        known = {position.pk for position in positions}
+
+        def build(parent_id, seen):
+            nodes = []
+            for position in children.get(parent_id, []):
+                # Страховка от цикла в данных: Position.clean() его не
+                # допускает, но данные могли прийти и мимо формы (импорт,
+                # ручной SQL), а зациклившийся обход повесил бы страницу.
+                if position.pk in seen:
+                    continue
+                seen.add(position.pk)
+                nodes.append({'position': position, 'children': build(position.pk, seen)})
+            return nodes
+
+        seen = set()
+        tree = build(None, seen)
+
+        # Должности, чей родитель отсутствует (его удалили — parent стал
+        # NULL) уже попали в корень. А вот оставшиеся после цикла — нет, и
+        # потерять их молча нельзя: человек на такой должности исчез бы со
+        # страницы целиком.
+        tree += [
+            {'position': position, 'children': []}
+            for position in positions
+            if position.pk not in seen and position.parent_id in known
+        ]
+
+        context['structure'] = tree
+        context['total_positions'] = len(positions)
+        context['staff_without_position'] = (
+            get_user_model().objects.filter(position__isnull=True).order_by('last_name', 'first_name')
+        )
         return context
 
 

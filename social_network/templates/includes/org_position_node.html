@@ -1,0 +1,53 @@
+{% load static %}
+{% comment %}
+  Узел структуры организации: должность, кто её занимает и её подчинённые.
+
+  {% load static %} нужен здесь свой: include не наследует загруженные
+  библиотеки тегов от включающего шаблона, а рекурсивное включение делает
+  этот файл ещё и «включающим» для самого себя.
+
+  Шаблон включает сам себя — так дерево любой глубины рисуется одной
+  разметкой. Зацикливания это не вызывает: дерево собрано в Python
+  (OrgStructureView), и защита от цикла стоит там, где данные, а не здесь.
+
+  Ожидает: node.position, node.children.
+{% endcomment %}
+<li class="relative pl-5 before:absolute before:left-0 before:top-0 before:h-full before:w-px before:bg-gray-200 dark:before:bg-zinc-700">
+  <div class="relative -ml-5 pl-5 before:absolute before:left-0 before:top-6 before:h-px before:w-4 before:bg-gray-200 dark:before:bg-zinc-700">
+    <div class="rounded-xl border border-gray-100 bg-white p-3 transition hover:border-gray-200 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ node.position.name }}</span>
+        {% if node.position.department %}
+        <span class="inline-flex items-center rounded-full bg-[#EAF3FF] px-2 py-0.5 text-xs font-medium text-[#0077FF] dark:bg-zinc-800">{{ node.position.department.name }}</span>
+        {% endif %}
+      </div>
+
+      {% comment %}
+        Вакансия показывается наравне с занятой должностью: пустая клетка в
+        структуре — факт об организации, а не недоработка отображения.
+      {% endcomment %}
+      <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {% for holder in node.position.holders.all %}
+        <a href="{% url 'addpost' holder.username %}" class="group inline-flex items-center gap-2">
+          <img class="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+               src="{% if holder.avatar %}{{ holder.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}"
+               alt="{{ holder.last_name }} {{ holder.first_name }}">
+          <span class="text-sm text-gray-700 group-hover:text-[#0077FF] dark:text-gray-300">
+            {% if holder.last_name or holder.first_name %}{{ holder.last_name }} {{ holder.first_name }}{% else %}{{ holder.username }}{% endif %}
+          </span>
+        </a>
+        {% empty %}
+        <span class="text-sm text-gray-400 dark:text-gray-500">Вакансия</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {% if node.children %}
+  <ul class="mt-3 space-y-3">
+    {% for child in node.children %}
+      {% include "includes/org_position_node.html" with node=child %}
+    {% endfor %}
+  </ul>
+  {% endif %}
+</li>

@@ -7,7 +7,8 @@ views.py вырос слишком большим (1000+ строк, неско�
 from ._common import clear_user_cache, push_chat_event, notify
 
 from .profile import (
-    AddProfile, SettingProfile, ShowUsers, ShowPhones, EmployeeStatusUpdateView,
+    AddProfile, SettingProfile, ShowUsers, ShowPhones, OrgStructureView,
+    EmployeeStatusUpdateView,
 )
 
 from .chat import (
@@ -32,7 +33,8 @@ from .notifications import NotificationMarkReadView, NotificationMarkAllReadView
 
 __all__ = [
     'clear_user_cache', 'push_chat_event', 'notify',
-    'AddProfile', 'SettingProfile', 'ShowUsers', 'ShowPhones', 'EmployeeStatusUpdateView',
+    'AddProfile', 'SettingProfile', 'ShowUsers', 'ShowPhones', 'OrgStructureView',
+    'EmployeeStatusUpdateView',
     'DialogsWithUnreadMixin', 'DialogsListView', 'DialogMessagesView', 'LoadMoreMessagesView',
     'GetUnreadCountView', 'SendMessageWithReplyView', 'MarkMessagesReadView', 'EditMessageView',
     'DeleteMessageView', 'ToggleMessageReactionView', 'ALLOWED_REACTION_EMOJIS',

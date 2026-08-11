@@ -28,6 +28,12 @@
     </a>
   </li>
   <li>
+    <a href="{% url 'org_structure' %}" class="side-menu {% if request.resolver_match.url_name == 'org_structure' %}side-menu--active{% endif %}">
+      <div class="side-menu__icon"> <i data-feather="git-merge"></i> </div>
+      <div class="side-menu__title">Структура</div>
+    </a>
+  </li>
+  <li>
     <a href="{% url 'gallery' %}" class="side-menu {% if request.resolver_match.url_name == 'gallery' %}side-menu--active{% endif %}">
       <div class="side-menu__icon"> <i data-feather="image"></i> </div>
       <div class="side-menu__title">Галерея</div>

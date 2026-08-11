@@ -281,6 +281,82 @@ class SettingsPageTest(PhoneDictionaryTestCase):
         self.assertIsNone(self.user.position_id)
 
 
+class OrgStructurePageTest(TestCase):
+    """Страница структуры — ради неё и заводился Position.parent.
+
+    Поле, которое видно одному администратору, ничем не отличается от
+    отсутствующего, поэтому иерархия обязана быть видна сотрудникам.
+    """
+
+    def setUp(self):
+        self.chief = Position.objects.create(name='Начальник организации', max_holders=1, order=1)
+        self.deputy = Position.objects.create(name='Заместитель организации', parent=self.chief, order=2)
+        self.lawyer = Position.objects.create(name='Юрист', parent=self.chief, order=3)
+
+        self.boss = User.objects.create_user(
+            username='structure_boss', password='x', last_name='Смирнов', first_name='Пётр',
+            position=self.chief,
+        )
+        self.viewer = User.objects.create_user(username='structure_viewer', password='pass12345')
+        self.client.force_login(self.viewer)
+
+    def test_page_shows_positions_and_holders(self):
+        response = self.client.get(reverse('org_structure'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Начальник организации')
+        self.assertContains(response, 'Смирнов')
+
+    def test_subordinates_are_nested_under_their_chief(self):
+        response = self.client.get(reverse('org_structure'))
+
+        tree = response.context['structure']
+        self.assertEqual(len(tree), 1)
+        self.assertEqual(tree[0]['position'], self.chief)
+        self.assertEqual(
+            [node['position'] for node in tree[0]['children']], [self.deputy, self.lawyer],
+        )
+
+    def test_vacant_position_is_shown_as_such(self):
+        """Пустая клетка в структуре — факт об организации, а не ошибка
+        отображения, поэтому её видно."""
+        response = self.client.get(reverse('org_structure'))
+
+        self.assertContains(response, 'Вакансия')
+
+    def test_staff_without_position_are_listed_separately(self):
+        """Иначе человек, которому должность ещё не назначили, просто
+        отсутствовал бы на странице."""
+        response = self.client.get(reverse('org_structure'))
+
+        self.assertIn(self.viewer, response.context['staff_without_position'])
+        self.assertContains(response, 'Без должности')
+
+    def test_empty_structure_does_not_break_the_page(self):
+        Position.objects.all().delete()
+
+        response = self.client.get(reverse('org_structure'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ещё не заполнена')
+
+    def test_page_requires_login(self):
+        self.client.logout()
+
+        response = self.client.get(reverse('org_structure'))
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_cycle_in_data_does_not_hang_the_page(self):
+        """Position.clean() цикл не пропустит, но данные могли прийти мимо
+        формы (импорт, ручной SQL), и обход обязан это пережить."""
+        Position.objects.filter(pk=self.chief.pk).update(parent=self.deputy)
+
+        response = self.client.get(reverse('org_structure'))
+
+        self.assertEqual(response.status_code, 200)
+
+
 class PhonebookPageTest(PhoneDictionaryTestCase):
 
     def test_directory_shows_numbers_from_the_dictionary(self):
