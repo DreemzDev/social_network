@@ -260,8 +260,16 @@ AUTH_USER_MODEL = 'profiles.User'
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = 'app/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static') 
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 STATIC_DIRS = []
+
+# Адрес статики несёт время правки файла: без этого браузер кеширует
+# скрипты «на глазок» и не спрашивает сервер часами — см.
+# social_network/staticfiles.py.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'social_network.staticfiles.VersionedStaticFilesStorage'},
+}
 
 # Обработка изображений (галерея, изображения постов). Не про storage:
 # документы в нём обязаны доезжать байт в байт, оптимизируются только

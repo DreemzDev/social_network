@@ -7,6 +7,9 @@ window.location.reload(), ошибки в этих местах проявлял
 работает» и ловились вручную.
 """
 
+import os
+import shutil
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 from unittest import mock
@@ -14,6 +17,7 @@ from unittest import mock
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
+from django.template import Context, Template
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -226,6 +230,65 @@ class FmActionsSourceTest(SimpleTestCase):
         сообщения уходили в console — то есть отказ операции пользователь
         не видел вовсе, вопреки правилу 12.4."""
         self.assertIn('jq-toast-wrap', self.source())
+
+
+class StaticVersioningTest(TestCase):
+    """Исправление в JS должно доезжать до браузера без Ctrl+F5.
+
+    Предыдущий тест проверяет, что нужная строка есть в `fm-actions.js`, —
+    и этого оказалось мало: сервер отдавал исправленный файл, а браузер
+    выполнял прежний. В ответе статики есть только `Last-Modified`, и Chrome
+    кеширует такой файл «на глазок», не спрашивая сервер (в замере через
+    CDP повторный заход давал `transferSize: 0`). Починка удаления в
+    корзину из-за этого для пользователя просто не наступила.
+
+    Лечится версией в адресе — см. `social_network/staticfiles.py`.
+    """
+
+    def storage(self, location):
+        from social_network.staticfiles import VersionedStaticFilesStorage
+
+        return VersionedStaticFilesStorage(location=location, base_url='/app/static/')
+
+    def test_static_tag_adds_the_file_version(self):
+        rendered = Template("{% load static %}{% static 'js/fm-actions.js' %}").render(Context())
+
+        path = Path(settings.BASE_DIR) / 'static' / 'js' / 'fm-actions.js'
+        self.assertEqual(rendered, f'/app/static/js/fm-actions.js?v={int(path.stat().st_mtime)}')
+
+    def test_version_changes_when_the_file_changes(self):
+        """Ради этого всё и делается: правка файла обязана менять адрес,
+        иначе браузер продолжит выполнять то, что у него уже лежит."""
+        directory = tempfile.mkdtemp(prefix='portal-static-')
+        self.addCleanup(shutil.rmtree, directory, True)
+        script = Path(directory) / 'script.js'
+        script.write_text('первая версия', encoding='utf-8')
+        storage = self.storage(directory)
+
+        before = storage.url('script.js')
+        os.utime(script, (script.stat().st_atime, script.stat().st_mtime + 60))
+        after = storage.url('script.js')
+
+        self.assertNotEqual(before, after)
+
+    def test_unknown_file_keeps_a_plain_url(self):
+        """Статика сторонних приложений лежит мимо STATIC_ROOT. Версии для
+        неё нет — но и падать на ней рендер страницы не должен."""
+        directory = tempfile.mkdtemp(prefix='portal-static-')
+        self.addCleanup(shutil.rmtree, directory, True)
+
+        self.assertEqual(self.storage(directory).url('missing.js'), '/app/static/missing.js')
+
+    def test_page_references_the_versioned_script(self):
+        """Проверка на настоящей странице: тег `{% static %}` мог бы брать
+        адрес мимо этого хранилища (у проекта из finders — только
+        CompressorFinder), и тогда версия не попала бы никуда."""
+        user = User.objects.create_user(username='static_version_user', password='pass12345')
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('exchange_folder', args=[user.pk]))
+
+        self.assertContains(response, 'js/fm-actions.js?v=')
 
 
 class ExchangeMoveTargetsTest(TestCase):
