@@ -19,6 +19,7 @@ import shutil
 import tempfile
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -238,6 +239,23 @@ class MediaVerifyTest(MediaCleanupTestCase):
         call_command('media_verify')
 
         self.assertTrue(os.path.exists(orphan))
+
+    def test_thumbnail_inside_the_originals_directory_is_not_a_leftover(self):
+        """Миниатюры галереи лежат в `gallery/thumbs/`, то есть ВНУТРИ
+        каталога оригиналов, и обход `gallery/` видит их тоже. Пока список
+        ссылок собирался по каждому каталогу отдельно, живая миниатюра
+        считалась мусором — а `--delete-untracked` её удалял. Поймано на
+        боевом каталоге, до того как что-то потерялось.
+        """
+        picture = GalleryImage.objects.create(image=self.image('with-thumb.png'))
+        picture.thumbnail.save('with-thumb_thumb.png', ContentFile(PNG), save=True)
+        thumb_path = self.path(picture.thumbnail)
+
+        self.assertNotIn(thumb_path, find_untracked_media())
+
+        call_command('media_verify', '--delete-untracked')
+
+        self.assertTrue(os.path.exists(thumb_path))
 
     def test_storage_blobs_are_out_of_scope(self):
         """У blob'ов своя сверка (storage_verify) и свои правила: файл без

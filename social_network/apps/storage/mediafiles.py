@@ -163,32 +163,40 @@ def find_untracked_media() -> list:
     удалить не может при всём желании. Так безопаснее: список того, что
     считается мусором, выводится из моделей, а не из вида каталога.
 
+    Список ссылок собирается **по всем полям сразу**, а не отдельно для
+    каждого каталога. Каталоги вложены друг в друга: миниатюры галереи
+    лежат в `gallery/thumbs/`, то есть внутри `gallery/`, и обход каталога
+    оригиналов видит их тоже. Сверяй он их только со своим полем `image` —
+    живые миниатюры попали бы в список мусора, а `--delete-untracked` их бы
+    удалил.
+
     Абсолютные пути, отсортированные — их печатает и удаляет `media_verify`.
     """
     media_root = str(settings.MEDIA_ROOT)
-    untracked = []
 
-    for root, owners in upload_roots().items():
+    referenced = set()
+    for model, field_names in _REGISTRY.items():
+        for field_name in field_names:
+            referenced.update(
+                # В БД имя лежит с прямыми слэшами всегда, на диске — с
+                # os.sep: на Windows без нормализации ни одна ссылка не
+                # совпала бы, и команда предложила бы удалить все файлы.
+                name.replace('\\', '/')
+                for name in model._default_manager.order_by()
+                .values_list(field_name, flat=True).distinct() if name
+            )
+
+    untracked = set()
+    for root in upload_roots():
         directory = os.path.join(media_root, root)
         if not os.path.isdir(directory):
             continue
-
-        referenced = set()
-        for model, field_name in owners:
-            referenced.update(
-                name for name in model._default_manager.order_by()
-                .values_list(field_name, flat=True).distinct() if name
-            )
-        # В БД имя лежит с прямыми слэшами всегда, на диске — с os.sep:
-        # на Windows без нормализации ни одна ссылка не совпала бы, и
-        # команда предложила бы удалить вообще все файлы.
-        referenced = {name.replace('\\', '/') for name in referenced}
 
         for current_dir, _, file_names in os.walk(directory):
             for file_name in file_names:
                 path = os.path.join(current_dir, file_name)
                 relative = os.path.relpath(path, media_root).replace(os.sep, '/')
                 if relative not in referenced:
-                    untracked.append(path)
+                    untracked.add(path)
 
     return sorted(untracked)
