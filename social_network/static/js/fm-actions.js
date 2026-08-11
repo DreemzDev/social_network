@@ -46,26 +46,54 @@
   }
 
   /**
-   * Тост в стилистике темы: Midone поставляет jquery-toast-plugin в своём
-   * бандле (.jq-toast-* в app.css), поэтому берём готовый компонент, а не
-   * рисуем собственные всплывашки. Если по какой-то причине плагина нет —
-   * тихо падаем в console, но не роняем действие пользователя.
+   * Тост в стилистике темы.
+   *
+   * Midone кладёт стили jquery-toast-plugin в app.css (.jq-toast-*), но сам
+   * плагин живёт внутри её собранного бандла и регистрируется на jQuery,
+   * которую webpack держит у себя. На страницах портала jQuery подключена
+   * отдельным файлом, и у ЭТОГО экземпляра метода .toast() нет — то есть
+   * весь показ сообщений уходил в console.log, где пользователь его не
+   * видит. Ровно поэтому неудачное удаление файла выглядело как «кнопка
+   * ничего не делает».
+   *
+   * Поэтому: если плагин есть — пользуемся им, если нет — собираем ту же
+   * разметку руками. Классы те же, оформление берётся из app.css, никакой
+   * второй визуальной системы не появляется.
    */
   FM.toast = function (text, type) {
     var $ = window.jQuery;
-    if (!$ || !$.toast) {
-      if (type === 'error') console.error(text); else console.log(text);
+    var hideAfter = type === 'error' ? 6000 : 3000;
+    var icon = type === 'error' ? 'error' : (type === 'info' ? 'info' : 'success');
+
+    if ($ && $.toast) {
+      $.toast({
+        text: text,
+        showHideTransition: 'slide',
+        position: 'bottom-right',
+        hideAfter: hideAfter,
+        icon: icon,
+        loader: false,
+        stack: 4,
+      });
       return;
     }
-    $.toast({
-      text: text,
-      showHideTransition: 'slide',
-      position: 'bottom-right',
-      hideAfter: type === 'error' ? 6000 : 3000,
-      icon: type === 'error' ? 'error' : (type === 'info' ? 'info' : 'success'),
-      loader: false,
-      stack: 4,
-    });
+
+    var wrap = document.querySelector('.jq-toast-wrap.bottom-right');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'jq-toast-wrap bottom-right';
+      document.body.appendChild(wrap);
+    }
+
+    var toast = document.createElement('div');
+    toast.className = 'jq-toast-single jq-has-icon jq-icon-' + icon;
+    toast.style.pointerEvents = 'all';
+    toast.style.cursor = 'pointer';
+    toast.textContent = text;
+    toast.addEventListener('click', function () { toast.remove(); });
+
+    wrap.appendChild(toast);
+    setTimeout(function () { toast.remove(); }, hideAfter);
   };
 
   /**
@@ -125,6 +153,21 @@
    */
   FM.post = function (url, data) {
     var body = new FormData();
+
+    /* Токен уходит и полем формы, и заголовком (ниже). Поле — не
+       перестраховка: FormData без единого поля даёт multipart-тело без
+       частей, а Daphne отвечает на такое 400 ещё ДО Django — запроса нет
+       даже в её логе, ответ пустой. Под этот случай попадали все действия
+       без данных: «в корзину», «восстановить», «удалить окончательно»,
+       «удалить папку», «переслать в каталог» — то есть кнопка нажималась,
+       а файл оставался на месте.
+
+       Тестами это не ловилось: тестовый клиент Django кодирует пустой
+       словарь как application/x-www-form-urlencoded и до Daphne не
+       доходит, а runserver (WSGI) такой запрос пропускает — расхождение
+       видно только на боевом сервере. */
+    body.append('csrfmiddlewaretoken', csrfToken());
+
     Object.keys(data || {}).forEach(function (key) {
       var value = data[key];
       if (Array.isArray(value)) {

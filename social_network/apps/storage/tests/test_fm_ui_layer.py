@@ -8,11 +8,13 @@ window.location.reload(), ошибки в этих местах проявлял
 """
 
 from datetime import timedelta
+from pathlib import Path
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory, TestCase, override_settings
+from django.conf import settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -188,6 +190,42 @@ class ExchangeBulkMoveTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()['success'])
         self.assertIn('нет прав', response.json()['message'].lower())
+
+
+class FmActionsSourceTest(SimpleTestCase):
+    """Два свойства `fm-actions.js`, которые нечем проверить иначе.
+
+    JS-раннера в проекте нет, а обе эти вещи ломались молча и **не
+    ловились серверными тестами в принципе** — поэтому проверяется сам
+    исходник, как уже делается с конфигами nginx в
+    `test_x_accel_redirect.py`. Тест грубый, но он стоит ровно там, где
+    отсутствие проверки уже стоило рабочей функциональности.
+    """
+
+    def source(self) -> str:
+        path = Path(settings.BASE_DIR) / 'static' / 'js' / 'fm-actions.js'
+        return path.read_text(encoding='utf-8')
+
+    def test_post_puts_csrf_token_into_the_body(self):
+        """FormData без единого поля — это multipart-тело без частей, и
+        Daphne отвечает на такое 400 ещё до Django. Под это попадали все
+        действия без данных: удаление в корзину, восстановление,
+        окончательное удаление, удаление папки, пересылка в каталог.
+
+        Тестовый клиент Django кодирует пустой словарь как
+        x-www-form-urlencoded и до Daphne не доходит, runserver (WSGI)
+        такой запрос пропускает — расхождение видно только на боевом
+        сервере, то есть у пользователя.
+        """
+        self.assertIn("body.append('csrfmiddlewaretoken'", self.source())
+
+    def test_toast_works_without_the_theme_plugin(self):
+        """Стили тостов Midone кладёт в app.css, а сам плагин прячет внутрь
+        своего бандла и вешает на jQuery, которую webpack держит у себя. У
+        подключённой отдельным файлом jQuery метода .toast() нет, и все
+        сообщения уходили в console — то есть отказ операции пользователь
+        не видел вовсе, вопреки правилу 12.4."""
+        self.assertIn('jq-toast-wrap', self.source())
 
 
 class ExchangeMoveTargetsTest(TestCase):
