@@ -78,6 +78,12 @@
     <div class="grid gap-1 rounded-lg overflow-hidden {% if total == 1 %}grid-cols-1{% elif total == 2 %}grid-cols-2{% else %}grid-cols-3{% endif %}">
       {% for image in images %}
         {% if total == 1 %}
+        {% comment %}
+          Одиночное фото занимает всю ширину карточки, поэтому здесь показан
+          оригинал (уже уменьшенный до IMAGE_MAX_SIDE при загрузке): миниатюра
+          480 px растянулась бы и стала мыльной. Миниатюра — там, где снимок
+          и показывается маленьким, то есть в сетке из нескольких.
+        {% endcomment %}
         <a href="{{ image.image.url }}" data-lightbox="gallery-{{ post.id }}"
            data-title="Фото от {{ post.author.first_name|default:'Пользователя' }}"
            class="block cursor-zoom-in">
@@ -88,7 +94,7 @@
         <a href="{{ image.image.url }}" data-lightbox="gallery-{{ post.id }}"
            data-title="Фото от {{ post.author.first_name|default:'Пользователя' }}"
            class="relative block aspect-square cursor-zoom-in overflow-hidden">
-          <img src="{{ image.image.url }}" alt="Фото поста"
+          <img src="{{ image.preview_url }}" alt="Фото поста"
                class="w-full h-full object-cover transition-transform hover:scale-105 duration-300" />
           {% if forloop.counter == 5 and total > 5 %}
           <span class="absolute inset-0 flex items-center justify-center bg-black/50 text-xl font-semibold text-white">

@@ -12,4 +12,4 @@ class GalleryConfig(AppConfig):
         # register_file_cleanup.
         from storage.mediafiles import register_file_cleanup
 
-        register_file_cleanup(self.get_model('GalleryImage'), 'image')
+        register_file_cleanup(self.get_model('GalleryImage'), 'image', 'thumbnail')

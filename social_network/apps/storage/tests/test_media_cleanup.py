@@ -188,8 +188,10 @@ class RegistryTest(TestCase):
     def test_expected_models_are_registered(self):
         registered = {model._meta.label: fields for model, fields in registered_fields().items()}
 
-        self.assertEqual(registered.get('gallery.GalleryImage'), ('image',))
-        self.assertEqual(registered.get('posts.PostImage'), ('image',))
+        # Миниатюры — такие же файлы на диске, как оригиналы: забудь их
+        # здесь, и каждая удалённая фотография оставляла бы половину себя.
+        self.assertEqual(registered.get('gallery.GalleryImage'), ('image', 'thumbnail'))
+        self.assertEqual(registered.get('posts.PostImage'), ('image', 'thumbnail'))
         self.assertEqual(registered.get('posts.Post'), ('photo',))
         self.assertEqual(registered.get('profiles.User'), ('avatar', 'cover'))
         self.assertEqual(registered.get('sitesettings.SiteSettings'), ('logo',))

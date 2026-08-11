@@ -67,7 +67,7 @@
     <div class="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
       {% for p in year.list %}
       <a class="group aspect-square overflow-hidden rounded-xl" href="{{ p.image.url }}" data-lightbox="roadtrip">
-        <img class="h-full w-full cursor-pointer object-cover object-center transition-transform duration-300 group-hover:scale-105" src="{{ p.image.url }}" alt="Gallery Image"/>
+        <img class="h-full w-full cursor-pointer object-cover object-center transition-transform duration-300 group-hover:scale-105" src="{{ p.preview_url }}" alt="Gallery Image"/>
       </a>
       {% endfor %}
     </div>

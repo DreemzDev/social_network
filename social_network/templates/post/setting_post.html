@@ -78,7 +78,7 @@
           <div class="grid grid-cols-4 gap-2">
             {% for image in post.images.all %}
             <div class="relative" data-existing-image-id="{{ image.id }}">
-              <img src="{{ image.image.url }}" alt="Изображение" class="w-full aspect-square object-cover rounded-xl border border-gray-200 dark:border-zinc-600">
+              <img src="{{ image.preview_url }}" alt="Изображение" class="w-full aspect-square object-cover rounded-xl border border-gray-200 dark:border-zinc-600">
               <button
                 type="button"
                 class="remove-existing-image-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"

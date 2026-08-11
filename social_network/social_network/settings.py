@@ -263,6 +263,13 @@ STATIC_URL = 'app/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static') 
 STATIC_DIRS = []
 
+# Обработка изображений (галерея, изображения постов). Не про storage:
+# документы в нём обязаны доезжать байт в байт, оптимизируются только
+# картинки на обычных ImageField (apps/storage/images.py).
+IMAGE_MAX_SIDE = 1920        # до какой стороны уменьшать оригинал
+IMAGE_QUALITY = 85           # качество JPEG при пересжатии
+IMAGE_THUMBNAIL_SIDE = 480   # сторона миниатюры для сетки и ленты
+
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 

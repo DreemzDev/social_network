@@ -2,6 +2,7 @@ from django.db import models
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
+from storage.images import process_on_save
 from storage.models import FileObject
 
 
@@ -35,6 +36,13 @@ class Post(models.Model):
 class PostImage(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='images', verbose_name="Пост")
     image = models.ImageField(upload_to="photos/%Y/%m/%d/", verbose_name="Изображение")
+    # Миниатюра для ленты: в карточке поста снимок показывается размером с
+    # ладонь, а грузился до этого целиком (ARCHITECTURE.md, 1.1 — картинки
+    # остаются обычными ImageField, но сжатие им нужно).
+    thumbnail = models.ImageField(
+        upload_to="photos/%Y/%m/%d/thumbs/", blank=True, null=True, editable=False,
+        verbose_name="Миниатюра",
+    )
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
 
     class Meta:
@@ -44,6 +52,20 @@ class PostImage(models.Model):
 
     def __str__(self):
         return f"Изображение поста #{self.post_id}"
+
+    def save(self, *args, **kwargs):
+        # Только новый файл: без этой оговорки смена порядка картинок в
+        # посте пересжимала бы уже сжатое, теряя качество на каждом круге
+        # (см. storage.images.process_on_save).
+        process_on_save(self, 'image', thumbnail_field='thumbnail')
+        super().save(*args, **kwargs)
+
+    @property
+    def preview_url(self) -> str:
+        """Миниатюра для ленты, оригинал — по клику (lightbox)."""
+        if self.thumbnail:
+            return self.thumbnail.url
+        return self.image.url if self.image else ''
 
 
 class PostFile(models.Model):

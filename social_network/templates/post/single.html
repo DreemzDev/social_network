@@ -82,7 +82,8 @@
         <a href="{{ image.image.url }}" data-lightbox="gallery-{{ post.id }}"
            data-title="Фото от {{ post.author.first_name|default:'Пользователя' }}"
            class="block overflow-hidden rounded-xl cursor-zoom-in">
-          <img src="{{ image.image.url }}" alt="Фото поста"
+          {% comment %}Одиночное фото — во всю ширину, поэтому оригинал; в сетке из нескольких хватает миниатюры.{% endcomment %}
+          <img src="{% if total > 1 %}{{ image.preview_url }}{% else %}{{ image.image.url }}{% endif %}" alt="Фото поста"
                class="w-full {% if total > 1 %}aspect-square object-cover{% else %}h-auto max-h-96 object-contain{% endif %} rounded-xl transition-transform hover:scale-105 duration-300" />
         </a>
         {% endfor %}
