@@ -14,3 +14,8 @@ social_network/Midone-master/
 # Снапшот Redis: появляется в рабочем каталоге при запуске redis-server
 # (Channels + Celery), к исходникам отношения не имеет.
 dump.rdb
+
+node_modules/
+
+# Вывод django-compressor: собирается из исходников, в git не нужен.
+social_network/static/CACHE/
