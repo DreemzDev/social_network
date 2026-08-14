@@ -247,3 +247,63 @@ class CatalogSendToExchangeTest(TestCase):
 
         self.assertTrue(ExchangeFile.objects.filter(pk=exchange_file.pk).exists())
         self.assertEqual(FileBlob.objects.get(pk=copied_blob_id).status, FileBlob.Status.ACTIVE)
+
+
+class CatalogIsOpenToEveryoneTest(TestCase):
+    """Каталог открыт на запись всем — это решение, а не пропуск.
+
+    Подтверждено владельцем портала 14.08.2026 (ARCHITECTURE.md, «Каталог
+    открыт на запись»). Тест стоит здесь потому, что отсутствие проверок
+    выглядит дырой при каждом аудите: пусть попытка «починить» роняет
+    прогон, а не уезжает в прод молча. Заодно фиксируется отличие от
+    обменника, где то же действие постороннему запрещено.
+    """
+
+    def setUp(self):
+        self.owner = User.objects.create_user(username='cat_open_owner', password='pass12345')
+        self.stranger = User.objects.create_user(username='cat_open_stranger', password='pass12345')
+        self.client.force_login(self.stranger)
+
+    def document(self, title='Приказ'):
+        uploaded = SimpleUploadedFile('doc.pdf', b'catalog content', content_type='application/pdf')
+        file_object = StorageService.upload(uploaded, user=self.owner, category=FileObject.Category.CATALOG)
+        return CatalogDocument.objects.create(
+            file_object=file_object, title=title, uploaded_by=self.owner,
+        )
+
+    def test_stranger_renames_and_trashes_a_foreign_document(self):
+        document = self.document()
+
+        renamed = self.client.post(reverse('catalog_rename', args=[document.pk]), {'title': 'Чужая правка'})
+        trashed = self.client.post(reverse('catalog_trash_doc', args=[document.pk]))
+
+        self.assertEqual(renamed.status_code, 200)
+        self.assertEqual(trashed.status_code, 200)
+        document.refresh_from_db()
+        self.assertEqual(document.title, 'Чужая правка')
+        self.assertTrue(document.is_deleted)
+
+    def test_stranger_purges_a_foreign_document(self):
+        """Самое сильное следствие: удаление окончательное и необратимое."""
+        document = self.document('На удаление')
+        document.is_deleted = True
+        document.save(update_fields=['is_deleted'])
+
+        response = self.client.post(reverse('catalog_purge', args=[document.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(CatalogDocument.objects.filter(pk=document.pk).exists())
+
+    def test_exchange_does_not_work_this_way(self):
+        """Граница решения: в обменнике посторонний удалить не может."""
+        uploaded = SimpleUploadedFile('mine.pdf', b'exchange content', content_type='application/pdf')
+        file_object = StorageService.upload(uploaded, user=self.owner, category=FileObject.Category.EXCHANGE)
+        exchange_file = ExchangeFile.objects.create(
+            file_object=file_object, owner=self.owner, uploaded_by=self.owner,
+        )
+
+        response = self.client.post(reverse('exchange_trash_file', args=[exchange_file.pk]))
+
+        self.assertEqual(response.status_code, 403)
+        exchange_file.refresh_from_db()
+        self.assertFalse(exchange_file.is_deleted)

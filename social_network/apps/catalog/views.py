@@ -1,3 +1,11 @@
+"""Каталог — общий раздел организации.
+
+Пишущие вьюхи прав не проверяют **намеренно**: переименовать, перенести и
+удалить документ или папку может любой аутентифицированный. Это отличает
+каталог от `exchange` и `deptdocs` и каждый аудит выглядит как пропущенная
+проверка — обоснование в ARCHITECTURE.md, «Каталог открыт на запись».
+Поведение закреплено тестом `CatalogIsOpenToEveryoneTest`.
+"""
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
