@@ -95,6 +95,9 @@ Daphne **не перезагружается сам** при изменении 
 | `d4f1e4e6` | сжатие изображений и миниатюры (галерея, посты) |
 | `ccf0d250` | починка удаления: 400 от Daphne на запросах без данных + невидимые тосты |
 | `64728e6a` | версия файла в адресе статики — правки JS доезжают до браузера без Ctrl+F5 |
+| `23e86050` | сокращение комментариев: обоснование в документах, в коде — суть |
+| `df16d0bf` | уборка: docker-файлы, шаблоны без ссылок, `node_modules` из git |
+| `88eea2e5` | `templates/includes/` разобран по подкаталогам |
 
 Этот файл описывает срез на момент написания, а не гарантию на будущее:
 если `git log`/`git status` показывают другое — верить им.
@@ -518,7 +521,7 @@ ARCHITECTURE.md, раздел 2, «Перенос между личными па
   сетка файлов, а счётчики у карточек сотрудников).
 
 ### Общие шаблоны вместо трёх копий
-`includes/fm_file_card.html` и `includes/fm_folder_card.html` — одна
+`includes/fm/file_card.html` и `includes/fm/folder_card.html` — одна
 разметка на три модуля; `exchange_file_card.html` / `catalog_document_card.html`
 / `deptdoc_card.html` теперь тонкие обёртки, задающие имена маршрутов и
 подписи. Права в карточке — фильтр `fm_tags.fm_can_manage`, который зовёт
@@ -527,13 +530,13 @@ ARCHITECTURE.md, раздел 2, «Перенос между личными па
 
 ### Панель управления списком и блок доступа
 Поиск, «выделить всё», сортировка и кнопки действий стоят **одной
-строкой** (`includes/fm_filter.html` собирает всё вместе); второй ряд
+строкой** (`includes/fm/filter.html` собирает всё вместе); второй ряд
 отдан только хлебным крошкам. Сортировка и select-all включаются
 параметрами `sort_options` / `fm_show_select_all` — на страницах, где
 выбирать нечего (список папок обменника, корень приватного доступа), они
 не рисуются.
 
-Нижний блок левого меню — `includes/fm_access_panel.html`, «Кому видно».
+Нижний блок левого меню — `includes/fm/access_panel.html`, «Кому видно».
 Раньше там были перенесённые из макета цветные метки («Важное»,
 «Совещания», …) — шесть ссылок в никуда. Теперь: обменник — «всем
 сотрудникам» + чья папка; каталог — «всем сотрудникам»; приватный доступ —
@@ -842,7 +845,7 @@ ARCHITECTURE.md, раздел 2, «Перенос между личными па
   контрол либо работает, либо его нет в разметке (ARCHITECTURE 12.4).
 
 **Страница структуры** — `/structure/` (`OrgStructureView`, шаблон
-`profiles/structure.html` + рекурсивный `includes/org_position_node.html`),
+`profiles/structure.html` + рекурсивный `includes/profile/org_position_node.html`),
 пункт «Структура» в главном боковом меню. Дерево собирается во вьюхе одним
 проходом по двум запросам, шаблон только рисует; узел включает сам себя,
 поэтому глубина вложенности разметку не меняет. Защита от цикла стоит во
@@ -854,7 +857,7 @@ ARCHITECTURE.md, раздел 2, «Перенос между личными па
 отдельным блоком внизу (иначе человек, которому должность ещё не
 назначили, просто отсутствовал бы на странице).
 
-Ещё грабля: `includes/org_position_node.html` содержит **свой**
+Ещё грабля: `includes/profile/org_position_node.html` содержит **свой**
 `{% load static %}` — include не наследует загруженные библиотеки тегов, а
 при рекурсивном включении это ещё и не сразу заметно.
 
@@ -888,8 +891,8 @@ bulk-вьюх: `storage.tasks.bulk_move_documents`, `bulk_trash_documents`.
 1. **`data-feather` иконки не отрисовывались в Alpine-дропдаунах.**
    `feather.replace()` в `app.js` вызывается один раз при загрузке страницы,
    не видит содержимое, которое Alpine рендерит позже (`x-show`). Решение:
-   inline-SVG вместо `<i data-feather>` — см. `includes/fm_icons.html`,
-   вызывается как `{% include "includes/fm_icons.html" with icon='trash' cls='...' %}`.
+   inline-SVG вместо `<i data-feather>` — см. `includes/fm/icons.html`,
+   вызывается как `{% include "includes/fm/icons.html" with icon='trash' cls='...' %}`.
    Набор иконок расширялся по ходу работы (`hard-drive`, `image` под
    «Просмотр» и т.д.) — если нужной иконки нет, дописать в этот файл, не
    заводить второй источник SVG.
@@ -925,14 +928,14 @@ bulk-вьюх: `storage.tasks.bulk_move_documents`, `bulk_trash_documents`.
 
 | Partial | Что |
 |---|---|
-| `includes/fm_menu.html` | левое меню разделов |
-| `includes/fm_access_panel.html` | блок «Кому видно» внутри меню |
-| `includes/fm_filter.html` | поиск + фильтр + select-all + сортировка + кнопки |
-| `includes/fm_sort.html`, `includes/fm_select_all.html` | вкладываются в фильтр |
-| `includes/fm_pagination.html` | страницы + «показывать по» |
-| `includes/fm_bulk_bar.html` | панель массовых действий |
-| `includes/fm_file_card.html`, `includes/fm_folder_card.html` | карточки |
-| `includes/fm_icons.html` | inline-SVG |
+| `includes/fm/menu.html` | левое меню разделов |
+| `includes/fm/access_panel.html` | блок «Кому видно» внутри меню |
+| `includes/fm/filter.html` | поиск + фильтр + select-all + сортировка + кнопки |
+| `includes/fm/sort.html`, `includes/fm/select_all.html` | вкладываются в фильтр |
+| `includes/fm/pagination.html` | страницы + «показывать по» |
+| `includes/fm/bulk_bar.html` | панель массовых действий |
+| `includes/fm/file_card.html`, `includes/fm/folder_card.html` | карточки |
+| `includes/fm/icons.html` | inline-SVG |
 | `<module>/_grid.html` | содержимое сетки, оно же ответ на `?partial=1` |
 
 Корневой блок каждой страницы — `class="fm-scope grid grid-cols-12 gap-6 mt-8"`,
@@ -943,7 +946,7 @@ bulk-вьюх: `storage.tasks.bulk_move_documents`, `bulk_trash_documents`.
 событий — висеть на `document` или на контейнере, но не на самих
 карточках (они пересоздаются).
 
-Главное боковое меню портала (`includes/side_menu.html`) содержало
+Главное боковое меню портала (`includes/layout/side_menu.html`) содержало
 раскрывающийся пункт «Файлы» с тремя подпунктами — по прямому запросу
 пользователя схлопнут в один пункт «Файловый менеджер», ведущий на
 обменник; вся навигация между разделами теперь только внутри

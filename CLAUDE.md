@@ -291,7 +291,7 @@ social_network/
 │  ├─ exchange/ catalog/ deptdocs/    потребители storage
 │  ├─ profiles/           пользователи, должности/звания/телефоны, уведомления
 │  └─ posts/ gallery/ comments/ phonebook/ …
-├─ templates/             includes/ — общие partial'ы файлового менеджера
+├─ templates/             includes/{fm,posts,profile,colleagues,chat,layout}/
 ├─ static/js/fm-actions.js   весь клиентский слой файлового менеджера
 └─ media/                 storage/blobs — только через storage_verify
 ```
