@@ -26,6 +26,7 @@ from storage.utils import (
     folder_ancestors,
     folder_subtree,
     folder_subtree_ids,
+    is_descendant,
 )
 
 from profiles.models import Notification
@@ -412,7 +413,7 @@ class MoveExchangeFolderView(LoginRequiredMixin, View):
         )
 
         if new_parent is not None and (
-            new_parent.pk == folder.pk or _is_descendant(new_parent, folder)
+            new_parent.pk == folder.pk or is_descendant(new_parent, folder)
         ):
             return JsonResponse(
                 {'success': False,
@@ -450,21 +451,6 @@ class MoveExchangeFolderView(LoginRequiredMixin, View):
 
         return JsonResponse({'success': True})
 
-
-def _is_descendant(candidate: ExchangeFolder, ancestor: ExchangeFolder) -> bool:
-    """True, если candidate лежит внутри поддерева ancestor. Без этой
-    проверки папку можно было бы перенести внутрь самой себя, и дерево
-    self-FK замкнулось бы в цикл, а обход подпапок — завис.
-
-    seen страхует от уже существующего в данных цикла."""
-    node = candidate
-    seen = set()
-    while node.parent_id is not None and node.pk not in seen:
-        seen.add(node.pk)
-        if node.parent_id == ancestor.pk:
-            return True
-        node = node.parent
-    return False
 
 
 class RenameExchangeFileView(LoginRequiredMixin, View):

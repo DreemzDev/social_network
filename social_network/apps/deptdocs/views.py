@@ -25,6 +25,7 @@ from storage.utils import (
     folder_ancestors,
     folder_subtree,
     folder_subtree_ids,
+    is_descendant,
 )
 
 from profiles.models import Notification
@@ -265,7 +266,7 @@ class MoveDepartmentFolderView(LoginRequiredMixin, View):
             new_parent = get_object_or_404(DepartmentFolder, pk=new_parent_id)
             if not new_parent.is_accessible_by(request.user):
                 raise PermissionDenied
-            if new_parent.pk == folder.pk or _is_descendant(new_parent, folder):
+            if new_parent.pk == folder.pk or is_descendant(new_parent, folder):
                 return JsonResponse(
                     {'success': False, 'error': 'Нельзя перенести папку в саму себя или во вложенную папку'},
                     status=400,
@@ -281,18 +282,6 @@ class MoveDepartmentFolderView(LoginRequiredMixin, View):
                            action='folder_moved', text=f'перенёс сюда папку «{folder.name}»')
         return JsonResponse({'success': True})
 
-
-def _is_descendant(candidate: DepartmentFolder, ancestor: DepartmentFolder) -> bool:
-    """seen страхует от зацикливания на уже существующем цикле в данных —
-    без него обход вверх по parent не закончился бы никогда."""
-    node = candidate
-    seen = set()
-    while node.parent_id is not None and node.pk not in seen:
-        seen.add(node.pk)
-        if node.parent_id == ancestor.pk:
-            return True
-        node = node.parent
-    return False
 
 
 class RenameDepartmentDocumentView(LoginRequiredMixin, View):

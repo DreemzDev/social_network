@@ -80,21 +80,12 @@ class Position(models.Model):
 
     def clean(self):
         from django.core.exceptions import ValidationError
+        from storage.utils import is_descendant
 
         if self.parent_id and self.parent_id == self.pk:
             raise ValidationError({'parent': 'Должность не может подчиняться сама себе'})
-        if self.pk and self.parent_id and self._is_descendant(self.parent):
+        if self.pk and self.parent_id and is_descendant(self.parent, self):
             raise ValidationError({'parent': 'Нельзя подчинить должность её же подчинённому — получится цикл'})
-
-    def _is_descendant(self, candidate) -> bool:
-        """Лежит ли candidate внутри поддерева этой должности."""
-        node, seen = candidate, set()
-        while node is not None and node.pk not in seen:
-            seen.add(node.pk)
-            if node.parent_id == self.pk:
-                return True
-            node = node.parent
-        return False
 
     @property
     def depth(self) -> int:

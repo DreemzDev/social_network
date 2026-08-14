@@ -32,6 +32,7 @@ from storage.utils import (
     folder_ancestors,
     folder_subtree,
     folder_subtree_ids,
+    is_descendant,
 )
 
 from profiles.models import Notification
@@ -173,7 +174,7 @@ class MoveCatalogFolderView(LoginRequiredMixin, View):
 
         if new_parent_id:
             new_parent = get_object_or_404(CatalogFolder, pk=new_parent_id)
-            if new_parent.pk == folder.pk or _is_descendant(new_parent, folder):
+            if new_parent.pk == folder.pk or is_descendant(new_parent, folder):
                 return JsonResponse(
                     {'success': False, 'error': 'Нельзя перенести папку в саму себя или во вложенную папку'},
                     status=400,
@@ -189,24 +190,6 @@ class MoveCatalogFolderView(LoginRequiredMixin, View):
                            action='folder_moved', text=f'перенёс сюда папку «{folder.name}»')
         return JsonResponse({'success': True})
 
-
-def _is_descendant(candidate: CatalogFolder, ancestor: CatalogFolder) -> bool:
-    """True, если candidate лежит где-то внутри поддерева ancestor.
-    Дерево обычно неглубокое (разделы каталога), поэтому обход вверх по
-    parent для каждого кандидата дешевле, чем рекурсивный запрос всех
-    потомков ancestor.
-
-    seen страхует от зацикливания: если в данных уже есть цикл (например,
-    заведён руками через /admin/), обход вверх иначе не закончится
-    никогда и повесит воркер."""
-    node = candidate
-    seen = set()
-    while node.parent_id is not None and node.pk not in seen:
-        seen.add(node.pk)
-        if node.parent_id == ancestor.pk:
-            return True
-        node = node.parent
-    return False
 
 
 class RenameCatalogDocumentView(LoginRequiredMixin, View):

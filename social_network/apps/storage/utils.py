@@ -196,7 +196,7 @@ def folder_subtree(folder, *, queryset=None) -> dict:
         level = []
         for pk, parent_id, name in children:
             # Защита от цикла в дереве: перенос папки в саму себя закрыт
-            # проверкой _is_descendant, но данные могли прийти и в обход её
+            # проверкой is_descendant, но данные могли прийти и в обход её
             # (админка, ручной SQL), а зациклившийся обход тут повесил бы
             # воркер намертво.
             if pk in paths:
@@ -365,6 +365,27 @@ def apply_filters(queryset, params, *, name_field):
         active['size_max'] = params.get('size_max')
 
     return queryset, active
+
+
+def is_descendant(candidate, ancestor) -> bool:
+    """Лежит ли candidate внутри поддерева ancestor.
+
+    Проверка перед переносом папки: без неё папку можно перенести внутрь
+    самой себя, дерево self-FK замкнётся в цикл и обход подпапок зависнет.
+    `seen` страхует от цикла, уже существующего в данных (заведён через
+    /admin/) — иначе обход вверх не закончится никогда.
+
+    Работает с любым деревом на self-FK `parent`: обменник, каталог,
+    документы отделов, должности.
+    """
+    node = candidate
+    seen = set()
+    while node.parent_id is not None and node.pk not in seen:
+        seen.add(node.pk)
+        if node.parent_id == ancestor.pk:
+            return True
+        node = node.parent
+    return False
 
 
 def folder_ancestors(folder) -> list:
