@@ -14,14 +14,14 @@
 <div class="fm-scope grid grid-cols-12 gap-6 mt-8">
   <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
     <h2 class="intro-y text-lg font-medium mr-auto mt-2">Информационный каталог</h2>
-    {% include "includes/fm_menu.html" with fm_active='trash' %}
+    {% include "includes/fm/menu.html" with fm_active='trash' %}
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
     <div class="intro-y flex flex-wrap items-center justify-between gap-2 mt-2">
       <div class="flex items-center">
         <a href="{% url 'catalog_root' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
-          {% include "includes/fm_icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Каталог
+          {% include "includes/fm/icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Каталог
         </a>
         <div class="mx-2 text-gray-400">/</div>
         <div class="font-medium">Корзина каталога</div>
@@ -37,13 +37,13 @@
 
     <div id="catalog-trash-grid" class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
       {% for item in documents %}
-      {% include "includes/catalog_document_card.html" with is_trash=True %}
+      {% include "includes/fm/catalog_document_card.html" with is_trash=True %}
       {% empty %}
       <div class="col-span-12 box p-8 text-center text-sm text-gray-600">Корзина пуста</div>
       {% endfor %}
     </div>
 
-    {% include "includes/fm_pagination.html" %}
+    {% include "includes/fm/pagination.html" %}
   </div>
 </div>
 {% endblock content %}

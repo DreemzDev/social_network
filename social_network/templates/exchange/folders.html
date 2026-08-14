@@ -17,11 +17,11 @@
 <div class="fm-scope grid grid-cols-12 gap-6 mt-8">
   <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
     <h2 class="intro-y text-lg font-medium mr-auto mt-2">Обменник</h2>
-    {% include "includes/fm_menu.html" with fm_active='exchange' %}
+    {% include "includes/fm/menu.html" with fm_active='exchange' %}
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10" x-data="{ uploadOpen: false }">
-    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск сотрудника' fm_upload_label='Загрузить файлы' fm_simple_search=True %}
+    {% include "includes/fm/filter.html" with fm_search_placeholder='Поиск сотрудника' fm_upload_label='Загрузить файлы' fm_simple_search=True %}
 
     <div class="intro-y grid grid-cols-12 gap-3 sm:gap-6 mt-5">
       {% for person in folders %}
@@ -38,12 +38,12 @@
           </div>
           <div class="absolute top-0 right-0 mr-2 mt-2 dropdown ml-auto" x-data="{ open: false }">
             <a class="w-5 h-5 block" href="javascript:;" x-on:click="open = !open" aria-label="Действия с папкой">
-              {% include "includes/fm_icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
+              {% include "includes/fm/icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
             </a>
             <div class="dropdown-box mt-5 absolute w-44 top-0 right-0 z-10" x-show="open" x-on:click.outside="open = false" x-cloak>
               <div class="dropdown-box__content box p-2">
                 <a href="{% url 'exchange_folder' person.pk %}" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
-                  {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Открыть
+                  {% include "includes/fm/icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Открыть
                 </a>
                 {% comment %}
                   Папка верхнего уровня в обменнике — сам сотрудник, а не
@@ -53,7 +53,7 @@
                 {% endcomment %}
                 <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
                    data-fm-action="download-archive" data-fm-url="{% url 'exchange_personal_download' person.pk %}">
-                  {% include "includes/fm_icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Скачать архивом
+                  {% include "includes/fm/icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Скачать архивом
                 </a>
               </div>
             </div>
@@ -65,7 +65,7 @@
       {% endfor %}
     </div>
 
-    {% include "includes/fm_pagination.html" %}
+    {% include "includes/fm/pagination.html" %}
   </div>
 
   {# На списке папок загрузка требует выбрать, в чью папку класть файл #}

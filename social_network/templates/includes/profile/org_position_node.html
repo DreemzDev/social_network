@@ -46,7 +46,7 @@
   {% if node.children %}
   <ul class="mt-3 space-y-3">
     {% for child in node.children %}
-      {% include "includes/org_position_node.html" with node=child %}
+      {% include "includes/profile/org_position_node.html" with node=child %}
     {% endfor %}
   </ul>
   {% endif %}

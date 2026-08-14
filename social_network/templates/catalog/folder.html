@@ -10,11 +10,11 @@
                moveOpen: false, moveTarget: null, moveFolderId: '', sendOpen: false, sendTarget: null }">
   <div class="col-span-12 lg:col-span-3 xl:col-span-2 xxl:col-span-2">
     <h2 class="intro-y text-lg font-medium mr-auto mt-2">Информационный каталог</h2>
-    {% include "includes/fm_menu.html" with fm_active='catalog' %}
+    {% include "includes/fm/menu.html" with fm_active='catalog' %}
   </div>
 
   <div class="col-span-12 lg:col-span-9 xl:col-span-10 xxl:col-span-10">
-    {% include "includes/fm_filter.html" with fm_search_placeholder='Поиск документов' fm_upload_label='Загрузить документ' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' fm_archive_button=True fm_show_select_all=True %}
+    {% include "includes/fm/filter.html" with fm_search_placeholder='Поиск документов' fm_upload_label='Загрузить документ' fm_extra_button_label='Новая папка' fm_extra_button_action='folderOpen = true' fm_archive_button=True fm_show_select_all=True %}
 
     {% comment %}
       Второй ряд — только хлебные крошки: выделение и сортировка переехали
@@ -23,7 +23,7 @@
     <div class="intro-y flex flex-wrap items-center gap-2 mt-5">
       <div class="flex items-center flex-wrap">
         <a href="{% url 'catalog_root' %}" class="flex items-center text-gray-600 hover:text-theme-1 text-sm">
-          {% include "includes/fm_icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Каталог
+          {% include "includes/fm/icons.html" with icon='home' cls='w-4 h-4 mr-1' %} Каталог
         </a>
         {% comment %}
           Хлебная крошка теперь показывает весь путь от корня, а не только
@@ -42,7 +42,7 @@
       </div>
     </div>
 
-    {% include "includes/fm_bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в папку' fm_bulk_download=True %}
+    {% include "includes/fm/bulk_bar.html" with fm_bulk_move=True fm_bulk_move_label='Переместить в папку' fm_bulk_download=True %}
 
     <div id="fm-dropzone" class="relative mt-5">
       <div id="fm-drop-hint" class="fm-drop-hint absolute inset-0 z-20 text-sm font-medium text-theme-1">
@@ -154,7 +154,7 @@
     </div>
   </div>
 
-  {% include "includes/fm_archive_modal.html" with fm_archive_folder_id=current_folder.id fm_archive_location=current_folder.name %}
+  {% include "includes/fm/archive_modal.html" with fm_archive_folder_id=current_folder.id fm_archive_location=current_folder.name %}
 </div>
 
 {% endblock content %}

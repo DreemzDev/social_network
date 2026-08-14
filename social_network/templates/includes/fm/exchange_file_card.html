@@ -1,6 +1,6 @@
 {% load fm_tags %}
 {% comment %}
-  Карточка файла обменника. Вся разметка — в общем includes/fm_file_card.html,
+  Карточка файла обменника. Вся разметка — в общем includes/fm/file_card.html,
   здесь только то, чем обменник отличается от каталога и приватного доступа:
   имя берётся из FileObject (своего заголовка у ExchangeFile нет), а править
   и удалять может владелец папки или тот, кто файл загрузил
@@ -9,4 +9,4 @@
   Отдельный файл сохранён, потому что на него ссылаются и страница
   обменника, и единая корзина (templates/storage/trash.html).
 {% endcomment %}
-{% include "includes/fm_file_card.html" with fm_title=item.file_object.original_name fm_download_url='exchange_download' fm_trash_url='exchange_trash_file' fm_restore_url='exchange_restore' fm_purge_url='exchange_purge' fm_rename_type='file' fm_send_label='Переслать в каталог' fm_can_manage=item|fm_can_manage:request.user %}
+{% include "includes/fm/file_card.html" with fm_title=item.file_object.original_name fm_download_url='exchange_download' fm_trash_url='exchange_trash_file' fm_restore_url='exchange_restore' fm_purge_url='exchange_purge' fm_rename_type='file' fm_send_label='Переслать в каталог' fm_can_manage=item|fm_can_manage:request.user %}

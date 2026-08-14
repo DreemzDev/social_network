@@ -60,7 +60,7 @@
             <span class="hidden xl:block text-white text-lg ml-3 truncate">{{ site_settings.site_name }}</span>
         </a>
         <div class="side-nav__devider my-6"></div>
-        {% include "includes/side_menu.html" %}
+        {% include "includes/layout/side_menu.html" %}
     </nav>
     <!-- END: Side Menu -->
 
@@ -181,7 +181,7 @@
     <div x-show="mobileMenuOpen" x-cloak class="fixed inset-0 z-40 lg:hidden" x-on:keydown.escape.window="mobileMenuOpen = false">
         <div class="fixed inset-0 bg-black/40" x-on:click="mobileMenuOpen = false"></div>
         <div class="fixed inset-y-0 left-0 w-64 overflow-y-auto bg-white p-4 shadow-lg dark:bg-zinc-800" x-on:click.away="mobileMenuOpen = false">
-            {% include "includes/menu.html" %}
+            {% include "includes/layout/menu.html" %}
         </div>
     </div>
 

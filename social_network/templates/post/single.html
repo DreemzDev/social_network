@@ -382,7 +382,7 @@
     <!-- Comments List -->
     <div class="space-y-4" id="comments-list">
         {% for comment in post.post_comments.all %}
-        {% include "includes/comment.html" %}
+        {% include "includes/posts/comment.html" %}
         {% empty %}
         <div class="text-center py-8">
             <svg class="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -925,7 +925,7 @@
   const csrfToken = '{{ csrf_token }}';
 
   // Кнопки редактирования/удаления рендерятся в HTML всегда (см.
-  // includes/comment.html), но скрыты — показываем их только автору
+  // includes/posts/comment.html), но скрыты — показываем их только автору
   // комментария. Единая точка для применения этого правила что при
   // обычной загрузке страницы, что при вставке нового комментария
   // через WebSocket, где серверу неизвестно, кто именно смотрит.

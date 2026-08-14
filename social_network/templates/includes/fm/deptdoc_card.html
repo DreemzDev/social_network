@@ -1,7 +1,7 @@
 {% load fm_tags %}
 {% comment %}
   Карточка документа приватного доступа. Разметка — в общем
-  includes/fm_file_card.html; права наследуются от папки
+  includes/fm/file_card.html; права наследуются от папки
   (DepartmentDocument.is_accessible_by → folder.allowed_users), фильтр
   fm_can_manage вызывает именно её.
 
@@ -9,4 +9,4 @@
   в единой корзине (storage/trash.html) его приходилось передавать
   вручную, иначе у документа не было даже кнопки «Восстановить».
 {% endcomment %}
-{% include "includes/fm_file_card.html" with fm_title=item.title fm_download_url='deptdocs_download' fm_trash_url='deptdocs_trash_doc' fm_restore_url='deptdocs_restore' fm_purge_url='deptdocs_purge' fm_rename_type='document' fm_send_label='Переслать в обменник' fm_can_manage=item|fm_can_manage:request.user %}
+{% include "includes/fm/file_card.html" with fm_title=item.title fm_download_url='deptdocs_download' fm_trash_url='deptdocs_trash_doc' fm_restore_url='deptdocs_restore' fm_purge_url='deptdocs_purge' fm_rename_type='document' fm_send_label='Переслать в обменник' fm_can_manage=item|fm_can_manage:request.user %}

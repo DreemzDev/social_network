@@ -55,7 +55,7 @@ class PortalHome(LoginRequiredMixin, ListView):
 class NewPostsFeedView(LoginRequiredMixin, View):
     """Отдаёт HTML новых постов (created позже last_post_id) для кнопки
     «Есть новые посты» — рендерит тем же partial-шаблоном, что и основная
-    лента (includes/post.html), чтобы разметка карточки не расходилась
+    лента (includes/posts/post.html), чтобы разметка карточки не расходилась
     между обычной загрузкой страницы и live-довставкой."""
 
     def get(self, request, last_post_id):
@@ -65,7 +65,7 @@ class NewPostsFeedView(LoginRequiredMixin, View):
             pk__gt=last_post_id
         ).order_by('-time_create')
 
-        html = render_to_string('includes/post_list_fragment.html', {'posts': posts, 'request': request}, request=request)
+        html = render_to_string('includes/posts/list_fragment.html', {'posts': posts, 'request': request}, request=request)
         return JsonResponse({'html': html, 'count': posts.count()})
 
 

@@ -1,6 +1,6 @@
 {% comment %}
   Левое меню файлового менеджера — разметка Midone, 1-в-1.
-  Иконки — готовые inline-SVG (см. includes/fm_icons.html): feather.replace()
+  Иконки — готовые inline-SVG (см. includes/fm/icons.html): feather.replace()
   из app.js отрабатывает один раз при загрузке и не всегда успевает по
   элементам, отрисованным позже.
 
@@ -18,20 +18,20 @@
 <div class="intro-y box p-5 mt-6">
   <div class="mt-1">
     <a href="{% url 'exchange_inbox' %}" class="flex items-center px-3 py-2 rounded-md {% if fm_active == 'exchange' %}bg-theme-1 text-white font-medium{% endif %}">
-      {% include "includes/fm_icons.html" with icon='send' cls='w-4 h-4 mr-2' %} Обменник
+      {% include "includes/fm/icons.html" with icon='send' cls='w-4 h-4 mr-2' %} Обменник
     </a>
     <a href="{% url 'catalog_root' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'catalog' %}bg-theme-1 text-white font-medium{% endif %}">
-      {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Информационный каталог
+      {% include "includes/fm/icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Информационный каталог
     </a>
     <a href="{% url 'deptdocs_list' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'deptdocs' %}bg-theme-1 text-white font-medium{% endif %}">
-      {% include "includes/fm_icons.html" with icon='lock' cls='w-4 h-4 mr-2' %} Приватный доступ
+      {% include "includes/fm/icons.html" with icon='lock' cls='w-4 h-4 mr-2' %} Приватный доступ
     </a>
     <a href="{% url 'storage_trash' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'trash' %}bg-theme-1 text-white font-medium{% endif %}">
-      {% include "includes/fm_icons.html" with icon='trash' cls='w-4 h-4 mr-2' %} Корзина
+      {% include "includes/fm/icons.html" with icon='trash' cls='w-4 h-4 mr-2' %} Корзина
     </a>
     <a href="{% url 'storage_dashboard' %}" class="flex items-center px-3 py-2 mt-2 rounded-md {% if fm_active == 'storage' %}bg-theme-1 text-white font-medium{% endif %}">
-      {% include "includes/fm_icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Занятое место
+      {% include "includes/fm/icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Занятое место
     </a>
   </div>
-  {% include "includes/fm_access_panel.html" %}
+  {% include "includes/fm/access_panel.html" %}
 </div>

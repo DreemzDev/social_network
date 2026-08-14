@@ -27,7 +27,7 @@
     <input type="hidden" name="per_page" value="{{ active_per_page }}">
     {% endif %}
 
-    {% include "includes/fm_icons.html" with icon='search' cls='w-4 h-4 absolute my-auto inset-y-0 ml-3 left-0 z-10 text-gray-700' %}
+    {% include "includes/fm/icons.html" with icon='search' cls='w-4 h-4 absolute my-auto inset-y-0 ml-3 left-0 z-10 text-gray-700' %}
     <input type="text" name="q" value="{{ active_filters.q|default:'' }}"
            class="input w-full sm:w-64 box px-10 text-gray-700 placeholder-theme-13"
            placeholder="{{ fm_search_placeholder|default:'Поиск файлов' }}">
@@ -35,7 +35,7 @@
     {% if not fm_simple_search %}
     <div class="inbox-filter dropdown absolute inset-y-0 mr-3 right-0 flex items-center">
       <span class="cursor-pointer" x-on:click="filterOpen = !filterOpen" title="Расширенный фильтр">
-        {% include "includes/fm_icons.html" with icon='chevron-down' cls='w-4 h-4 text-gray-700' %}
+        {% include "includes/fm/icons.html" with icon='chevron-down' cls='w-4 h-4 text-gray-700' %}
       </span>
       <div class="inbox-filter__dropdown-box dropdown-box mt-10 absolute top-0 left-0 z-20"
            x-show="filterOpen" x-on:click.outside="filterOpen = false" x-cloak>
@@ -85,20 +85,20 @@
     под хлебные крошки — они про навигацию, а не про список.
   {% endcomment %}
   <div class="w-full sm:w-auto flex flex-wrap items-center gap-2 mt-3 sm:mt-0">
-    {% if fm_show_select_all %}{% include "includes/fm_select_all.html" %}{% endif %}
-    {% if sort_options %}{% include "includes/fm_sort.html" %}{% endif %}
+    {% if fm_show_select_all %}{% include "includes/fm/select_all.html" %}{% endif %}
+    {% if sort_options %}{% include "includes/fm/sort.html" %}{% endif %}
 
     {% if fm_upload_label %}
     <button type="button" class="button text-white bg-theme-1 shadow-md" x-on:click="uploadOpen = true">{{ fm_upload_label }}</button>
     {% endif %}
     {% if fm_archive_button %}
     <button type="button" class="button box text-gray-700 flex items-center" x-on:click="archiveOpen = true">
-      {% include "includes/fm_icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Загрузить архив
+      {% include "includes/fm/icons.html" with icon='hard-drive' cls='w-4 h-4 mr-2' %} Загрузить архив
     </button>
     {% endif %}
     {% if fm_extra_button_label %}
     <button type="button" class="button box text-gray-700 flex items-center" x-on:click="{{ fm_extra_button_action }}">
-      {% include "includes/fm_icons.html" with icon='folder-plus' cls='w-4 h-4 mr-2' %} {{ fm_extra_button_label }}
+      {% include "includes/fm/icons.html" with icon='folder-plus' cls='w-4 h-4 mr-2' %} {{ fm_extra_button_label }}
     </button>
     {% endif %}
   </div>

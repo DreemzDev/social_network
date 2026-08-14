@@ -1,4 +1,4 @@
-{% extends 'includes/auth_base.html' %}
+{% extends 'includes/layout/auth_base.html' %}
 {% load static %}
 
 {% block auth_title %}Ещё пара кликов<br>для регистрации аккаунта.{% endblock auth_title %}
@@ -25,20 +25,20 @@
     {% csrf_token %}
     <div class="intro-x mt-8">
         {{ form.username }}
-        {% include "includes/field_errors.html" with field=form.username %}
+        {% include "includes/layout/field_errors.html" with field=form.username %}
         {{ form.last_name }}
-        {% include "includes/field_errors.html" with field=form.last_name %}
+        {% include "includes/layout/field_errors.html" with field=form.last_name %}
         {{ form.first_name }}
-        {% include "includes/field_errors.html" with field=form.first_name %}
+        {% include "includes/layout/field_errors.html" with field=form.first_name %}
         {{ form.patronymic }}
-        {% include "includes/field_errors.html" with field=form.patronymic %}
+        {% include "includes/layout/field_errors.html" with field=form.patronymic %}
         <div class="intro-x relative mt-4">
             {{ form.password1 }}
             <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="password-input" tabindex="-1">
                 <i data-feather="eye" class="w-4 h-4"></i>
             </button>
         </div>
-        {% include "includes/field_errors.html" with field=form.password1 %}
+        {% include "includes/layout/field_errors.html" with field=form.password1 %}
 
         <!-- Индикатор сложности пароля -->
         <div class="intro-x w-full grid grid-cols-12 gap-4 h-1 mt-3" id="password-strength">
@@ -55,7 +55,7 @@
                 <i data-feather="eye" class="w-4 h-4"></i>
             </button>
         </div>
-        {% include "includes/field_errors.html" with field=form.password2 %}
+        {% include "includes/layout/field_errors.html" with field=form.password2 %}
 
         <div class="intro-x mt-6 mb-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Восстановление доступа</div>
         <div class="intro-x rounded-md flex items-start px-4 py-3 bg-theme-14 text-theme-10 text-xs sm:text-sm">
@@ -63,7 +63,7 @@
             <div>В сети нет почты для сброса пароля — если забудете его, восстановить доступ можно только по этому слову. Запомните его.</div>
         </div>
         {{ form.security_answer }}
-        {% include "includes/field_errors.html" with field=form.security_answer %}
+        {% include "includes/layout/field_errors.html" with field=form.security_answer %}
     </div>
     <div class="intro-x mt-5 xl:mt-8 flex flex-col xl:flex-row text-center xl:text-left">
         <button type="submit" class="button button--lg w-full xl:w-auto xl:px-8 text-white bg-theme-1 xl:mr-3">Зарегистрироваться</button>

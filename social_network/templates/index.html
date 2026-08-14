@@ -7,9 +7,9 @@
 <div class="w-full flex-shrink-0 md:w-72">
     {% block sidebar %}
     <div class="flex flex-col gap-4">
-        {% include "includes/filterPosts.html" %}
+        {% include "includes/posts/filter.html" %}
         {% if request.user.is_authenticated %}
-        {% include "includes/widget_online.html" %}
+        {% include "includes/layout/widget_online.html" %}
         {% endif %}
     </div>
     {% endblock sidebar %}
@@ -19,7 +19,7 @@
 {% block content %}
 
 <!-- Кнопка "Есть новые посты" — только на странице ленты новостей. Клик и
-     WS-подписка на post_created обрабатываются в includes/post.html (общий
+     WS-подписка на post_created обрабатываются в includes/posts/post.html (общий
      partial), она просто ищет этот элемент по id, если он есть на странице. -->
 <button type="button" id="new-posts-button"
         class="hidden sticky top-2 z-10 mx-auto mb-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#0077FF] px-4 py-2.5 text-sm font-medium text-white shadow-lg hover:bg-[#3391FF]">
@@ -29,6 +29,6 @@
   Есть новые посты
 </button>
 
-{% include "includes/post.html" %}
+{% include "includes/posts/post.html" %}
 
 {% endblock content %}

@@ -19,9 +19,9 @@ def _push(post_id, event_type, **payload):
 
 def broadcast_new_comment(comment):
     """Рендерит комментарий тем же partial-шаблоном, что и обычный список
-    (templates/includes/comment.html), и рассылает готовый HTML всем, кто
+    (templates/includes/posts/comment.html), и рассылает готовый HTML всем, кто
     сейчас смотрит страницу поста — без дублирования разметки в JS."""
-    html = render_to_string('includes/comment.html', {'comment': comment, 'request': None})
+    html = render_to_string('includes/posts/comment.html', {'comment': comment, 'request': None})
     _push(comment.post_id, 'comment_created', html=html)
 
     from posts.realtime import broadcast_post_comment_count_changed

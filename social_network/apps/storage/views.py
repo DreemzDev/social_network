@@ -133,13 +133,13 @@ class UnifiedTrashView(LoginRequiredMixin, TemplateView):
 
         context['tabs'] = [
             self._tab('exchange', 'Обменник', exchange_qs,
-                      'includes/exchange_file_card.html', 'exchange_trash',
+                      'includes/fm/exchange_file_card.html', 'exchange_trash',
                       'Корзина обменника пуста'),
             self._tab('catalog', 'Информационный каталог', catalog_qs,
-                      'includes/catalog_document_card.html', 'catalog_trash',
+                      'includes/fm/catalog_document_card.html', 'catalog_trash',
                       'Корзина каталога пуста'),
             self._tab('deptdocs', 'Приватный доступ', deptdocs_qs,
-                      'includes/deptdoc_card.html', 'deptdocs_trash',
+                      'includes/fm/deptdoc_card.html', 'deptdocs_trash',
                       'Корзина приватного доступа пуста'),
         ]
 

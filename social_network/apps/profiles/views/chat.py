@@ -99,7 +99,7 @@ class DialogsListView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
     def render_to_response(self, context, **response_kwargs):
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             html = render_to_string(
-                'includes/dialog_list_fragment.html', context, request=self.request
+                'includes/chat/list_fragment.html', context, request=self.request
             )
             return JsonResponse({
                 'html': html,

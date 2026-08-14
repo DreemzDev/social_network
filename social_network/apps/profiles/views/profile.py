@@ -154,7 +154,7 @@ class ShowUsers(ListView):
     def render_to_response(self, context, **response_kwargs):
         if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             html = render_to_string(
-                'includes/colleague_list_fragment.html', context, request=self.request
+                'includes/colleagues/list_fragment.html', context, request=self.request
             )
             return JsonResponse({
                 'html': html,

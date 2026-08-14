@@ -24,7 +24,7 @@
 
   {% if fm_active == 'exchange' %}
     <div class="flex items-start mt-3 text-sm">
-      {% include "includes/fm_icons.html" with icon='users' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
+      {% include "includes/fm/icons.html" with icon='users' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
       <div>
         <div>Всем сотрудникам</div>
         <div class="text-xs text-gray-500 mt-1">
@@ -35,7 +35,7 @@
     </div>
     {% if folder_owner %}
     <div class="flex items-center mt-3 text-sm">
-      {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2 text-gray-500 flex-shrink-0' %}
+      {% include "includes/fm/icons.html" with icon='folder' cls='w-4 h-4 mr-2 text-gray-500 flex-shrink-0' %}
       <span class="truncate">
         Папка: {% if folder_owner.last_name or folder_owner.first_name %}{{ folder_owner.last_name }} {{ folder_owner.first_name }}{% else %}{{ folder_owner.username }}{% endif %}
       </span>
@@ -44,7 +44,7 @@
 
   {% elif fm_active == 'catalog' %}
     <div class="flex items-start mt-3 text-sm">
-      {% include "includes/fm_icons.html" with icon='users' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
+      {% include "includes/fm/icons.html" with icon='users' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
       <div>
         <div>Всем сотрудникам</div>
         <div class="text-xs text-gray-500 mt-1">
@@ -76,7 +76,7 @@
       </button>
     {% else %}
       <div class="flex items-start mt-3 text-sm">
-        {% include "includes/fm_icons.html" with icon='lock' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
+        {% include "includes/fm/icons.html" with icon='lock' cls='w-4 h-4 mr-2 mt-0.5 text-gray-500 flex-shrink-0' %}
         <div>
           <div>Только допущенным</div>
           <div class="text-xs text-gray-500 mt-1">

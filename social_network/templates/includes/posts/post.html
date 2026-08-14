@@ -1,12 +1,12 @@
 {% load static %}
 <!-- Кнопка "Есть новые посты" рендерится только на странице ленты новостей
-     (см. index.html), а не здесь — includes/post.html переиспользуется и
+     (см. index.html), а не здесь — includes/posts/post.html переиспользуется и
      на "Моей странице", где эта кнопка не нужна. Разметку и обработчик клика
      ищите в index.html; WS-событие post_created ниже просто её показывает,
      если элемент присутствует на странице. -->
 
 <div class="space-y-6 flex flex-col mx-auto w-full" id="posts-list">
-  {% include "includes/post_list_fragment.html" %}
+  {% include "includes/posts/list_fragment.html" %}
 </div>
 
 <!-- Modal удаления поста (общая на всю ленту, не дублируется на карточку) -->

@@ -17,12 +17,12 @@
   <ul class="pagination">
     <li>
       <a class="pagination__link fm-page-link" href="{% fm_qs page=1 %}" aria-label="Первая страница">
-        {% include "includes/fm_icons.html" with icon='chevrons-left' cls='w-4 h-4' %}
+        {% include "includes/fm/icons.html" with icon='chevrons-left' cls='w-4 h-4' %}
       </a>
     </li>
     <li>
       <a class="pagination__link fm-page-link" href="{% if page_obj.has_previous %}{% fm_qs page=page_obj.previous_page_number %}{% else %}{% fm_qs page=1 %}{% endif %}" aria-label="Предыдущая страница">
-        {% include "includes/fm_icons.html" with icon='chevron-left' cls='w-4 h-4' %}
+        {% include "includes/fm/icons.html" with icon='chevron-left' cls='w-4 h-4' %}
       </a>
     </li>
     {% for num in page_obj.paginator.page_range %}
@@ -34,12 +34,12 @@
     {% endfor %}
     <li>
       <a class="pagination__link fm-page-link" href="{% if page_obj.has_next %}{% fm_qs page=page_obj.next_page_number %}{% else %}{% fm_qs page=page_obj.paginator.num_pages %}{% endif %}" aria-label="Следующая страница">
-        {% include "includes/fm_icons.html" with icon='chevron-right' cls='w-4 h-4' %}
+        {% include "includes/fm/icons.html" with icon='chevron-right' cls='w-4 h-4' %}
       </a>
     </li>
     <li>
       <a class="pagination__link fm-page-link" href="{% fm_qs page=page_obj.paginator.num_pages %}" aria-label="Последняя страница">
-        {% include "includes/fm_icons.html" with icon='chevrons-right' cls='w-4 h-4' %}
+        {% include "includes/fm/icons.html" with icon='chevrons-right' cls='w-4 h-4' %}
       </a>
     </li>
   </ul>

@@ -1,0 +1,6 @@
+{% load static %}
+{% for post in posts %}
+{% include "includes/posts/card.html" %}
+{% empty %}
+{% include "includes/posts/empty.html" %}
+{% endfor %}

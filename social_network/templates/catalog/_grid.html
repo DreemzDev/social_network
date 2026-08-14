@@ -15,11 +15,11 @@
 {% endcomment %}
 <div class="intro-y grid grid-cols-12 gap-3 sm:gap-6">
   {% for folder in subfolders %}
-    {% include "includes/fm_folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=True can_delete=True folder_delete_url=folder.get_delete_url folder_download_url=folder.get_download_url folder_selectable=False %}
+    {% include "includes/fm/folder_card.html" with folder_id=folder.id folder_name=folder.name folder_url=folder.get_absolute_url can_rename=True can_delete=True folder_delete_url=folder.get_delete_url folder_download_url=folder.get_download_url folder_selectable=False %}
   {% endfor %}
 
   {% for item in documents %}
-    {% include "includes/catalog_document_card.html" %}
+    {% include "includes/fm/catalog_document_card.html" %}
   {% endfor %}
 
   {% if not subfolders and not documents %}
@@ -35,4 +35,4 @@
   {% endif %}
 </div>
 
-{% include "includes/fm_pagination.html" %}
+{% include "includes/fm/pagination.html" %}

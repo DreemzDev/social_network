@@ -1,4 +1,4 @@
-{% extends 'includes/auth_base.html' %}
+{% extends 'includes/layout/auth_base.html' %}
 {% load static %}
 
 {% block auth_title %}Ещё пара кликов<br>для завершения регистрации.{% endblock auth_title %}
@@ -25,11 +25,11 @@
     {% csrf_token %}
     <div class="intro-x mt-8">
         {{ form.last_name }}
-        {% include "includes/field_errors.html" with field=form.last_name %}
+        {% include "includes/layout/field_errors.html" with field=form.last_name %}
         {{ form.first_name }}
-        {% include "includes/field_errors.html" with field=form.first_name %}
+        {% include "includes/layout/field_errors.html" with field=form.first_name %}
         {{ form.patronymic }}
-        {% include "includes/field_errors.html" with field=form.patronymic %}
+        {% include "includes/layout/field_errors.html" with field=form.patronymic %}
     </div>
     <div class="intro-x mt-5 xl:mt-8 text-center xl:text-left">
         <button type="submit" class="button button--lg w-full xl:w-auto xl:px-8 text-white bg-theme-1">Завершить регистрацию</button>

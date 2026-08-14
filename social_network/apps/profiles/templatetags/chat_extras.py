@@ -36,7 +36,7 @@ def chat_date_label(value):
 def dialog_time_label(value):
     """Для списка диалогов: время (ЧЧ:ММ), если сообщение сегодняшнее,
     иначе короткая дата — тот же встроенный date-фильтр ('d M'), что уже
-    используется для постов (см. templates/includes/post.html)."""
+    используется для постов (см. templates/includes/posts/post.html)."""
     if not value:
         return ''
 

@@ -6,7 +6,7 @@
 
 {% block sidebar_wrapper %}
 <div class="w-full flex-shrink-0 md:w-72">
-  {% include "includes/dialog_filter_dept.html" %}
+  {% include "includes/chat/filter_dept.html" %}
 </div>
 {% endblock sidebar_wrapper %}
 
@@ -38,7 +38,7 @@
     </form>
 
     <div id="dialogs-list" class="flex flex-col gap-2">
-        {% include "includes/dialog_list_fragment.html" %}
+        {% include "includes/chat/list_fragment.html" %}
     </div>
 
     <div id="dialogs-loader" class="hidden justify-center py-6">

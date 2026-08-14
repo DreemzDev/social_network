@@ -6,8 +6,8 @@
 
 {% block sidebar_wrapper %}
 <div class="w-full flex-shrink-0 space-y-4 md:w-72">
-  {% include "includes/colleague_filter_dept.html" %}
-  {% include "includes/colleague_filter_status.html" %}
+  {% include "includes/colleagues/filter_dept.html" %}
+  {% include "includes/colleagues/filter_status.html" %}
 </div>
 {% endblock sidebar_wrapper %}
 
@@ -34,7 +34,7 @@
   </form>
 
   <div id="colleagues-list" class="flex flex-col gap-2">
-    {% include "includes/colleague_list_fragment.html" %}
+    {% include "includes/colleagues/list_fragment.html" %}
   </div>
 
   <div id="colleagues-loader" class="hidden justify-center py-6">

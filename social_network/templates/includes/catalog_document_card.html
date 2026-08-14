@@ -1,8 +1,0 @@
-{% load fm_tags %}
-{% comment %}
-  Карточка документа информационного каталога. Разметка — в общем
-  includes/fm_file_card.html; каталог общедоступен всем аутентифицированным
-  (ARCHITECTURE.md, раздел 8), поэтому fm_can_manage здесь всегда True —
-  фильтр вернёт True, так как у CatalogDocument нет метода проверки прав.
-{% endcomment %}
-{% include "includes/fm_file_card.html" with fm_title=item.title fm_download_url='catalog_download' fm_trash_url='catalog_trash_doc' fm_restore_url='catalog_restore' fm_purge_url='catalog_purge' fm_rename_type='document' fm_send_label='Переслать в обменник' fm_can_manage=item|fm_can_manage:request.user %}

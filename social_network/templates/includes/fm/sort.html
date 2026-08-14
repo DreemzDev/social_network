@@ -10,7 +10,7 @@
 {% endcomment %}
 <div class="dropdown" x-data="{ sortOpen: false }">
   <button type="button" class="button box text-gray-700 text-sm flex items-center" x-on:click="sortOpen = !sortOpen">
-    {% include "includes/fm_icons.html" with icon='chevron-down' cls='w-4 h-4 mr-1' %}
+    {% include "includes/fm/icons.html" with icon='chevron-down' cls='w-4 h-4 mr-1' %}
     {% for value, label in sort_options.items %}{% if active_sort == value %}{{ label }}{% endif %}{% endfor %}
   </button>
   <div class="dropdown-box mt-10 absolute w-48 z-20" x-show="sortOpen" x-on:click.outside="sortOpen = false" x-cloak>

@@ -8,6 +8,7 @@ window.location.reload(), ошибки в этих местах проявлял
 """
 
 import os
+import re
 import shutil
 import tempfile
 from datetime import timedelta
@@ -17,7 +18,8 @@ from unittest import mock
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
-from django.template import Context, Template
+from django.template import Context, Template, TemplateDoesNotExist
+from django.template.loader import get_template
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -230,6 +232,42 @@ class FmActionsSourceTest(SimpleTestCase):
         сообщения уходили в console — то есть отказ операции пользователь
         не видел вовсе, вопреки правилу 12.4."""
         self.assertIn('jq-toast-wrap', self.source())
+
+
+class TemplateReferencesTest(SimpleTestCase):
+    """Каждый {% include %} и {% extends %} обязан разрешаться.
+
+    Битая ссылка на шаблон не видна ни при запуске, ни при импорте — только
+    при заходе на страницу, и то в виде 500. При переносе `includes/` по
+    подкаталогам таких ссылок правилось больше сорока.
+    """
+
+    def references(self):
+        pattern = re.compile(r"{%\s*(?:include|extends)\s+['\"]([^'\"]+)['\"]")
+        for directory, _, files in os.walk(Path(settings.BASE_DIR) / 'templates'):
+            for name in files:
+                if not name.endswith('.html'):
+                    continue
+                path = Path(directory) / name
+                for reference in pattern.findall(path.read_text(encoding='utf-8')):
+                    yield path.name, reference
+
+    def test_every_reference_resolves(self):
+        broken = []
+        for source, reference in self.references():
+            try:
+                get_template(reference)
+            except TemplateDoesNotExist:
+                broken.append(f'{source} -> {reference}')
+
+        self.assertEqual(broken, [])
+
+    def test_includes_are_sorted_into_subdirectories(self):
+        """В корне `includes/` файлов быть не должно: сорок партиалов одной
+        кучей — это то, ради чего каталог и разбирали."""
+        root = Path(settings.BASE_DIR) / 'templates' / 'includes'
+
+        self.assertEqual([f.name for f in root.glob('*.html')], [])
 
 
 class StaticVersioningTest(TestCase):

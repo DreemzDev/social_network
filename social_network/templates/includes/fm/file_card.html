@@ -62,7 +62,7 @@
 
     <div class="absolute top-0 right-0 mr-2 mt-2 dropdown ml-auto" x-data="{ open: false }">
       <a class="w-5 h-5 block" href="javascript:;" x-on:click="open = !open" aria-label="Действия с файлом">
-        {% include "includes/fm_icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
+        {% include "includes/fm/icons.html" with icon='more-vertical' cls='w-5 h-5 text-gray-500' %}
       </a>
       <div class="dropdown-box mt-5 absolute w-44 top-0 right-0 z-10" x-show="open" x-on:click.outside="open = false" x-cloak>
         <div class="dropdown-box__content box p-2">
@@ -75,19 +75,19 @@
           {% endcomment %}
           <a href="{% url fm_download_url item.id %}?inline=1" target="_blank" rel="noopener"
              class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
-            {% include "includes/fm_icons.html" with icon='image' cls='w-4 h-4 mr-2' %} Просмотр
+            {% include "includes/fm/icons.html" with icon='image' cls='w-4 h-4 mr-2' %} Просмотр
           </a>
           {% endif %}
 
           <a href="{% url fm_download_url item.id %}" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md">
-            {% include "includes/fm_icons.html" with icon='download' cls='w-4 h-4 mr-2' %} Скачать
+            {% include "includes/fm/icons.html" with icon='download' cls='w-4 h-4 mr-2' %} Скачать
           </a>
 
           {% if not is_trash %}
             {% if fm_can_manage %}
             <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
                x-on:click="renameOpen = true; renameTarget = { type: '{{ fm_rename_type|default:"file" }}', id: {{ item.id }} }; renameValue = '{{ fm_title|escapejs }}'; open = false">
-              {% include "includes/fm_icons.html" with icon='book-open' cls='w-4 h-4 mr-2' %} Переименовать
+              {% include "includes/fm/icons.html" with icon='book-open' cls='w-4 h-4 mr-2' %} Переименовать
             </a>
             {% comment %}
               moveTarget — всегда объект {type, id}, как и renameTarget:
@@ -96,14 +96,14 @@
             {% endcomment %}
             <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
                x-on:click="moveOpen = true; moveTarget = { type: 'file', id: {{ item.id }} }; moveFolderId = ''; open = false">
-              {% include "includes/fm_icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Переместить
+              {% include "includes/fm/icons.html" with icon='folder' cls='w-4 h-4 mr-2' %} Переместить
             </a>
             {% endif %}
 
             {% if fm_send_label %}
             <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md"
                x-on:click="sendOpen = true; sendTarget = {{ item.id }}; open = false">
-              {% include "includes/fm_icons.html" with icon='send' cls='w-4 h-4 mr-2' %} {{ fm_send_label }}
+              {% include "includes/fm/icons.html" with icon='send' cls='w-4 h-4 mr-2' %} {{ fm_send_label }}
             </a>
             {% endif %}
 
@@ -115,7 +115,7 @@
                data-fm-confirm="Файл переедет в корзину — оттуда его можно восстановить."
                data-fm-confirm-label="Удалить"
                data-fm-success="Файл в корзине">
-              {% include "includes/fm_icons.html" with icon='trash' cls='w-4 h-4 mr-2' %} Удалить
+              {% include "includes/fm/icons.html" with icon='trash' cls='w-4 h-4 mr-2' %} Удалить
             </a>
             {% endif %}
           {% else %}
@@ -123,7 +123,7 @@
                data-fm-action="restore" data-fm-remove-card="1"
                data-fm-url="{% url fm_restore_url item.id %}"
                data-fm-success="Восстановлено">
-              {% include "includes/fm_icons.html" with icon='rotate-ccw' cls='w-4 h-4 mr-2' %} Восстановить
+              {% include "includes/fm/icons.html" with icon='rotate-ccw' cls='w-4 h-4 mr-2' %} Восстановить
             </a>
             <a href="javascript:;" class="flex items-center p-2 transition duration-300 ease-in-out bg-white hover:bg-gray-200 rounded-md text-theme-6"
                data-fm-action="purge" data-fm-remove-card="1"
@@ -132,7 +132,7 @@
                data-fm-confirm="«{{ fm_title }}» будет удалён без возможности восстановления."
                data-fm-confirm-label="Удалить навсегда"
                data-fm-success="Удалено окончательно">
-              {% include "includes/fm_icons.html" with icon='x' cls='w-4 h-4 mr-2' %} Удалить окончательно
+              {% include "includes/fm/icons.html" with icon='x' cls='w-4 h-4 mr-2' %} Удалить окончательно
             </a>
           {% endif %}
         </div>
