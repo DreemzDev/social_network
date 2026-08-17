@@ -8,7 +8,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ site_settings.site_name }}</title>
-    
+    <link rel="shortcut icon" href="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static 'midone/images/logo.svg' %}{% endif %}">
 
     <!-- <link rel="stylesheet" href="{% static 'src/emojionearea.css' %}"> -->
     <link href="{% static 'src/lightbox.css' %}" rel="stylesheet" />
@@ -56,7 +56,7 @@
     <!-- BEGIN: Side Menu (Midone) -->
     <nav class="side-nav">
         <a href="{% url 'home' %}" class="intro-x flex items-center pl-5 pt-4">
-            <img class="w-6" src="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static '/img/logo.png' %}{% endif %}" alt="{{ site_settings.site_name }}">
+            <img class="w-6" src="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static 'midone/images/logo.svg' %}{% endif %}" alt="{{ site_settings.site_name }}">
             <span class="hidden xl:block text-white text-lg ml-3 truncate">{{ site_settings.site_name }}</span>
         </a>
         <div class="side-nav__devider my-6"></div>

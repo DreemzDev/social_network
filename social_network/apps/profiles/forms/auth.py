@@ -11,7 +11,6 @@ from django.core.exceptions import ValidationError
 
 
 AUTH_INPUT_CLASSES = 'intro-x login__input input input--lg border border-gray-300 block'
-AUTH_INPUT_CLASSES_MT = AUTH_INPUT_CLASSES + ' mt-4'
 AUTH_PASSWORD_CLASSES = AUTH_INPUT_CLASSES + ' pr-12'
 
 
@@ -89,15 +88,15 @@ class RegisterUserForm(UserCreationForm):
         'autofocus': True,
     }))
     last_name = forms.CharField(widget=forms.TextInput(attrs={
-        'class': AUTH_INPUT_CLASSES_MT,
+        'class': AUTH_INPUT_CLASSES,
         'placeholder': 'Фамилия',
     }))
     first_name = forms.CharField(widget=forms.TextInput(attrs={
-        'class': AUTH_INPUT_CLASSES_MT,
+        'class': AUTH_INPUT_CLASSES,
         'placeholder': 'Имя',
     }))
     patronymic = forms.CharField(required=False, widget=forms.TextInput(attrs={
-        'class': AUTH_INPUT_CLASSES_MT,
+        'class': AUTH_INPUT_CLASSES,
         'placeholder': 'Отчество (необязательно)',
     }))
     password1 = forms.CharField(widget=forms.PasswordInput(attrs={
@@ -110,7 +109,7 @@ class RegisterUserForm(UserCreationForm):
         'placeholder': 'Повторите пароль',
     }))
     security_answer = forms.CharField(widget=forms.TextInput(attrs={
-        'class': AUTH_INPUT_CLASSES_MT,
+        'class': AUTH_INPUT_CLASSES,
         'placeholder': 'Например: имя первого питомца',
     }), help_text='Понадобится для восстановления доступа, если забудете пароль')
 

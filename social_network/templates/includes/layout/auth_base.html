@@ -5,8 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ site_settings.site_name }}</title>
+    <link rel="shortcut icon" href="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static 'midone/images/logo.svg' %}{% endif %}">
     <script src="{% static 'js/tailwinds.js' %}"></script>
     <link href="{% static 'midone/css/app.css' %}" rel="stylesheet" />
+    {% block auth_head %}{% endblock auth_head %}
 </head>
 <body class="login">
     <div class="container sm:px-10">
@@ -14,7 +16,7 @@
             <!-- BEGIN: Info -->
             <div class="hidden xl:flex flex-col min-h-screen">
                 <a href="{% url 'home' %}" class="-intro-x flex items-center pt-5">
-                    <img class="w-6" src="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static '/img/logo.png' %}{% endif %}" alt="{{ site_settings.site_name }}">
+                    <img class="w-6" src="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static 'midone/images/logo.svg' %}{% endif %}" alt="{{ site_settings.site_name }}">
                     <span class="text-white text-lg ml-3">{{ site_settings.site_name }}</span>
                 </a>
                 <div class="my-auto">
