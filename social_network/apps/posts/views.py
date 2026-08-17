@@ -70,7 +70,7 @@ class NewPostsFeedView(LoginRequiredMixin, View):
 
 
 
-class ShowPost(FormMixin, DetailView):
+class ShowPost(LoginRequiredMixin, FormMixin, DetailView):
 
     model = Post
     template_name = 'post/single.html'
@@ -261,7 +261,7 @@ class PostDeleteView(LoginRequiredMixin, DeleteView):
 
     
 
-class HelpView(TemplateView):
+class HelpView(LoginRequiredMixin, TemplateView):
     template_name = 'post/help.html'
 
 

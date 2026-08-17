@@ -92,7 +92,7 @@ class SettingProfile(LoginRequiredMixin, UpdateView, DetailView):
         return super().post(request, *args, **kwargs)
 
 
-class ShowUsers(ListView):
+class ShowUsers(LoginRequiredMixin, ListView):
     model = get_user_model()
     template_name = 'profiles/all_users.html'
     paginate_by = 20
@@ -163,7 +163,7 @@ class ShowUsers(ListView):
         return super().render_to_response(context, **response_kwargs)
 
 
-class ShowPhones(ListView, FormView):
+class ShowPhones(LoginRequiredMixin, ListView, FormView):
     model = get_user_model()
     template_name = 'profiles/phones.html'
     form_class = UpdateBookForm

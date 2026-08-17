@@ -1,3 +1,4 @@
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView
 from django.shortcuts import render
 from django.db.models import Count
@@ -8,7 +9,7 @@ from category.models import Category
 from posts.models import Post
 from django.contrib.auth import get_user_model
 # Create your views here.
-class PostCategory(ListView):
+class PostCategory(LoginRequiredMixin, ListView):
     paginate_by = 10
     model = Post
     template_name = 'index.html'
@@ -22,7 +23,7 @@ class PostCategory(ListView):
         context['current_cat_id'] = int(self.kwargs.get('cat_id', 0))  # текущий фильтр
         return context
 
-class UserCategory(ListView):  
+class UserCategory(LoginRequiredMixin, ListView):  
     model = get_user_model()
     template_name = 'profiles/all_users.html'
     context_object_name = 'sh_users'
@@ -41,7 +42,7 @@ class UserCategory(ListView):
 
         return context
 
-class PhoneCategory(ListView):  
+class PhoneCategory(LoginRequiredMixin, ListView):  
     model = get_user_model()
     template_name = 'profiles/phones.html'
     context_object_name = 'phones'

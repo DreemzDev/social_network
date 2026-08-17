@@ -255,6 +255,11 @@ USE_TZ = True
 
 AUTH_USER_MODEL = 'profiles.User'
 
+# Куда отправлять неаутентифицированного посетителя. Без этой строки
+# LoginRequiredMixin уводит на дефолтный /accounts/login/, которого в
+# проекте нет, и защита превращается в 404 вместо формы входа.
+LOGIN_URL = 'login'
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
