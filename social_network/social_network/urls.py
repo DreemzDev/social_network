@@ -50,8 +50,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('', include('posts.urls')),
-    path('', include('register.urls')),
-    path('', include('login.urls')),
     path('', include('profiles.urls')),
     path('', include('comments.urls')),
     path('', include('gallery.urls')),

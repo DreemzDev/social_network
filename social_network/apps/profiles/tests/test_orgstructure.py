@@ -17,7 +17,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
-from category.models import Category
+from profiles.models import Category
 from profiles.forms import SettingProfileForm, UserPhonesForm
 from profiles.models import PhoneType, Position, Rank, UserPhone
 

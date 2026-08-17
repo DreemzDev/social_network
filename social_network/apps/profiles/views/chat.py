@@ -10,8 +10,7 @@ from django.core.cache import cache
 
 from django_private_chat2.models import MessageModel, DialogsModel
 
-from category.models import Category
-from ..models import MessageReaction, MessageReply
+from ..models import Category, MessageReaction, MessageReply
 from ._common import clear_user_cache, push_chat_event
 
 ALLOWED_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡']

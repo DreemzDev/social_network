@@ -6,6 +6,11 @@ views.py вырос слишком большим (1000+ строк, неско�
 """
 from ._common import clear_user_cache, push_chat_event, notify
 
+from .auth import (
+    LoginUser, logout_user, RegisterUser,
+    PasswordResetRequestView, PasswordResetConfirmView,
+)
+
 from .profile import (
     AddProfile, SettingProfile, ShowUsers, ShowPhones, OrgStructureView,
     EmployeeStatusUpdateView,
@@ -33,6 +38,8 @@ from .notifications import NotificationMarkReadView, NotificationMarkAllReadView
 
 __all__ = [
     'clear_user_cache', 'push_chat_event', 'notify',
+    'LoginUser', 'logout_user', 'RegisterUser',
+    'PasswordResetRequestView', 'PasswordResetConfirmView',
     'AddProfile', 'SettingProfile', 'ShowUsers', 'ShowPhones', 'OrgStructureView',
     'EmployeeStatusUpdateView',
     'DialogsWithUnreadMixin', 'DialogsListView', 'DialogMessagesView', 'LoadMoreMessagesView',

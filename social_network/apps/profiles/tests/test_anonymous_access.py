@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import get_resolver, reverse
 
-from category.models import Category
+from profiles.models import Category
 from posts.models import Post
 
 User = get_user_model()

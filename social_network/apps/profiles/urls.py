@@ -3,6 +3,14 @@ from django.urls import path
 from .views import *
 
 urlpatterns = [
+    # Учётная запись: раньше эти четыре адреса обслуживали отдельные
+    # приложения login и register.
+    path('login/', LoginUser.as_view(), name='login'),
+    path('logout/', logout_user, name='logout'),
+    path('register/', RegisterUser.as_view(), name='register'),
+    path('password-reset/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+
     path('addprofile/', AddProfile.as_view(), name='addprofile'),
     path('settingprofile/', SettingProfile.as_view(), name='settingprofile'),
     path('users/', ShowUsers.as_view(), name='show_users'),

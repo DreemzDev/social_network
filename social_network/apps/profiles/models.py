@@ -1,5 +1,4 @@
 from django.db import models
-from category.models import Category
 # from django.contrib.auth.models import User
 from django.dispatch import receiver
 from django.urls import reverse
@@ -12,7 +11,27 @@ from django.core.cache import cache
 from django.contrib.auth.signals import user_logged_in, user_logged_out
 
 
-# Create your models here.
+class Category(models.Model):
+    """Подразделение сотрудника.
+
+    Жило отдельным приложением `category` вместе с тремя вьюхами-копиями
+    существующих страниц. Вьюхи схлопнуты в оригиналы, а справочник — часть
+    структуры организации, рядом с Position и Rank.
+    """
+
+    name = models.CharField(max_length=100, db_index=True, verbose_name='Категория')
+
+    class Meta:
+        verbose_name = 'Категория'
+        verbose_name_plural = 'Категории'
+        ordering = ['id']
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('category', kwargs={'cat_id': self.pk})
+
 
 class Rank(models.Model):
     """Звание — справочник, а не свободный текст.

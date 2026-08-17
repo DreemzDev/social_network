@@ -56,6 +56,13 @@ class PositionAdmin(admin.ModelAdmin):
         return obj._holders_count
 
 
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    list_display_links = ('id', 'name')
+    search_fields = ('name',)
+
+
 @admin.register(Rank)
 class RankAdmin(admin.ModelAdmin):
     list_display = ('name', 'order')

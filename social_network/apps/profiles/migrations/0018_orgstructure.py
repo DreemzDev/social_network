@@ -8,7 +8,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('category', '0001_initial'),
         ('profiles', '0017_rename_position_rank_to_text'),
     ]
 
@@ -48,7 +47,7 @@ class Migration(migrations.Migration):
                 ('max_holders', models.PositiveIntegerField(default=0, verbose_name='Сколько человек может занимать (0 — без ограничения)')),
                 ('assignable_by_user', models.BooleanField(default=False, help_text='Оставьте выключенным для руководящих должностей — их назначает только администратор.', verbose_name='Сотрудник может выбрать эту должность сам')),
                 ('order', models.PositiveIntegerField(default=0, verbose_name='Порядок в списке')),
-                ('department', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='positions', to='category.category', verbose_name='Подразделение')),
+                ('department', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='positions', to='profiles.category', verbose_name='Подразделение')),
                 ('parent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='children', to='profiles.position', verbose_name='Подчиняется должности')),
             ],
             options={

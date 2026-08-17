@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.urls import reverse_lazy
+from ..models import Category
 from django.db.models import Q
 from django.http import JsonResponse
 from django.template.loader import render_to_string
@@ -10,7 +11,6 @@ from django.shortcuts import redirect
 from django.views.generic import DetailView, ListView, UpdateView, FormView, TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from category.models import Category
 from phonebook.models import Phonebook
 from phonebook.forms import UpdateBookForm
 from profiles.models import Position

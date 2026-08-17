@@ -17,12 +17,11 @@ from django.views.decorators.http import require_POST
 from django.views.generic import ListView, DetailView, TemplateView, FormView, UpdateView, DeleteView
 from django.views.generic.edit import FormMixin
 
-from category.models import Category
 from comments.forms import CommentForm
 from comments.models import Comment
 from comments.realtime import broadcast_new_comment, notify_post_author_about_comment
 from profiles.forms import TaskForm, NoteForm, EventForm
-from profiles.models import Task, Note
+from profiles.models import Category, Task, Note
 
 from storage.models import FileObject
 from storage.services import StorageService
@@ -96,9 +95,6 @@ class ShowPost(LoginRequiredMixin, FormMixin, DetailView):
 
     @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
-        # Просмотр поста открыт всем (см. get()), но комментировать может
-        # только залогиненный пользователь — иначе form_valid() ниже
-        # попытается сохранить comment_author=AnonymousUser.
         self.object = self.get_object()
         form = self.get_form()
         if form.is_valid():

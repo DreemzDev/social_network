@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('category', '0001_initial'),
+        ('profiles', '0001_initial'),
         ('storage', '0002_seed_periodic_tasks'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('uploaded_at', models.DateTimeField(auto_now_add=True)),
                 ('is_deleted', models.BooleanField(db_index=True, default=False)),
                 ('deleted_at', models.DateTimeField(blank=True, null=True)),
-                ('allowed_departments', models.ManyToManyField(related_name='department_documents', to='category.category')),
+                ('allowed_departments', models.ManyToManyField(related_name='department_documents', to='profiles.category')),
                 ('deleted_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
                 ('file_object', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='+', to='storage.fileobject')),
                 ('uploaded_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
