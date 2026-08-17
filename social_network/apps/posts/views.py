@@ -42,13 +42,23 @@ class PortalHome(LoginRequiredMixin, ListView):
     
 
     def get_queryset(self):
-        return Post.objects.select_related('author').annotate(
+        posts = Post.objects.select_related('author').annotate(
             num_comments=Count('post_comments')
-        ).prefetch_related('images', 'files', 'likes', 'viewers').order_by('-time_create')
+        ).prefetch_related('images', 'files', 'likes', 'viewers')
+
+        # cat_id приходит с маршрута /category/<id>/ — это та же лента,
+        # суженная до одного подразделения. Раньше на него отвечала отдельная
+        # вьюха, собиравшая посты без select_related и prefetch_related.
+        cat_id = self.kwargs.get('cat_id')
+        if cat_id:
+            posts = posts.filter(author__cat_id=cat_id)
+
+        return posts.order_by('-time_create')
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context['cats'] = Category.objects.all()
+        context['current_cat_id'] = int(self.kwargs.get('cat_id', 0))
         return context
 
 

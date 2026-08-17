@@ -4,6 +4,10 @@ from .views import *
 
 urlpatterns = [
     path('', PortalHome.as_view(), name='home'),
+    # Та же лента, суженная до подразделения. Раньше на этот адрес отвечала
+    # отдельная вьюха приложения category — копия PortalHome без
+    # select_related, prefetch_related и annotate.
+    path('category/<int:cat_id>/', PortalHome.as_view(), name='category'),
 
     path('post/<int:post_id>/', ShowPost.as_view(), name='post'),
     path('post/<int:post_id>/likers/', post_likers, name='post_likers'),

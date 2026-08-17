@@ -7,6 +7,11 @@ urlpatterns = [
     path('settingprofile/', SettingProfile.as_view(), name='settingprofile'),
     path('users/', ShowUsers.as_view(), name='show_users'),
     path('phones/', ShowPhones.as_view(), name='show_phones'),
+    # Те же два списка, суженные до подразделения. Прежние вьюхи приложения
+    # category были их обеднёнными копиями: без пагинации, без dept_links и
+    # без prefetch телефонов.
+    path('filterUsers/<int:cat_id>/', ShowUsers.as_view(), name='filterUsers'),
+    path('filterPhones/<int:cat_id>/', ShowPhones.as_view(), name='filterPhones'),
     path('structure/', OrgStructureView.as_view(), name='org_structure'),
 # Список всех диалогов
     path('dialogs/', DialogsListView.as_view(), name='dialogs_list'),

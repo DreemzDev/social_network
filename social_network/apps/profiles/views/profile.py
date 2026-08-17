@@ -109,6 +109,13 @@ class ShowUsers(LoginRequiredMixin, ListView):
         if dept:
             qs = qs.filter(cat__name=dept)
 
+        # /filterUsers/<id>/ — тот же список, суженный до подразделения.
+        # Отдельная вьюха под этот маршрут не давала ни пагинации, ни
+        # dept_links, из-за чего блок фильтра на странице оставался пустым.
+        cat_id = self.kwargs.get('cat_id')
+        if cat_id:
+            qs = qs.filter(cat_id=cat_id)
+
         if status == 'online':
             online_since = timezone.now() - timedelta(minutes=5)
             qs = qs.filter(last_activity__gte=online_since)
@@ -121,6 +128,7 @@ class ShowUsers(LoginRequiredMixin, ListView):
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context["cats"] = Category.objects.all()
+        context["current_cat_id"] = int(self.kwargs.get('cat_id', 0))
 
         def qs_with(**overrides):
             params = self.request.GET.copy()
@@ -166,6 +174,10 @@ class ShowUsers(LoginRequiredMixin, ListView):
 class ShowPhones(LoginRequiredMixin, ListView, FormView):
     model = get_user_model()
     template_name = 'profiles/phones.html'
+    # Шаблон обращается к списку и как к `phones`, и как к `object_list`.
+    # Пока эту страницу рендерили две вьюхи, имя задавала только одна, и
+    # половина блоков справочника на /phones/ оставалась пустой.
+    context_object_name = 'phones'
     form_class = UpdateBookForm
     success_url = reverse_lazy('show_phones')
 
@@ -177,14 +189,21 @@ class ShowPhones(LoginRequiredMixin, ListView, FormView):
         query = self.request.GET.get('q', '')
         # prefetch — телефоны выводятся циклом по каждому сотруднику: без него
         # справочник делал бы запрос на каждую строку списка.
-        return get_user_model().objects.filter(
+        phones = get_user_model().objects.filter(
             Q(first_name__icontains=query) | Q(last_name__icontains=query)
         ).select_related('cat').prefetch_related('phones__type')
+
+        cat_id = self.kwargs.get('cat_id')
+        if cat_id:
+            phones = phones.filter(cat_id=cat_id)
+
+        return phones
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context["cats"] = Category.objects.all()
         context["books"] = Phonebook.objects.all()
+        context["current_cat_id"] = int(self.kwargs.get('cat_id', 0))
         return context
 
 
