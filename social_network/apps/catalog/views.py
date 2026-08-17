@@ -17,6 +17,9 @@ from django.views.generic import ListView, View
 
 from storage import realtime
 from storage.exceptions import FileTooLargeError, QuotaExceededError
+from storage.fmviews import (
+    DownloadObjectView, PurgeObjectView, RestoreObjectView, TrashObjectView,
+)
 from storage.models import FileObject
 from storage.services import StorageService
 from storage.signals import attribute_deletion
@@ -424,53 +427,33 @@ class SendCatalogDocumentToExchangeView(LoginRequiredMixin, View):
         return JsonResponse({'success': True})
 
 
-class DownloadCatalogDocumentView(LoginRequiredMixin, View):
-    """?inline=1 — открыть в браузере (PDF/картинка) вместо скачивания,
-    см. StorageService.get_download_response(inline=...)."""
+class CatalogDocumentMixin:
+    """Каталог общий: `check_permission` намеренно не переопределяется —
+    в базовом классе он и так ничего не проверяет."""
 
-    def get(self, request, doc_id):
-        # Права тривиальны: любой аутентифицированный пользователь.
-        # LoginRequiredMixin уже это обеспечивает — дополнительной проверки
-        # здесь не требуется (ARCHITECTURE.md, раздел 8).
-        document = get_object_or_404(CatalogDocument, pk=doc_id, is_deleted=False)
-        inline = request.GET.get('inline') == '1'
-        return StorageService.get_download_response(document.file_object, request, inline=inline)
+    model = CatalogDocument
+    pk_kwarg = 'doc_id'
+    noun = 'документ'
 
-
-class TrashCatalogDocumentView(LoginRequiredMixin, View):
-    def post(self, request, doc_id):
-        document = get_object_or_404(CatalogDocument, pk=doc_id, is_deleted=False)
-        document.is_deleted = True
-        document.deleted_at = timezone.now()
-        document.deleted_by = request.user
-        document.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
-
-        _notify_folder(document.folder_id, actor=request.user,
-                       action='file_trashed', text='удалил документ')
-        return JsonResponse({'success': True})
+    def notify(self, obj, *, actor, action, text):
+        _notify_folder(obj.folder_id, actor=actor, action=action, text=text)
 
 
-class RestoreCatalogDocumentView(LoginRequiredMixin, View):
-    def post(self, request, doc_id):
-        document = get_object_or_404(CatalogDocument, pk=doc_id, is_deleted=True)
-        document.is_deleted = False
-        document.deleted_at = None
-        document.deleted_by = None
-        document.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
-
-        _notify_folder(document.folder_id, actor=request.user,
-                       action='file_restored', text='восстановил документ')
-        return JsonResponse({'success': True})
+class TrashCatalogDocumentView(CatalogDocumentMixin, TrashObjectView):
+    pass
 
 
-class PurgeCatalogDocumentView(LoginRequiredMixin, View):
-    def post(self, request, doc_id):
-        document = get_object_or_404(CatalogDocument, pk=doc_id, is_deleted=True)
-        # detach() вызывать не нужно — его выполнит сигнал post_delete;
-        # пометка лишь сохраняет в журнале, кто инициировал удаление.
-        attribute_deletion(document, user=request.user, consumer='catalog.CatalogDocument')
-        document.delete()
-        return JsonResponse({'success': True})
+class RestoreCatalogDocumentView(CatalogDocumentMixin, RestoreObjectView):
+    pass
+
+
+class PurgeCatalogDocumentView(CatalogDocumentMixin, PurgeObjectView):
+    pass
+
+
+class DownloadCatalogDocumentView(CatalogDocumentMixin, DownloadObjectView):
+    """`?inline=1` — открыть в браузере вместо скачивания. Права тривиальны:
+    каталог виден всем аутентифицированным (ARCHITECTURE.md, раздел 8)."""
 
 
 class CatalogTrashView(LoginRequiredMixin, ListView):

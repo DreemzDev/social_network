@@ -11,6 +11,9 @@ from django.views.generic import ListView, View
 
 from storage import realtime
 from storage.exceptions import FileTooLargeError, QuotaExceededError
+from storage.fmviews import (
+    DownloadObjectView, PurgeObjectView, RestoreObjectView, TrashObjectView,
+)
 from storage.models import FileObject
 from storage.services import StorageService
 from storage.signals import attribute_deletion
@@ -756,37 +759,34 @@ class SendExchangeFileToCatalogView(LoginRequiredMixin, View):
         return JsonResponse({'success': True})
 
 
-class DownloadExchangeFileView(LoginRequiredMixin, View):
-    """Скачивание доступно всем сотрудникам: содержимое папок обменника
-    открыто, как в сетевой папке. Ограничение только на удаление.
+class ExchangeFileMixin:
+    """Что базовые вьюхи storage должны знать про файл обменника.
 
-    ?inline=1 — открыть в браузере вместо скачивания."""
+    Скачивание доступно всем сотрудникам — содержимое папок открыто, как в
+    сетевой папке; ограничение только на изменение и удаление.
+    """
 
-    def get(self, request, file_id):
-        exchange_file = get_object_or_404(ExchangeFile, pk=file_id, is_deleted=False)
-        inline = request.GET.get('inline') == '1'
-        return StorageService.get_download_response(exchange_file.file_object, request, inline=inline)
+    model = ExchangeFile
+    pk_kwarg = 'file_id'
+    noun = 'файл'
 
-
-class TrashExchangeFileView(LoginRequiredMixin, View):
-    """Удаление в корзину — storage не трогается вообще."""
-
-    def post(self, request, file_id):
-        exchange_file = get_object_or_404(ExchangeFile, pk=file_id, is_deleted=False)
-
-        if not exchange_file.can_be_deleted_by(request.user):
+    def check_permission(self, request, obj):
+        if not obj.can_be_deleted_by(request.user):
             raise PermissionDenied
 
-        exchange_file.is_deleted = True
-        exchange_file.deleted_at = timezone.now()
-        exchange_file.deleted_by = request.user
-        exchange_file.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+    def notify(self, obj, *, actor, action, text):
+        _notify_folder(obj.folder, obj.owner_id, actor=actor, action=action, text=text)
 
-        _notify_folder(
-            exchange_file.folder, exchange_file.owner_id, actor=request.user,
-            action='file_trashed', text='удалил файл',
-        )
-        return JsonResponse({'success': True})
+
+class DownloadExchangeFileView(ExchangeFileMixin, DownloadObjectView):
+    """Скачивать может любой сотрудник, поэтому проверка прав снимается."""
+
+    def check_permission(self, request, obj):
+        pass
+
+
+class TrashExchangeFileView(ExchangeFileMixin, TrashObjectView):
+    pass
 
 
 class ExchangeTrashView(LoginRequiredMixin, ListView):
@@ -812,36 +812,9 @@ class ExchangeTrashView(LoginRequiredMixin, ListView):
         return context
 
 
-class RestoreExchangeFileView(LoginRequiredMixin, View):
-    def post(self, request, file_id):
-        exchange_file = get_object_or_404(ExchangeFile, pk=file_id, is_deleted=True)
-
-        if not exchange_file.can_be_deleted_by(request.user):
-            raise PermissionDenied
-
-        exchange_file.is_deleted = False
-        exchange_file.deleted_at = None
-        exchange_file.deleted_by = None
-        exchange_file.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
-
-        _notify_folder(
-            exchange_file.folder, exchange_file.owner_id, actor=request.user,
-            action='file_restored', text='восстановил файл',
-        )
-        return JsonResponse({'success': True})
+class RestoreExchangeFileView(ExchangeFileMixin, RestoreObjectView):
+    pass
 
 
-class PurgeExchangeFileView(LoginRequiredMixin, View):
-    """Окончательное удаление — только из корзины."""
-
-    def post(self, request, file_id):
-        exchange_file = get_object_or_404(ExchangeFile, pk=file_id, is_deleted=True)
-
-        if not exchange_file.can_be_deleted_by(request.user):
-            raise PermissionDenied
-
-        # detach() вызывать не нужно — его выполнит сигнал post_delete;
-        # пометка лишь сохраняет в журнале, кто инициировал удаление.
-        attribute_deletion(exchange_file, user=request.user, consumer='exchange.ExchangeFile')
-        exchange_file.delete()
-        return JsonResponse({'success': True})
+class PurgeExchangeFileView(ExchangeFileMixin, PurgeObjectView):
+    pass

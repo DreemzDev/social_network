@@ -10,6 +10,9 @@ from django.views.generic import ListView, View
 
 from storage import realtime
 from storage.exceptions import FileTooLargeError, QuotaExceededError
+from storage.fmviews import (
+    DownloadObjectView, PurgeObjectView, RestoreObjectView, TrashObjectView,
+)
 from storage.models import FileObject
 from storage.services import StorageService
 from storage.signals import attribute_deletion
@@ -581,63 +584,39 @@ class UploadDepartmentDocumentView(LoginRequiredMixin, View):
         return JsonResponse({'success': True})
 
 
-class DownloadDepartmentDocumentView(LoginRequiredMixin, View):
-    """?inline=1 — открыть в браузере вместо скачивания."""
 
-    def get(self, request, doc_id):
-        document = get_object_or_404(DepartmentDocument, pk=doc_id, is_deleted=False)
 
-        # Права — здесь, не в storage (ARCHITECTURE.md, раздел 8).
-        if not document.is_accessible_by(request.user):
+class DepartmentDocumentMixin:
+    """Права наследуются от папки: доступ к документу есть у того, кто есть
+    в `allowed_users` его папки."""
+
+    model = DepartmentDocument
+    pk_kwarg = 'doc_id'
+    noun = 'документ'
+
+    def check_permission(self, request, obj):
+        if not obj.is_accessible_by(request.user):
             raise PermissionDenied
 
-        inline = request.GET.get('inline') == '1'
-        return StorageService.get_download_response(document.file_object, request, inline=inline)
+    def notify(self, obj, *, actor, action, text):
+        _notify_folder(obj.folder_id, actor=actor, action=action, text=text)
 
 
-class TrashDepartmentDocumentView(LoginRequiredMixin, View):
-    def post(self, request, doc_id):
-        document = get_object_or_404(DepartmentDocument, pk=doc_id, is_deleted=False)
-        if not document.is_accessible_by(request.user):
-            raise PermissionDenied
-
-        document.is_deleted = True
-        document.deleted_at = timezone.now()
-        document.deleted_by = request.user
-        document.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
-
-        _notify_folder(document.folder_id, actor=request.user,
-                       action='file_trashed', text='удалил документ')
-        return JsonResponse({'success': True})
+class TrashDepartmentDocumentView(DepartmentDocumentMixin, TrashObjectView):
+    pass
 
 
-class RestoreDepartmentDocumentView(LoginRequiredMixin, View):
-    def post(self, request, doc_id):
-        document = get_object_or_404(DepartmentDocument, pk=doc_id, is_deleted=True)
-        if not document.is_accessible_by(request.user):
-            raise PermissionDenied
-
-        document.is_deleted = False
-        document.deleted_at = None
-        document.deleted_by = None
-        document.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
-
-        _notify_folder(document.folder_id, actor=request.user,
-                       action='file_restored', text='восстановил документ')
-        return JsonResponse({'success': True})
+class RestoreDepartmentDocumentView(DepartmentDocumentMixin, RestoreObjectView):
+    pass
 
 
-class PurgeDepartmentDocumentView(LoginRequiredMixin, View):
-    def post(self, request, doc_id):
-        document = get_object_or_404(DepartmentDocument, pk=doc_id, is_deleted=True)
-        if not document.is_accessible_by(request.user):
-            raise PermissionDenied
+class PurgeDepartmentDocumentView(DepartmentDocumentMixin, PurgeObjectView):
+    pass
 
-        # detach() вызывать не нужно — его выполнит сигнал post_delete;
-        # пометка лишь сохраняет в журнале, кто инициировал удаление.
-        attribute_deletion(document, user=request.user, consumer='deptdocs.DepartmentDocument')
-        document.delete()
-        return JsonResponse({'success': True})
+
+class DownloadDepartmentDocumentView(DepartmentDocumentMixin, DownloadObjectView):
+    """`?inline=1` — открыть в браузере вместо скачивания. Права проверяет
+    миксин, а не storage (ARCHITECTURE.md, раздел 8)."""
 
 
 class DepartmentDocumentTrashView(LoginRequiredMixin, ListView):
