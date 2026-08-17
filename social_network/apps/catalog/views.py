@@ -18,7 +18,8 @@ from django.views.generic import ListView, View
 from storage import realtime
 from storage.exceptions import FileTooLargeError, QuotaExceededError
 from storage.fmviews import (
-    DownloadObjectView, PurgeObjectView, RestoreObjectView, TrashObjectView,
+    DownloadObjectView, PurgeObjectView, RenameObjectView, RestoreObjectView,
+    TrashObjectView,
 )
 from storage.models import FileObject
 from storage.services import StorageService
@@ -51,6 +52,18 @@ def _notify_folder(folder_id, *, actor, action, text):
         realtime.SCOPE_CATALOG, realtime.folder_location(folder_id),
         action=action, actor=actor, text=text,
     )
+
+
+class CatalogDocumentMixin:
+    """Каталог общий: `check_permission` намеренно не переопределяется —
+    в базовом классе он и так ничего не проверяет."""
+
+    model = CatalogDocument
+    pk_kwarg = 'doc_id'
+    noun = 'документ'
+
+    def notify(self, obj, *, actor, action, text):
+        _notify_folder(obj.folder_id, actor=actor, action=action, text=text)
 
 
 class CatalogFolderView(PartialGridMixin, LoginRequiredMixin, ListView):
@@ -195,20 +208,8 @@ class MoveCatalogFolderView(LoginRequiredMixin, View):
 
 
 
-class RenameCatalogDocumentView(LoginRequiredMixin, View):
-    def post(self, request, doc_id):
-        document = get_object_or_404(CatalogDocument, pk=doc_id, is_deleted=False)
-        title = request.POST.get('title', '').strip()
-
-        if not title:
-            return JsonResponse({'success': False, 'error': 'Укажите название документа'}, status=400)
-
-        document.title = title
-        document.save(update_fields=['title'])
-
-        _notify_folder(document.folder_id, actor=request.user,
-                       action='file_renamed', text=f'переименовал документ в «{title}»')
-        return JsonResponse({'success': True, 'title': document.title})
+class RenameCatalogDocumentView(CatalogDocumentMixin, RenameObjectView):
+    pass
 
 
 class MoveCatalogDocumentView(LoginRequiredMixin, View):
@@ -425,18 +426,6 @@ class SendCatalogDocumentToExchangeView(LoginRequiredMixin, View):
             action='file_created', actor=request.user, text='переслал сюда документ из каталога',
         )
         return JsonResponse({'success': True})
-
-
-class CatalogDocumentMixin:
-    """Каталог общий: `check_permission` намеренно не переопределяется —
-    в базовом классе он и так ничего не проверяет."""
-
-    model = CatalogDocument
-    pk_kwarg = 'doc_id'
-    noun = 'документ'
-
-    def notify(self, obj, *, actor, action, text):
-        _notify_folder(obj.folder_id, actor=actor, action=action, text=text)
 
 
 class TrashCatalogDocumentView(CatalogDocumentMixin, TrashObjectView):

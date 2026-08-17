@@ -12,7 +12,8 @@ from django.views.generic import ListView, View
 from storage import realtime
 from storage.exceptions import FileTooLargeError, QuotaExceededError
 from storage.fmviews import (
-    DownloadObjectView, PurgeObjectView, RestoreObjectView, TrashObjectView,
+    DownloadObjectView, PurgeObjectView, RenameObjectView, RestoreObjectView,
+    TrashObjectView,
 )
 from storage.models import FileObject
 from storage.services import StorageService
@@ -123,6 +124,25 @@ def _move_targets(current_owner):
         }
         for user in get_user_model().objects.order_by('last_name', 'first_name')
     ]
+
+
+class ExchangeFileMixin:
+    """Что базовые вьюхи storage должны знать про файл обменника.
+
+    Скачивание доступно всем сотрудникам — содержимое папок открыто, как в
+    сетевой папке; ограничение только на изменение и удаление.
+    """
+
+    model = ExchangeFile
+    pk_kwarg = 'file_id'
+    noun = 'файл'
+
+    def check_permission(self, request, obj):
+        if not obj.can_be_deleted_by(request.user):
+            raise PermissionDenied
+
+    def notify(self, obj, *, actor, action, text):
+        _notify_folder(obj.folder, obj.owner_id, actor=actor, action=action, text=text)
 
 
 class ExchangeFolderListView(LoginRequiredMixin, ListView):
@@ -456,27 +476,16 @@ class MoveExchangeFolderView(LoginRequiredMixin, View):
 
 
 
-class RenameExchangeFileView(LoginRequiredMixin, View):
-    """Переименовывает FileObject.original_name — у ExchangeFile своего
-    заголовка нет, имя всегда берётся из именованного объекта storage."""
+class RenameExchangeFileView(ExchangeFileMixin, RenameObjectView):
+    """Имя лежит в FileObject.original_name — своего заголовка у
+    ExchangeFile нет."""
 
-    def post(self, request, file_id):
-        exchange_file = get_object_or_404(ExchangeFile, pk=file_id, is_deleted=False)
-        if not exchange_file.can_be_deleted_by(request.user):
-            raise PermissionDenied
+    name_param = 'name'
+    empty_error = 'Укажите название файла'
 
-        name = request.POST.get('name', '').strip()
-        if not name:
-            return JsonResponse({'success': False, 'error': 'Укажите название файла'}, status=400)
-
-        exchange_file.file_object.original_name = name
-        exchange_file.file_object.save(update_fields=['original_name'])
-
-        _notify_folder(
-            exchange_file.folder, exchange_file.owner_id, actor=request.user,
-            action='file_renamed', text=f'переименовал файл в «{name}»',
-        )
-        return JsonResponse({'success': True, 'name': name})
+    def apply_name(self, obj, name):
+        obj.file_object.original_name = name
+        obj.file_object.save(update_fields=['original_name'])
 
 
 class MoveExchangeFileView(LoginRequiredMixin, View):
@@ -757,25 +766,6 @@ class SendExchangeFileToCatalogView(LoginRequiredMixin, View):
             action='file_created', actor=request.user, text='добавил документ в каталог',
         )
         return JsonResponse({'success': True})
-
-
-class ExchangeFileMixin:
-    """Что базовые вьюхи storage должны знать про файл обменника.
-
-    Скачивание доступно всем сотрудникам — содержимое папок открыто, как в
-    сетевой папке; ограничение только на изменение и удаление.
-    """
-
-    model = ExchangeFile
-    pk_kwarg = 'file_id'
-    noun = 'файл'
-
-    def check_permission(self, request, obj):
-        if not obj.can_be_deleted_by(request.user):
-            raise PermissionDenied
-
-    def notify(self, obj, *, actor, action, text):
-        _notify_folder(obj.folder, obj.owner_id, actor=actor, action=action, text=text)
 
 
 class DownloadExchangeFileView(ExchangeFileMixin, DownloadObjectView):

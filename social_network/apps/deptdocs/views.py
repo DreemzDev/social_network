@@ -11,7 +11,8 @@ from django.views.generic import ListView, View
 from storage import realtime
 from storage.exceptions import FileTooLargeError, QuotaExceededError
 from storage.fmviews import (
-    DownloadObjectView, PurgeObjectView, RestoreObjectView, TrashObjectView,
+    DownloadObjectView, PurgeObjectView, RenameObjectView, RestoreObjectView,
+    TrashObjectView,
 )
 from storage.models import FileObject
 from storage.services import StorageService
@@ -58,6 +59,22 @@ def _visible_root_folders(user):
     return DepartmentFolder.objects.filter(
         parent__isnull=True, allowed_users=user
     ).distinct()
+
+
+class DepartmentDocumentMixin:
+    """Права наследуются от папки: доступ к документу есть у того, кто есть
+    в `allowed_users` его папки."""
+
+    model = DepartmentDocument
+    pk_kwarg = 'doc_id'
+    noun = 'документ'
+
+    def check_permission(self, request, obj):
+        if not obj.is_accessible_by(request.user):
+            raise PermissionDenied
+
+    def notify(self, obj, *, actor, action, text):
+        _notify_folder(obj.folder_id, actor=actor, action=action, text=text)
 
 
 class DepartmentFolderListView(PartialGridMixin, LoginRequiredMixin, ListView):
@@ -287,22 +304,8 @@ class MoveDepartmentFolderView(LoginRequiredMixin, View):
 
 
 
-class RenameDepartmentDocumentView(LoginRequiredMixin, View):
-    def post(self, request, doc_id):
-        document = get_object_or_404(DepartmentDocument, pk=doc_id, is_deleted=False)
-        if not document.is_accessible_by(request.user):
-            raise PermissionDenied
-
-        title = request.POST.get('title', '').strip()
-        if not title:
-            return JsonResponse({'success': False, 'error': 'Укажите название документа'}, status=400)
-
-        document.title = title
-        document.save(update_fields=['title'])
-
-        _notify_folder(document.folder_id, actor=request.user,
-                       action='file_renamed', text=f'переименовал документ в «{title}»')
-        return JsonResponse({'success': True, 'title': document.title})
+class RenameDepartmentDocumentView(DepartmentDocumentMixin, RenameObjectView):
+    pass
 
 
 class MoveDepartmentDocumentView(LoginRequiredMixin, View):
@@ -584,22 +587,6 @@ class UploadDepartmentDocumentView(LoginRequiredMixin, View):
         return JsonResponse({'success': True})
 
 
-
-
-class DepartmentDocumentMixin:
-    """Права наследуются от папки: доступ к документу есть у того, кто есть
-    в `allowed_users` его папки."""
-
-    model = DepartmentDocument
-    pk_kwarg = 'doc_id'
-    noun = 'документ'
-
-    def check_permission(self, request, obj):
-        if not obj.is_accessible_by(request.user):
-            raise PermissionDenied
-
-    def notify(self, obj, *, actor, action, text):
-        _notify_folder(obj.folder_id, actor=actor, action=action, text=text)
 
 
 class TrashDepartmentDocumentView(DepartmentDocumentMixin, TrashObjectView):

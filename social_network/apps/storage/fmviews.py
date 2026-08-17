@@ -101,6 +101,37 @@ class PurgeObjectView(FmObjectView):
         return JsonResponse({'success': True})
 
 
+class RenameObjectView(FmObjectView):
+    """Переименование.
+
+    `name_param` — имя поля и в запросе, и в ответе: обменник исторически
+    шлёт `name`, каталог и документы отделов — `title`, и менять это значит
+    трогать разметку трёх модалок.
+    """
+
+    expects_trashed = False
+    name_param = 'title'
+    name_field = 'title'
+    empty_error = 'Укажите название документа'
+
+    def post(self, request, **kwargs):
+        obj = self.get_object(request, **kwargs)
+
+        name = request.POST.get(self.name_param, '').strip()
+        if not name:
+            return JsonResponse({'success': False, 'error': self.empty_error}, status=400)
+
+        self.apply_name(obj, name)
+
+        self.notify(obj, actor=request.user, action='file_renamed',
+                    text=f'переименовал {self.noun} в «{name}»')
+        return JsonResponse({'success': True, self.name_param: name})
+
+    def apply_name(self, obj, name):
+        setattr(obj, self.name_field, name)
+        obj.save(update_fields=[self.name_field])
+
+
 class DownloadObjectView(FmObjectView):
     """Скачивание. `?inline=1` — открыть в браузере вместо загрузки."""
 
