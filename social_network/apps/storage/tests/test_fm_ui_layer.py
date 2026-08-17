@@ -288,19 +288,33 @@ class ThemeAssetsTest(SimpleTestCase):
     KNOWN_GAPS = {'./fonts/slick.eot', './fonts/slick.eot?#iefix', './fonts/slick.svg#slick',
                   './fonts/slick.ttf', './fonts/slick.woff'}
 
-    def test_every_file_referenced_by_app_css_exists(self):
-        css_path = Path(settings.BASE_DIR) / 'static' / 'midone' / 'css' / 'app.css'
-        css = css_path.read_text(encoding='utf-8', errors='replace')
-
+    def test_every_file_referenced_by_theme_css_exists(self):
         missing = []
-        for reference in sorted(set(re.findall(r'url\(([^)]+)\)', css))):
-            reference = reference.strip('\'"')
-            if reference.startswith(('data:', 'http', '%23')) or reference in self.KNOWN_GAPS:
-                continue
-            if not (css_path.parent / reference).exists():
-                missing.append(reference)
+        for css_path in sorted((Path(settings.BASE_DIR) / 'static' / 'midone' / 'css').glob('*.css')):
+            css = css_path.read_text(encoding='utf-8', errors='replace')
+            for reference in sorted(set(re.findall(r'url\(([^)]+)\)', css))):
+                reference = reference.strip('\'"')
+                if reference.startswith(('data:', 'http', '%23')) or reference in self.KNOWN_GAPS:
+                    continue
+                if not (css_path.parent / reference).exists():
+                    missing.append(f'{css_path.name}: {reference}')
 
         self.assertEqual(missing, [])
+
+    def test_roboto_is_served_from_disk(self):
+        """Тема объявляет Roboto через `url(https://fonts.gstatic.com/...)`,
+        то есть без интернета портал теряет типографику целиком — проверено
+        блокировкой gstatic в браузере: не грузится ни одно начертание.
+
+        Для внутренней сети это неприемлемо, поэтому шрифт лежит рядом.
+        """
+        fonts_css = Path(settings.BASE_DIR) / 'static' / 'midone' / 'css' / 'fonts-local.css'
+        weights = set(re.findall(r'font-weight:\s*(\d+)', fonts_css.read_text(encoding='utf-8')))
+
+        self.assertTrue({'400', '500', '700'} <= weights, f'нет базовых начертаний: {weights}')
+        self.assertTrue(
+            (Path(settings.BASE_DIR) / 'static' / 'midone' / 'fonts' / 'roboto' / 'Roboto-Regular.ttf').exists()
+        )
 
 
 class StaticVersioningTest(TestCase):

@@ -1,16 +1,6 @@
 {% extends 'includes/layout/auth_base.html' %}
 {% load static %}
 
-{% block auth_head %}
-<style>
-    /* Midone держит поля входа шире 350px — на одноколоночной форме это
-       ровно то, что нужно, но пара полей в строке из-за этого не помещается
-       в колонку и уезжает за край. Внутри формы регистрации ширину задаёт
-       сетка. */
-    .register-form .login__input { min-width: 0; width: 100%; }
-</style>
-{% endblock auth_head %}
-
 {% block auth_title %}Ещё пара кликов<br>для регистрации аккаунта.{% endblock auth_title %}
 {% block auth_subtitle %}Внутренняя социальная сеть организации{% endblock auth_subtitle %}
 
@@ -33,65 +23,49 @@
 
 <form method="post" novalidate>
     {% csrf_token %}
-    {% comment %}
-      Поля идут парами: анкета из семи строк в столбик занимала весь экран и
-      заставляла прокручивать форму. Midone-макет регистрации одноколоночный,
-      но там и полей вдвое меньше.
-
-      Ниже 640px пары разворачиваются обратно в столбик (grid-cols-1) — на
-      узком экране два поля в строке нечитаемы.
-    {% endcomment %}
-    <div class="intro-x mt-8 register-form">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-            <div>
-                {{ form.last_name }}
-                {% include "includes/layout/field_errors.html" with field=form.last_name %}
-            </div>
-            <div class="mt-4 sm:mt-0">
-                {{ form.first_name }}
-                {% include "includes/layout/field_errors.html" with field=form.first_name %}
-            </div>
+    <div class="intro-x mt-8">
+        {{ form.username }}
+        {% include "includes/layout/field_errors.html" with field=form.username %}
+        <div class="mt-4">
+            {{ form.last_name }}
+            {% include "includes/layout/field_errors.html" with field=form.last_name %}
+        </div>
+        <div class="mt-4">
+            {{ form.first_name }}
+            {% include "includes/layout/field_errors.html" with field=form.first_name %}
+        </div>
+        <div class="mt-4">
+            {{ form.patronymic }}
+            {% include "includes/layout/field_errors.html" with field=form.patronymic %}
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 mt-4">
-            <div>
-                {{ form.patronymic }}
-                {% include "includes/layout/field_errors.html" with field=form.patronymic %}
-            </div>
-            <div class="mt-4 sm:mt-0">
-                {{ form.username }}
-                {% include "includes/layout/field_errors.html" with field=form.username %}
-            </div>
+        <div class="intro-x auth-field relative mt-4">
+            {{ form.password1 }}
+            <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="password-input" tabindex="-1">
+                <i data-feather="eye" class="w-4 h-4"></i>
+            </button>
         </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 mt-4">
-            <div class="relative">
-                {{ form.password1 }}
-                <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="password-input" tabindex="-1">
-                    <i data-feather="eye" class="w-4 h-4"></i>
-                </button>
-                {% include "includes/layout/field_errors.html" with field=form.password1 %}
-            </div>
-            <div class="relative mt-4 sm:mt-0">
-                {{ form.password2 }}
-                <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="{{ form.password2.id_for_label }}" tabindex="-1">
-                    <i data-feather="eye" class="w-4 h-4"></i>
-                </button>
-                {% include "includes/layout/field_errors.html" with field=form.password2 %}
-            </div>
-        </div>
+        {% include "includes/layout/field_errors.html" with field=form.password1 %}
 
         <!-- Индикатор сложности пароля -->
-        <div class="intro-x w-full grid grid-cols-12 gap-4 h-1 mt-3" id="password-strength">
+        <div class="intro-x auth-field w-full grid grid-cols-12 gap-4 h-1 mt-3" id="password-strength">
             <div class="col-span-3 h-full rounded bg-gray-200" data-bar></div>
             <div class="col-span-3 h-full rounded bg-gray-200" data-bar></div>
             <div class="col-span-3 h-full rounded bg-gray-200" data-bar></div>
             <div class="col-span-3 h-full rounded bg-gray-200" data-bar></div>
         </div>
-        <div class="intro-x text-gray-600 mt-2 text-xs sm:text-sm" id="password-strength-label">Минимум 8 символов</div>
+        <div class="intro-x auth-field text-gray-600 mt-2 text-xs sm:text-sm" id="password-strength-label">Минимум 8 символов</div>
 
-        <div class="intro-x mt-6 mb-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Восстановление доступа</div>
-        <div class="intro-x rounded-md flex items-start px-4 py-3 bg-theme-14 text-theme-10 text-xs sm:text-sm">
+        <div class="intro-x auth-field relative mt-4">
+            {{ form.password2 }}
+            <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400" data-target="{{ form.password2.id_for_label }}" tabindex="-1">
+                <i data-feather="eye" class="w-4 h-4"></i>
+            </button>
+        </div>
+        {% include "includes/layout/field_errors.html" with field=form.password2 %}
+
+        <div class="intro-x auth-field mt-6 mb-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Восстановление доступа</div>
+        <div class="intro-x auth-field rounded-md flex items-start px-4 py-3 bg-theme-14 text-theme-10 text-xs sm:text-sm">
             <i data-feather="info" class="w-4 h-4 mr-2 flex-shrink-0 mt-0.5"></i>
             <div>В сети нет почты для сброса пароля — если забудете его, восстановить доступ можно только по этому слову. Запомните его.</div>
         </div>

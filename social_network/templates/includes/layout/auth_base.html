@@ -7,8 +7,27 @@
     <title>{{ site_settings.site_name }}</title>
     <link rel="shortcut icon" href="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static 'midone/images/logo.svg' %}{% endif %}">
     <script src="{% static 'js/tailwinds.js' %}"></script>
-    <link href="{% static 'midone/css/app.css' %}" rel="stylesheet" />
     {% block auth_head %}{% endblock auth_head %}
+    <link href="{% static 'midone/css/app.css' %}" rel="stylesheet" />
+    <link href="{% static 'midone/css/fonts-local.css' %}" rel="stylesheet" />
+    <style>
+        /* Колонка формы у Midone подгоняется под самого широкого потомка
+           (xl:w-auto), а поля жёстко шириной 350px. Любой блок с длинным
+           текстом — подсказка, индикатор сложности — растягивал колонку, и
+           поля рядом с ним выглядели узкими. Всё, что должно равняться по
+           полю, помечается auth-field. */
+        .auth-field { max-width: 350px; }
+
+        /* Midone держит поле на z-index 49. Кнопка «глаз» позиционирована
+           абсолютно, но без своего z-index уходит ПОД поле: иконка есть в
+           разметке, занимает место и не рисуется. */
+        .password-toggle { z-index: 50; }
+
+        @media (max-width: 1279px) {
+            /* Ниже 1280px Midone растягивает поля на всю ширину. */
+            .auth-field { max-width: none; }
+        }
+    </style>
 </head>
 <body class="login">
     <div class="container sm:px-10">
@@ -30,7 +49,7 @@
             <!-- END: Info -->
             <!-- BEGIN: Form -->
             <div class="h-screen xl:h-auto flex py-5 xl:py-0 my-10 xl:my-0">
-                <div class="my-auto mx-auto xl:ml-20 bg-white xl:bg-transparent px-5 sm:px-8 py-8 xl:p-0 rounded-md shadow-md xl:shadow-none w-full sm:w-3/4 lg:w-2/4 xl:w-auto">
+                <div class="my-auto mx-auto bg-white xl:bg-transparent px-5 sm:px-8 py-8 xl:p-0 rounded-md shadow-md xl:shadow-none w-full sm:w-3/4 lg:w-2/4 xl:w-auto">
                     {% if messages %}
                     {% for message in messages %}
                     <div class="intro-x rounded-md flex items-center px-5 py-4 mb-4 {% if message.tags == 'error' %}bg-theme-6{% else %}bg-theme-9{% endif %} text-white">
