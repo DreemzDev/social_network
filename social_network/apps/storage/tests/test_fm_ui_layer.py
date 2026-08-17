@@ -270,6 +270,39 @@ class TemplateReferencesTest(SimpleTestCase):
         self.assertEqual([f.name for f in root.glob('*.html')], [])
 
 
+class ThemeAssetsTest(SimpleTestCase):
+    """Картинки и шрифты, на которые ссылается тема, должны лежать на диске.
+
+    Страница входа выглядела сломанной: белый фон, а заголовок и подпись —
+    белым по белому, то есть невидимы. Причина — `.login:before` рисует фон
+    файлом `../images/bg-login-page.svg`, которого в статике не было ни
+    разу: при переносе темы его просто не скопировали. На узком экране фон
+    рисуется градиентом из CSS, поэтому дефект годами прятался.
+
+    Ничего в браузере при этом не «падало»: 404 на фоновую картинку CSS
+    молча игнорирует.
+    """
+
+    #: Шрифты slick-карусели отсутствуют и в самом дистрибутиве Midone,
+    #: а карусель в проекте не используется — ссылки в CSS мёртвые.
+    KNOWN_GAPS = {'./fonts/slick.eot', './fonts/slick.eot?#iefix', './fonts/slick.svg#slick',
+                  './fonts/slick.ttf', './fonts/slick.woff'}
+
+    def test_every_file_referenced_by_app_css_exists(self):
+        css_path = Path(settings.BASE_DIR) / 'static' / 'midone' / 'css' / 'app.css'
+        css = css_path.read_text(encoding='utf-8', errors='replace')
+
+        missing = []
+        for reference in sorted(set(re.findall(r'url\(([^)]+)\)', css))):
+            reference = reference.strip('\'"')
+            if reference.startswith(('data:', 'http', '%23')) or reference in self.KNOWN_GAPS:
+                continue
+            if not (css_path.parent / reference).exists():
+                missing.append(reference)
+
+        self.assertEqual(missing, [])
+
+
 class StaticVersioningTest(TestCase):
     """Исправление в JS должно доезжать до браузера без Ctrl+F5.
 
