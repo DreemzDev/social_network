@@ -134,7 +134,7 @@ cd c:/Users/User/Desktop/social_network/social_network
 ../.venv/Scripts/python.exe manage.py test storage profiles --top-level-directory=apps
 ```
 
-На 14.08.2026 — 359 тестов. Число будет расти; верить прогону, а не цифре.
+На 17.08.2026 — 369 тестов. Число будет расти; верить прогону, а не цифре.
 
 ---
 
