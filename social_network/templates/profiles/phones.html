@@ -1,119 +1,66 @@
-{% extends 'base.html' %} {% load static %} {% block breadcrumb %}Справочник{% endblock breadcrumb %} {% block content %}
+{% extends 'base.html' %}
+{% load static %}
+{% block breadcrumb %}Справочник организации{% endblock breadcrumb %}
 
-<div class="w-full min-w-0 space-y-4">
+{% block content_layout %} md:flex-row-reverse md:w-2/3 md:flex-none md:mx-auto{% endblock content_layout %}
 
-  <!-- Заголовок -->
-  <div class="rounded-xl border border-gray-100 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-    <div class="text-lg font-semibold text-gray-900 dark:text-white">Справочник организации</div>
-    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-      Телефоны сотрудников. Остальные справочники — в главном меню.
-    </p>
-  </div>
-
-  <!-- Поиск и фильтр -->
-  <div class="rounded-xl border border-gray-100 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900" x-data="{ filterOpen: false }">
-    <div class="flex flex-col gap-3 md:flex-row md:items-center">
-      <form action="{% url 'show_phones' %}" method="get" class="flex-1">
-        <div class="relative">
-          <input
-            name="q"
-            type="text"
-            value="{{ request.GET.q }}"
-            class="block w-full rounded-lg border border-gray-300 bg-gray-50 py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
-            placeholder="Поиск по сотруднику..."
-          />
-          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-            </svg>
-          </div>
-        </div>
-      </form>
-
-      <div class="relative">
-        <button
-          type="button"
-          x-on:click="filterOpen = !filterOpen"
-          x-on:click.outside="filterOpen = false"
-          class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700 md:w-auto"
-        >
-          Фильтр по отделу
-          <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" d="M20 6H10m0 0a2 2 0 1 0-4 0m4 0a2 2 0 1 1-4 0m0 0H4m16 6h-2m0 0a2 2 0 1 0-4 0m4 0a2 2 0 1 1-4 0m0 0H4m16 6H10m0 0a2 2 0 1 0-4 0m4 0a2 2 0 1 1-4 0m0 0H4" />
-          </svg>
-        </button>
-
-        <div
-          x-cloak
-          x-show="filterOpen"
-          class="absolute right-0 z-10 mt-2 w-56 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
-        >
-          <ul class="max-h-72 overflow-y-auto py-1 text-sm">
-            {% for c in cats %}
-            <li>
-              <a
-                href="{% url 'filterPhones' c.id %}"
-                class="block px-4 py-2 {% if c.id == current_cat_id %}bg-[#EAF3FF] font-medium text-[#0077FF] dark:bg-zinc-700{% else %}text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-zinc-700{% endif %}"
-              >
-                {{ c.name }}
-              </a>
-            </li>
-            {% endfor %}
-          </ul>
-          <a
-            href="{% url 'show_phones' %}"
-            class="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:border-zinc-700 dark:hover:bg-zinc-700"
-          >
-            Сбросить фильтр
-            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Список сотрудников -->
-  <div class="flex flex-col gap-2">
-    {% for p in object_list %}
-    <div class="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 transition hover:border-gray-200 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 sm:flex-nowrap">
-      <img
-        class="h-14 w-14 flex-shrink-0 rounded-full object-cover"
-        src="{% if p.avatar %}{{ p.avatar.url }}{% else %}{% static '/img/avatar7.png' %}{% endif %}"
-        alt="{{ p.first_name }} {{ p.last_name }}"
-      />
-
-      <div class="min-w-0 flex-1 sm:w-56 sm:flex-shrink-0 sm:flex-none">
-        <div class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ p.first_name }} {{ p.last_name }}</div>
-        <div class="mt-1 flex flex-wrap items-center gap-1.5">
-          {% if p.cat %}
-          <span class="inline-flex items-center rounded-full bg-[#EAF3FF] px-2 py-0.5 text-xs font-medium text-[#0077FF] dark:bg-zinc-800">{{ p.cat.name }}</span>
-          {% endif %}
-          {% if p.cab %}
-          <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-300">Каб. №{{ p.cab }}</span>
-          {% endif %}
-        </div>
-      </div>
-
-      {% comment %}
-        Виды связи приходят из справочника (PhoneType), а не перечисляются
-        здесь: раньше пять подписей были вшиты в разметку, и добавление
-        шестого вида означало правку шаблона.
-      {% endcomment %}
-      <div class="grid min-w-0 flex-1 grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-300 sm:grid-cols-3 md:grid-cols-5">
-        {% for phone in p.phones.all %}
-        <div><span class="text-gray-400">{{ phone.type.name }}:</span> {{ phone.number }}</div>
-        {% endfor %}
-      </div>
-    </div>
-    {% empty %}
-    <div class="rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-gray-400">
-      Сотрудники не найдены
-    </div>
-    {% endfor %}
-  </div>
-
-
+{% block sidebar_wrapper %}
+<div class="w-full flex-shrink-0 space-y-4 md:w-72">
+  {% comment %}
+    Фильтр отделов — тот же партиал, что у «Коллег»: обе страницы строят
+    dept_links одной функцией profiles.views.profile.dept_links.
+  {% endcomment %}
+  {% include "includes/colleagues/filter_dept.html" %}
 </div>
+{% endblock sidebar_wrapper %}
+
+{% block content %}
+
+<div class="w-full">
+  <form action="{% url 'show_phones' %}" method="get" class="mb-4">
+    {% if request.GET.dept %}<input type="hidden" name="dept" value="{{ request.GET.dept }}">{% endif %}
+    <div class="relative">
+      <input
+        name="q"
+        type="text"
+        value="{{ request.GET.q }}"
+        class="block w-full rounded-full border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+        placeholder="Поиск по сотруднику..."
+      />
+      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+        <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+      </div>
+    </div>
+  </form>
+
+  <div id="phones-list" class="flex flex-col gap-2">
+    {% include "includes/phones/list_fragment.html" %}
+  </div>
+
+  <div id="phones-loader" class="hidden justify-center py-6">
+    <svg class="h-6 w-6 animate-spin text-[#0077FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
+  </div>
+
+  {% if page_obj %}
+  <div
+    id="phones-sentinel"
+    data-infinite-sentinel
+    data-url="{% url 'show_phones' %}"
+    data-list="#phones-list"
+    data-loader="#phones-loader"
+    data-has-next="{{ page_obj.has_next|yesno:'1,0' }}"
+    data-next-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"
+  ></div>
+  {% endif %}
+</div>
+
 {% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/infinite-list.js' %}"></script>
+{% endblock extra_js %}

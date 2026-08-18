@@ -45,65 +45,22 @@
   </div>
 
   {% if page_obj %}
-  <div id="colleagues-sentinel" data-has-next="{{ page_obj.has_next|yesno:'1,0' }}" data-next-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"></div>
+  <div
+    id="colleagues-sentinel"
+    data-infinite-sentinel
+    data-url="{% url 'show_users' %}"
+    data-list="#colleagues-list"
+    data-loader="#colleagues-loader"
+    data-has-next="{{ page_obj.has_next|yesno:'1,0' }}"
+    data-next-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"
+  ></div>
   {% endif %}
 </div>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const sentinel = document.getElementById('colleagues-sentinel');
-    if (!sentinel) return;
 
-    const list = document.getElementById('colleagues-list');
-    const loader = document.getElementById('colleagues-loader');
-    let loading = false;
-
-    function currentParams() {
-      const params = new URLSearchParams(window.location.search);
-      params.delete('page');
-      return params;
-    }
-
-    function loadNextPage() {
-      const hasNext = sentinel.dataset.hasNext === '1';
-      if (!hasNext || loading) return;
-
-      loading = true;
-      loader.classList.remove('hidden');
-      loader.classList.add('flex');
-
-      const params = currentParams();
-      params.set('page', sentinel.dataset.nextPage);
-
-      fetch(`{% url 'show_users' %}?${params.toString()}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          list.insertAdjacentHTML('beforeend', data.html);
-          if (data.has_next) {
-            sentinel.dataset.hasNext = '1';
-            sentinel.dataset.nextPage = String(parseInt(sentinel.dataset.nextPage, 10) + 1);
-          } else {
-            sentinel.dataset.hasNext = '0';
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          loading = false;
-          loader.classList.add('hidden');
-          loader.classList.remove('flex');
-        });
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) loadNextPage();
-      },
-      { rootMargin: '200px' }
-    );
-    observer.observe(sentinel);
-  });
-</script>
 
 {% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'js/infinite-list.js' %}"></script>
+{% endblock extra_js %}

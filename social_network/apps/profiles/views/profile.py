@@ -90,6 +90,40 @@ class SettingProfile(LoginRequiredMixin, UpdateView, DetailView):
         return super().post(request, *args, **kwargs)
 
 
+def query_string_with(request, **overrides):
+    """Текущие GET-параметры с заменой части из них.
+
+    `page` всегда сбрасывается: смена фильтра на пятой странице списка почти
+    наверняка означает, что пятой страницы в новом наборе уже нет.
+    """
+    params = request.GET.copy()
+    params.pop('page', None)
+    for key, value in overrides.items():
+        if value:
+            params[key] = value
+        else:
+            params.pop(key, None)
+    return params.urlencode()
+
+
+def dept_links(request, cats):
+    """Ссылки бокового фильтра по отделам — общие для «Коллег» и справочника
+    организации: обе страницы рисуют их одним партиалом."""
+    active = request.GET.get('dept')
+    return [
+        {'name': None, 'label': 'Все отделы', 'qs': query_string_with(request, dept=None), 'active': not active},
+        *[
+            {
+                'name': cat.name,
+                'label': cat.name,
+                'qs': query_string_with(request, dept=cat.name),
+                'active': active == cat.name,
+            }
+            for cat in cats
+        ],
+    ]
+
+
 class ShowUsers(LoginRequiredMixin, ListView):
     model = get_user_model()
     template_name = 'profiles/all_users.html'
@@ -128,32 +162,13 @@ class ShowUsers(LoginRequiredMixin, ListView):
         context["cats"] = Category.objects.all()
         context["current_cat_id"] = int(self.kwargs.get('cat_id', 0))
 
-        def qs_with(**overrides):
-            params = self.request.GET.copy()
-            params.pop('page', None)
-            for key, value in overrides.items():
-                if value:
-                    params[key] = value
-                else:
-                    params.pop(key, None)
-            return params.urlencode()
+        context["dept_links"] = dept_links(self.request, context['cats'])
 
-        context["dept_links"] = [
-            {'name': None, 'label': 'Все отделы', 'qs': qs_with(dept=None), 'active': not self.request.GET.get('dept')},
-            *[
-                {
-                    'name': cat.name,
-                    'label': cat.name,
-                    'qs': qs_with(dept=cat.name),
-                    'active': self.request.GET.get('dept') == cat.name,
-                }
-                for cat in context['cats']
-            ],
-        ]
+        status = self.request.GET.get('status')
         context["status_links"] = [
-            {'value': None, 'label': 'Все статусы', 'qs': qs_with(status=None), 'active': not self.request.GET.get('status')},
-            {'value': 'online', 'label': 'Онлайн', 'qs': qs_with(status='online'), 'active': self.request.GET.get('status') == 'online'},
-            {'value': 'offline', 'label': 'Офлайн', 'qs': qs_with(status='offline'), 'active': self.request.GET.get('status') == 'offline'},
+            {'value': None, 'label': 'Все статусы', 'qs': query_string_with(self.request, status=None), 'active': not status},
+            {'value': 'online', 'label': 'Онлайн', 'qs': query_string_with(self.request, status='online'), 'active': status == 'online'},
+            {'value': 'offline', 'label': 'Офлайн', 'qs': query_string_with(self.request, status='offline'), 'active': status == 'offline'},
         ]
         return context
 
@@ -170,8 +185,11 @@ class ShowUsers(LoginRequiredMixin, ListView):
 
 
 class ShowPhones(LoginRequiredMixin, ListView):
-    """Телефоны сотрудников. Файловые справочники живут в своём модуле:
-    добавление уехало на /phonebook/add/, список — в главное меню."""
+    """Справочник организации — та же страница, что «Коллеги», но с видами
+    связи вместо должности: карточки списком, фильтр по отделу сбоку и
+    подгрузка по прокрутке. Файловые справочники живут в своём модуле:
+    добавление на /phonebook/add/, список — в главном меню.
+    """
 
     model = get_user_model()
     template_name = 'profiles/phones.html'
@@ -179,6 +197,7 @@ class ShowPhones(LoginRequiredMixin, ListView):
     # Пока эту страницу рендерили две вьюхи, имя задавала только одна, и
     # половина блоков справочника на /phones/ оставалась пустой.
     context_object_name = 'phones'
+    paginate_by = 20
 
     def get_queryset(self):
         query = self.request.GET.get('q', '')
@@ -186,8 +205,15 @@ class ShowPhones(LoginRequiredMixin, ListView):
         # справочник делал бы запрос на каждую строку списка.
         phones = get_user_model().objects.filter(
             Q(first_name__icontains=query) | Q(last_name__icontains=query)
-        ).select_related('cat').prefetch_related('phones__type')
+        ).select_related('cat').prefetch_related('phones__type').order_by('last_name', 'first_name')
 
+        dept = self.request.GET.get('dept', '')
+        if dept:
+            phones = phones.filter(cat__name=dept)
+
+        # /filterPhones/<id>/ — прежний адрес фильтра по подразделению.
+        # Боковой фильтр давно ходит через ?dept=, но старые ссылки должны
+        # продолжать работать.
         cat_id = self.kwargs.get('cat_id')
         if cat_id:
             phones = phones.filter(cat_id=cat_id)
@@ -197,8 +223,19 @@ class ShowPhones(LoginRequiredMixin, ListView):
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context["cats"] = Category.objects.all()
-        context["current_cat_id"] = int(self.kwargs.get('cat_id', 0))
+        context["dept_links"] = dept_links(self.request, context['cats'])
         return context
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            html = render_to_string(
+                'includes/phones/list_fragment.html', context, request=self.request
+            )
+            return JsonResponse({
+                'html': html,
+                'has_next': context['page_obj'].has_next() if context['page_obj'] else False,
+            })
+        return super().render_to_response(context, **response_kwargs)
 
 
 class OrgStructureView(LoginRequiredMixin, TemplateView):

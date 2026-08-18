@@ -1,0 +1,7 @@
+{% for p in page_obj.object_list %}
+{% include "includes/phones/card.html" %}
+{% empty %}
+<div class="rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-gray-400">
+  Сотрудники не найдены
+</div>
+{% endfor %}

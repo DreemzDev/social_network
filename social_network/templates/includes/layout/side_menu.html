@@ -58,23 +58,25 @@
       </div>
     </a>
     <ul :class="{ 'side-menu__sub-open': open }">
+      {% comment %}
+        Пункты подменю без side-menu__icon: иконка здесь чисто декоративная
+        (у всех справочников она была бы одна и та же), а стоит 36px из 210
+        доступных — с ней «Справочник организации» уже не помещался в строку.
+      {% endcomment %}
       <li>
-        <a href="{% url 'show_phones' %}" class="side-menu {% if request.resolver_match.url_name == 'show_phones' or request.resolver_match.url_name == 'filterPhones' %}side-menu--active{% endif %}">
-          <div class="side-menu__icon"> <i data-feather="users"></i> </div>
+        <a href="{% url 'show_phones' %}" title="Справочник организации" class="side-menu {% if request.resolver_match.url_name == 'show_phones' or request.resolver_match.url_name == 'filterPhones' %}side-menu--active{% endif %}">
           <div class="side-menu__title">Справочник организации</div>
         </a>
       </li>
       {% for b in menu_books %}
       <li>
-        <a href="{% url 'phonebook' b.id %}" class="side-menu {% if request.resolver_match.url_name == 'phonebook' and request.resolver_match.kwargs.book_id == b.id %}side-menu--active{% endif %}">
-          <div class="side-menu__icon"> <i data-feather="book"></i> </div>
+        <a href="{% url 'phonebook' b.id %}" title="{{ b.title }}" class="side-menu {% if request.resolver_match.url_name == 'phonebook' and request.resolver_match.kwargs.book_id == b.id %}side-menu--active{% endif %}">
           <div class="side-menu__title">{{ b.title }}</div>
         </a>
       </li>
       {% endfor %}
       <li>
-        <a href="{% url 'phonebook_add' %}" class="side-menu {% if request.resolver_match.url_name == 'phonebook_add' %}side-menu--active{% endif %}">
-          <div class="side-menu__icon"> <i data-feather="plus-circle"></i> </div>
+        <a href="{% url 'phonebook_add' %}" title="Добавить справочник" class="side-menu {% if request.resolver_match.url_name == 'phonebook_add' %}side-menu--active{% endif %}">
           <div class="side-menu__title">Добавить справочник</div>
         </a>
       </li>
