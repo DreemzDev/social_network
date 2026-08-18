@@ -4,12 +4,10 @@
   (includes/colleagues/card.html), но содержимое своё: виды связи вместо
   должности и кнопки сообщения.
 
-  Отдельной колонки отдела здесь нет намеренно. Пяти видам связи нужно
-  539px, а с колонкой отдела на них оставалось 441 — номера обрезались
-  многоточием, то есть колонка отдела стоила читаемости телефонов. Отдел
-  никуда не делся: он значком под фамилией и фильтром слева.
+  Отдельной колонки отдела здесь нет: отдел фильтруется слева, а в карточке
+  он значком под фамилией — так же, как на прежней странице справочника.
 {% endcomment %}
-<div class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-gray-100 bg-white p-3 transition hover:border-gray-200 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 2xl:flex-nowrap">
+<div class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-gray-100 bg-white p-3 transition hover:border-gray-200 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 sm:flex-nowrap">
   <a href="{% url 'addpost' p.username %}" class="relative flex-shrink-0">
     <img
       class="h-14 w-14 rounded-full object-cover"
@@ -19,7 +17,7 @@
     <span class="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-zinc-900 {% if p.is_online %}bg-green-400{% else %}bg-gray-300 dark:bg-zinc-600{% endif %}"></span>
   </a>
 
-  <div class="min-w-0 flex-1 2xl:w-60 2xl:flex-shrink-0 2xl:flex-none">
+  <div class="min-w-0 flex-1 sm:w-60 sm:flex-shrink-0 sm:flex-none">
     <a href="{% url 'addpost' p.username %}" class="block truncate text-sm font-medium text-gray-900 hover:text-[#0077FF] dark:text-white">
       {{ p.last_name }} {{ p.first_name }}
     </a>
@@ -38,17 +36,15 @@
     здесь: раньше пять подписей были вшиты в разметку, и добавление
     шестого вида означало правку шаблона.
 
-    Ширина по содержимому, а не равными колонками: при равных длинный
-    мобильный номер обрезался, пока короткие впустую держали место. До
-    1536px виды связи занимают всю ширину карточки отдельной строкой —
-    рядом с фамилией нужных им 539px хватает только на широком мониторе.
-    Строка у них при любой ширине одна.
+    Один столбец, номер под номером. В несколько колонок рядом оказывались
+    «Город» и «ЗС», между которыми нет ничего общего, и нужный вид связи
+    приходилось искать по строке вместо чтения сверху вниз.
   {% endcomment %}
-  <div class="order-5 w-full min-w-0 2xl:order-none 2xl:w-auto 2xl:flex-1">
+  <div class="order-5 w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">
     {% if p.phones.all %}
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm text-gray-600 dark:text-gray-300">
+    <div class="flex flex-col gap-y-0.5 text-sm text-gray-600 dark:text-gray-300">
       {% for phone in p.phones.all %}
-      <div class="whitespace-nowrap"><span class="text-gray-400">{{ phone.type.name }}:</span> {{ phone.number }}</div>
+      <div class="truncate"><span class="text-gray-400">{{ phone.type.name }}:</span> {{ phone.number }}</div>
       {% endfor %}
     </div>
     {% else %}
