@@ -1,0 +1,16 @@
+{% comment %}
+  Кто добавил справочник и кто правил последним. Справочники правит любой
+  сотрудник, и подпись — единственное, что отличает общий документ от
+  ничейного.
+{% endcomment %}
+<div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+  {% if book.created_by %}Добавил {{ book.created_by.last_name }} {{ book.created_by.first_name }}{% else %}Добавлен{% endif %}{% if book.created_at %}, {{ book.created_at|date:"d.m.Y" }}{% endif %}
+  {% if book.updated_by %}
+  <span class="mx-1 text-gray-300 dark:text-zinc-600">·</span>
+  изменил {{ book.updated_by.last_name }} {{ book.updated_by.first_name }}{% if book.updated_at %}, {{ book.updated_at|date:"d.m.Y" }}{% endif %}
+  {% endif %}
+  {% if book.is_deleted %}
+  <span class="mx-1 text-gray-300 dark:text-zinc-600">·</span>
+  <span class="text-red-600 dark:text-red-400">удалил {% if book.deleted_by %}{{ book.deleted_by.last_name }} {{ book.deleted_by.first_name }}{% else %}—{% endif %}{% if book.deleted_at %}, {{ book.deleted_at|date:"d.m.Y" }}{% endif %}</span>
+  {% endif %}
+</div>

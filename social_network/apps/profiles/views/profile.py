@@ -8,11 +8,9 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.shortcuts import redirect
-from django.views.generic import DetailView, ListView, UpdateView, FormView, TemplateView, View
+from django.views.generic import DetailView, ListView, UpdateView, TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from phonebook.models import Phonebook
-from phonebook.forms import UpdateBookForm
 from profiles.models import Position
 from profiles.forms import (
     AddProfileForm, SettingProfileForm, ChangePasswordForm, SecurityAnswerForm, UserPhonesForm,
@@ -171,19 +169,16 @@ class ShowUsers(LoginRequiredMixin, ListView):
         return super().render_to_response(context, **response_kwargs)
 
 
-class ShowPhones(LoginRequiredMixin, ListView, FormView):
+class ShowPhones(LoginRequiredMixin, ListView):
+    """Телефоны сотрудников. Файловые справочники живут в своём модуле:
+    добавление уехало на /phonebook/add/, список — в главное меню."""
+
     model = get_user_model()
     template_name = 'profiles/phones.html'
     # Шаблон обращается к списку и как к `phones`, и как к `object_list`.
     # Пока эту страницу рендерили две вьюхи, имя задавала только одна, и
     # половина блоков справочника на /phones/ оставалась пустой.
     context_object_name = 'phones'
-    form_class = UpdateBookForm
-    success_url = reverse_lazy('show_phones')
-
-    def form_valid(self, form):
-        form.save()
-        return super().form_valid(form)
 
     def get_queryset(self):
         query = self.request.GET.get('q', '')
@@ -202,7 +197,6 @@ class ShowPhones(LoginRequiredMixin, ListView, FormView):
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context["cats"] = Category.objects.all()
-        context["books"] = Phonebook.objects.all()
         context["current_cat_id"] = int(self.kwargs.get('cat_id', 0))
         return context
 

@@ -39,11 +39,46 @@
       <div class="side-menu__title">Галерея</div>
     </a>
   </li>
-  <li>
-    <a href="{% url 'show_phones' %}" class="side-menu {% if request.resolver_match.url_name == 'show_phones' %}side-menu--active{% endif %}">
+  {% comment %}
+    Разметка подменю — темы Midone (side-menu__sub-icon + вложенный ul), а
+    раскрытие на Alpine. JS темы здесь не годится: её модуль side-menu.js
+    лежит в бандле app.js, но entry его не подключает — ни в нашей копии, ни
+    в оригинале Midone v1.0.4, то есть обработчик не выполняется вовсе.
+    Проверено в браузере: клик не вызывал даже slideUp.
+
+    Открытым рисуем сразу на страницах справочников — иначе активный пункт
+    оказывается спрятан внутри свёрнутого списка.
+  {% endcomment %}
+  <li x-data="{ open: {% if phonebook_menu_open %}true{% else %}false{% endif %} }">
+    <a href="javascript:;" class="side-menu" :class="{ 'side-menu--open': open }" x-on:click="open = !open">
       <div class="side-menu__icon"> <i data-feather="book-open"></i> </div>
-      <div class="side-menu__title">Справочник</div>
+      <div class="side-menu__title">
+        Справочники
+        <i data-feather="chevron-down" class="side-menu__sub-icon"></i>
+      </div>
     </a>
+    <ul :class="{ 'side-menu__sub-open': open }">
+      <li>
+        <a href="{% url 'show_phones' %}" class="side-menu {% if request.resolver_match.url_name == 'show_phones' or request.resolver_match.url_name == 'filterPhones' %}side-menu--active{% endif %}">
+          <div class="side-menu__icon"> <i data-feather="users"></i> </div>
+          <div class="side-menu__title">Справочник организации</div>
+        </a>
+      </li>
+      {% for b in menu_books %}
+      <li>
+        <a href="{% url 'phonebook' b.id %}" class="side-menu {% if request.resolver_match.url_name == 'phonebook' and request.resolver_match.kwargs.book_id == b.id %}side-menu--active{% endif %}">
+          <div class="side-menu__icon"> <i data-feather="book"></i> </div>
+          <div class="side-menu__title">{{ b.title }}</div>
+        </a>
+      </li>
+      {% endfor %}
+      <li>
+        <a href="{% url 'phonebook_add' %}" class="side-menu {% if request.resolver_match.url_name == 'phonebook_add' %}side-menu--active{% endif %}">
+          <div class="side-menu__icon"> <i data-feather="plus-circle"></i> </div>
+          <div class="side-menu__title">Добавить справочник</div>
+        </a>
+      </li>
+    </ul>
   </li>
   <li>
     <a href="{% url 'exchange_inbox' %}"

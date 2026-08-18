@@ -51,6 +51,12 @@
            дефицит ширины на .side-nav вместо того, чтобы .content сам ужимался. */
         .side-nav { flex-shrink: 0; }
         .content { min-width: 0; }
+
+        /* Стрелка раскрытого подменю. Привязать её к состоянию через Alpine
+           нельзя: feather подменяет <i data-feather> на <svg> и уносит с
+           собой привязки, поэтому поворот вешается на класс родительской
+           ссылки, которую feather не трогает. */
+        .side-nav .side-menu--open .side-menu__sub-icon { transform: rotate(180deg); }
     </style>
 
 </head>

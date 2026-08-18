@@ -107,6 +107,7 @@ TEMPLATES = [
                 'profiles.context_processors.online_users',
                 'profiles.context_processors.unread_messages_count',
                 'sitesettings.context_processors.site_settings',
+                'phonebook.context_processors.reference_books',
             ],
         },
     },
