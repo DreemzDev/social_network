@@ -64,9 +64,15 @@
     </a>
     <ul class="{% if phonebook_menu_open %}side-menu__sub-open{% endif %}"{% if phonebook_menu_open %} style="display: block;"{% endif %}>
       <li>
+        {% comment %}
+          В меню «Организация», на самой странице — «Справочник организации».
+          Полное название в отступах темы не помещается и обрезалось
+          многоточием, а пункт стоит внутри списка «Справочники», где слово
+          «справочник» и так подразумевается.
+        {% endcomment %}
         <a href="{% url 'show_phones' %}" title="Справочник организации" class="side-menu {% if request.resolver_match.url_name == 'show_phones' or request.resolver_match.url_name == 'filterPhones' %}side-menu--active{% endif %}">
           <div class="side-menu__icon"> <i data-feather="users"></i> </div>
-          <div class="side-menu__title">Справочник организации</div>
+          <div class="side-menu__title">Организация</div>
         </a>
       </li>
       {% for b in menu_books %}
