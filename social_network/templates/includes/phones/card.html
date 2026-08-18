@@ -7,7 +7,7 @@
   Отдельной колонки отдела здесь нет: отдел фильтруется слева, а в карточке
   он значком под фамилией — так же, как на прежней странице справочника.
 {% endcomment %}
-<div class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-gray-100 bg-white p-3 transition hover:border-gray-200 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 sm:flex-nowrap">
+<div class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-gray-100 bg-white p-3 transition hover:border-gray-200 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 2xl:flex-nowrap">
   <a href="{% url 'addpost' p.username %}" class="relative flex-shrink-0">
     <img
       class="h-14 w-14 rounded-full object-cover"
@@ -17,7 +17,7 @@
     <span class="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-zinc-900 {% if p.is_online %}bg-green-400{% else %}bg-gray-300 dark:bg-zinc-600{% endif %}"></span>
   </a>
 
-  <div class="min-w-0 flex-1 sm:w-60 sm:flex-shrink-0 sm:flex-none">
+  <div class="min-w-0 flex-1 2xl:w-60 2xl:flex-shrink-0 2xl:flex-none">
     <a href="{% url 'addpost' p.username %}" class="block truncate text-sm font-medium text-gray-900 hover:text-[#0077FF] dark:text-white">
       {{ p.last_name }} {{ p.first_name }}
     </a>
@@ -39,8 +39,13 @@
     Один столбец, номер под номером. В несколько колонок рядом оказывались
     «Город» и «ЗС», между которыми нет ничего общего, и нужный вид связи
     приходилось искать по строке вместо чтения сверху вниз.
+
+    Рядом с фамилией столбец встаёт только на широком экране: обоим нужно
+    424px карточки, а в раскладке «Коллег» столько набирается лишь от
+    ~1600px. Уже — виды связи занимают свою строку внутри карточки, и
+    места им там хватает с запасом.
   {% endcomment %}
-  <div class="order-5 w-full min-w-0 sm:order-none sm:w-auto sm:flex-1">
+  <div class="order-5 w-full min-w-0 2xl:order-none 2xl:w-auto 2xl:flex-1">
     {% if p.phones.all %}
     <div class="flex flex-col gap-y-0.5 text-sm text-gray-600 dark:text-gray-300">
       {% for phone in p.phones.all %}

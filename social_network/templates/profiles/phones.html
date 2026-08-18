@@ -2,12 +2,7 @@
 {% load static %}
 {% block breadcrumb %}Справочник организации{% endblock breadcrumb %}
 
-{% comment %}
-  Раскладка «Коллег», но без ограничения ширины до 2/3: в карточке справочника
-  колонка видов связи, и в узком контенте она схлопывается — замерено 75px на
-  1440 и 0 на 1280, номера превращались в многоточие.
-{% endcomment %}
-{% block content_layout %} md:flex-row-reverse{% endblock content_layout %}
+{% block content_layout %} md:flex-row-reverse md:w-2/3 md:flex-none md:mx-auto{% endblock content_layout %}
 
 {% block sidebar_wrapper %}
 <div class="w-full flex-shrink-0 space-y-4 md:w-72">
