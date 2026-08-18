@@ -68,15 +68,17 @@
         .side-nav > ul ul li > a.side-menu { opacity: 1; transform: none; animation: none; }
 
         /* Название справочника должно уместиться в одну строку. Места в меню
-           210px, из них тема забирала 36px под иконку и не оставляла отступа
-           справа — «Справочник организации» не влезал на 14px. Иконки у
-           пунктов подменю убраны (см. side_menu.html), шрифт вторичного
-           уровня на ступень мельче; что всё равно не поместилось —
+           210px, а тема тратила их щедро: 24px иконка, 12px отступ до текста
+           и ни пикселя справа — «Справочник организации» не влезал. Иконка
+           пунктов подменю уменьшена до 14px, отступы поджаты, шрифт
+           вторичного уровня на ступень мельче. Что и так не поместилось —
            обрезается многоточием, полное имя остаётся в title. */
-        .side-nav > ul ul .side-menu { min-width: 0; padding-left: 0.875rem; padding-right: 0.5rem; }
+        .side-nav > ul ul .side-menu { min-width: 0; padding-left: 0.75rem; padding-right: 0.5rem; }
+        .side-nav > ul ul .side-menu__icon { width: 0.875rem; }
+        .side-nav > ul ul .side-menu__icon svg { width: 0.875rem; height: 0.875rem; }
         .side-nav > ul ul .side-menu__title {
             display: block;
-            margin-left: 0;
+            margin-left: 0.5rem;
             font-size: 0.8125rem;
             overflow: hidden;
             text-overflow: ellipsis;

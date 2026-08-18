@@ -2,7 +2,12 @@
 {% load static %}
 {% block breadcrumb %}Справочник организации{% endblock breadcrumb %}
 
-{% block content_layout %} md:flex-row-reverse md:w-2/3 md:flex-none md:mx-auto{% endblock content_layout %}
+{% comment %}
+  Раскладка «Коллег», но без ограничения ширины до 2/3: у карточки справочника
+  справа идут пять видов связи, и в узкой колонке они складываются в две
+  строки.
+{% endcomment %}
+{% block content_layout %} md:flex-row-reverse{% endblock content_layout %}
 
 {% block sidebar_wrapper %}
 <div class="w-full flex-shrink-0 space-y-4 md:w-72">
