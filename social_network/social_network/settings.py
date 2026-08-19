@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'gallery.apps.GalleryConfig',
     'phonebook.apps.PhonebookConfig',
     'django_celery_beat',
+    'netmap',
     'storage.apps.StorageConfig',
     'exchange.apps.ExchangeConfig',
     'catalog.apps.CatalogConfig',

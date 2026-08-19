@@ -98,6 +98,19 @@
       <div class="side-menu__title">Файловый менеджер</div>
     </a>
   </li>
+  {% if request.user.is_staff %}
+  {% comment %}
+    Карта сети — служебная страница: адреса, имена машин и кто за что
+    отвечает. Пункт не просто отключён, а не выводится вовсе тем, кому
+    страница недоступна (ARCHITECTURE 12.4).
+  {% endcomment %}
+  <li>
+    <a href="{% url 'netmap' %}" class="side-menu {% if 'netmap' in request.path %}side-menu--active{% endif %}">
+      <div class="side-menu__icon"> <i data-feather="server"></i> </div>
+      <div class="side-menu__title">Карта сети</div>
+    </a>
+  </li>
+  {% endif %}
   <li class="side-nav__devider my-6"></li>
   <li>
     <span class="side-menu" style="opacity: .4; cursor: not-allowed;">
