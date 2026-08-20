@@ -105,10 +105,16 @@
             <!-- BEGIN: Search -->
             <div class="intro-x relative mr-3 sm:mr-6">
                 <div class="search hidden sm:block">
-                    <input type="text" class="search__input input placeholder-theme-13" placeholder="Поиск (в разработке)">
+                    <input id="global-search" type="text" autocomplete="off" class="search__input input placeholder-theme-13" placeholder="Поиск по порталу">
                     <i data-feather="search" class="search__icon"></i>
                 </div>
-                <a class="notification sm:hidden" href="javascript:;"> <i data-feather="search" class="notification__icon"></i> </a>
+                <a class="notification sm:hidden" href="{% url 'global_search' %}"> <i data-feather="search" class="notification__icon"></i> </a>
+                {% comment %}
+                  Показ и скрытие выпадающего списка делает сама тема
+                  (её search.js по focus/focusout), содержимое подставляет
+                  static/js/global-search.js.
+                {% endcomment %}
+                <div class="search-result" id="global-search-result"></div>
             </div>
             <!-- END: Search -->
 
@@ -658,6 +664,7 @@
 {% block extra_js %}{% endblock extra_js %}
 
     <!-- Midone (Left4Code) — иконки/анимации sidebar, подключается последним чтобы не влиять на порядок $/jQuery остальных скриптов -->
+    <script src="{% static 'js/global-search.js' %}"></script>
     <script src="{% static 'midone/js/app.js' %}"></script>
 
 </body>

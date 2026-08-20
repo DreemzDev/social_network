@@ -1,0 +1,40 @@
+{% load static %}
+{% comment %}
+  Содержимое выпадающего списка поиска. Классы — темы Midone
+  (search-result__content__title и т.д.), чтобы список выглядел родным.
+  Отдаётся тем же сервером, что и страница результатов: разметка одна.
+{% endcomment %}
+<div class="search-result__content">
+  {% if too_short %}
+  <div class="px-1 py-2 text-sm text-gray-600">Введите хотя бы два символа</div>
+
+  {% elif not groups %}
+  <div class="px-1 py-2 text-sm text-gray-600">Ничего не найдено</div>
+
+  {% else %}
+  {% for group in groups %}
+  <div class="search-result__content__title">{{ group.title }}</div>
+  <div class="mb-5">
+    {% for hit in group.hits %}
+    <a href="{{ hit.url }}" class="flex items-center mt-2">
+      {% if hit.avatar %}
+      <div class="w-8 h-8 image-fit flex-shrink-0">
+        <img alt="{{ hit.title }}" class="rounded-full" src="{{ hit.avatar }}">
+      </div>
+      {% else %}
+      <div class="w-8 h-8 bg-theme-18 text-theme-9 flex items-center justify-center rounded-full flex-shrink-0">
+        <i class="w-4 h-4" data-feather="{{ group.icon }}"></i>
+      </div>
+      {% endif %}
+      <div class="ml-3 min-w-0 truncate">{{ hit.title }}</div>
+      <div class="ml-auto w-48 truncate text-gray-600 text-xs text-right">{{ hit.subtitle }}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <a href="{% url 'global_search' %}?q={{ query|urlencode }}" class="w-full block text-center border-t border-gray-200 pt-4 text-theme-1 text-sm">
+    Показать все результаты
+  </a>
+  {% endif %}
+</div>

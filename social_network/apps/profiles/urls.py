@@ -3,6 +3,7 @@ from django.urls import path
 from .views import *
 
 urlpatterns = [
+    path('search/', GlobalSearchView.as_view(), name='global_search'),
     # Учётная запись: раньше эти четыре адреса обслуживали отдельные
     # приложения login и register.
     path('login/', LoginUser.as_view(), name='login'),

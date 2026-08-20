@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block breadcrumb %}Поиск{% endblock breadcrumb %}
+
+{% block content %}
+<div class="w-full min-w-0 space-y-4">
+
+  <div class="rounded-xl border border-gray-100 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+    <form method="get" action="{% url 'global_search' %}">
+      <div class="relative">
+        <input name="q" value="{{ query }}" autofocus placeholder="Сотрудник, файл, справочник, новость..."
+               class="block w-full rounded-full border border-gray-300 bg-white py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-[#0077FF] focus:ring-[#0077FF] dark:border-zinc-600 dark:bg-zinc-800 dark:text-white">
+        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+          <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if too_short %}
+  <div class="rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-gray-400">
+    Введите хотя бы два символа
+  </div>
+  {% elif query and not groups %}
+  <div class="rounded-xl border border-gray-100 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
+    <div class="text-sm font-medium text-gray-900 dark:text-white">По запросу «{{ query }}» ничего не найдено</div>
+    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+      Поиск смотрит сотрудников, файлы, справочники и новости — и только то, что доступно вам.
+    </p>
+  </div>
+  {% endif %}
+
+  {% for group in groups %}
+  <div class="overflow-hidden rounded-xl border border-gray-100 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+    <div class="border-b border-gray-100 px-4 py-3 text-sm font-semibold text-gray-900 dark:border-zinc-800 dark:text-white">
+      {{ group.title }} <span class="ml-1 font-normal text-gray-400">{{ group.hits|length }}</span>
+    </div>
+    <ul class="divide-y divide-gray-100 dark:divide-zinc-800">
+      {% for hit in group.hits %}
+      <li>
+        <a href="{{ hit.url }}" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+          {% if hit.avatar %}
+          <img src="{{ hit.avatar }}" alt="" class="h-9 w-9 flex-shrink-0 rounded-full object-cover">
+          {% endif %}
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm text-gray-900 dark:text-white">{{ hit.title }}</div>
+            <div class="truncate text-xs text-gray-400">{{ hit.subtitle }}</div>
+          </div>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+
+</div>
+{% endblock content %}

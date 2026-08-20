@@ -11,6 +11,7 @@ from .auth import (
     PasswordResetRequestView, PasswordResetConfirmView,
 )
 
+from .search import GlobalSearchView
 from .profile import (
     AddProfile, SettingProfile, ShowUsers, ShowPhones, OrgStructureView,
     EmployeeStatusUpdateView,
@@ -51,4 +52,5 @@ __all__ = [
     'EventCreateView', 'EventDeleteView', 'CalendarUsersListView', 'CalendarTaskCreateView',
     'CalendarEventsFeedView', 'CALENDAR_COLORS',
     'NotificationMarkReadView', 'NotificationMarkAllReadView',
+    'GlobalSearchView',
 ]
