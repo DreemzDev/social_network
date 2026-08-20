@@ -2,6 +2,14 @@
 {% load static %}
 {% block breadcrumb %}Карта сети{% endblock breadcrumb %}
 
+{% comment %}
+  Ширина ограничена, а не «во весь экран»: на широком мониторе страница
+  расползалась. Но и раскладку «Коллег» (2/3) взять нельзя — таблице
+  инвентаря нужно 1050px, а 2/3 дают 860px на 1600px, и она поехала бы вбок.
+  1152px — самая узкая ширина, при которой таблица ещё помещается целиком.
+{% endcomment %}
+{% block content_layout %} mx-auto w-full max-w-6xl{% endblock content_layout %}
+
 {% block content %}
 <div class="w-full min-w-0 space-y-4">
 
