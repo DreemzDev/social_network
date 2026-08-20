@@ -1,6 +1,13 @@
 {% extends 'base.html' %}
 {% block breadcrumb %}Поиск{% endblock breadcrumb %}
 
+{% comment %}
+  Уже, чем страница по умолчанию: результат это список из названия и
+  подписи, и во всю ширину монитора подпись уезжала от названия так далеко,
+  что их приходилось связывать глазами.
+{% endcomment %}
+{% block content_layout %} mx-auto w-full max-w-4xl{% endblock content_layout %}
+
 {% block content %}
 <div class="w-full min-w-0 space-y-4">
 
