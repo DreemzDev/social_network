@@ -2,18 +2,31 @@ from django.templatetags.static import static
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.views.generic import ListView, View
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.core.cache import cache
 
 from django_private_chat2.models import MessageModel, DialogsModel
 
-from ..models import Category, MessageReaction, MessageReply
+from storage.exceptions import FileTooLargeError, QuotaExceededError
+from storage.models import FileObject
+from storage.services import StorageService
+from storage.signals import attribute_deletion
+
+from ..models import Category, MessageAttachment, MessageReaction, MessageReply, looks_like_image
 from ._common import clear_user_cache, push_chat_event
 
 ALLOWED_REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡']
+
+# Сколько файлов принимается за одно сообщение. Ограничение не про место
+# (его сторожит квота), а про сам запрос: сотня файлов одним POST заняла бы
+# воркер Daphne на всё время загрузки.
+MAX_ATTACHMENTS_PER_MESSAGE = 10
+
+CONSUMER = 'profiles.MessageAttachment'
 
 
 class DialogsWithUnreadMixin:
@@ -40,7 +53,7 @@ class DialogsWithUnreadMixin:
             dialog.last_message = MessageModel.objects.filter(
                 Q(sender=self.request.user, recipient=other_user) |
                 Q(sender=other_user, recipient=self.request.user)
-            ).select_related('sender').order_by('-created').first()
+            ).select_related('sender').prefetch_related('attachments').order_by('-created').first()
 
             dialog_list.append(dialog)
 
@@ -107,6 +120,19 @@ class DialogsListView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
         return super().render_to_response(context, **response_kwargs)
 
 
+def serialize_attachment(attachment):
+    """Одна форма вложения на все пути: первая отрисовка страницы, догрузка
+    истории и живое событие получателю."""
+    return {
+        'id': attachment.pk,
+        'name': attachment.original_name,
+        'size': attachment.size_display,
+        'is_image': attachment.is_image and not attachment.is_expired,
+        'expired': attachment.is_expired,
+        'url': None if attachment.is_expired else reverse('chat_attachment', args=[attachment.pk]),
+    }
+
+
 def _serialize_message(msg):
     """Общий формат JSON-представления сообщения для LoadMoreMessagesView и
     SendMessageWithReplyView — чтобы фронтенд получал одинаковую форму
@@ -139,6 +165,7 @@ def _serialize_message(msg):
         'sender_avatar': msg.sender.avatar.url if msg.sender.avatar else None,
         'created': msg.created.strftime('%H:%M'),
         'file': msg.file.url if hasattr(msg, 'file') and msg.file else None,
+        'attachments': [serialize_attachment(a) for a in msg.attachments.all()],
         'reply_to': reply_payload,
         'reactions': reactions_payload,
     }
@@ -159,7 +186,7 @@ class DialogMessagesView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
             Q(sender=self.request.user, recipient=self.other_user) |
             Q(sender=self.other_user, recipient=self.request.user)
         ).select_related('sender', 'recipient').prefetch_related(
-            'reactions', 'reply_info__reply_to__sender'
+            'reactions', 'reply_info__reply_to__sender', 'attachments',
         ).order_by('-created')[:self.paginate_by]
 
     def get_context_data(self, **kwargs):
@@ -169,6 +196,12 @@ class DialogMessagesView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
         context['active_user_id'] = self.other_user.pk
         context['messages'] = list(reversed(context['messages']))  # от старых к новым
         context['reaction_emojis'] = ALLOWED_REACTION_EMOJIS
+        # Срок берётся из политики storage, а не пишется в шаблоне числом:
+        # его правят в админке, и подпись обязана меняться вместе с ним.
+        context['chat_ttl_days'] = StorageService.get_category_ttl_days(
+            FileObject.Category.CHAT
+        )
+        context['max_attachments'] = MAX_ATTACHMENTS_PER_MESSAGE
         return context
 
 
@@ -193,7 +226,7 @@ class LoadMoreMessagesView(LoginRequiredMixin, View):
         # Берём на одно сообщение больше лимита, чтобы узнать has_more без
         # отдельного COUNT()-запроса по всему диалогу на каждый скролл.
         messages = list(queryset.select_related('sender', 'recipient').prefetch_related(
-            'reactions__user', 'reply_info__reply_to__sender'
+            'reactions__user', 'reply_info__reply_to__sender', 'attachments',
         ).order_by('-created')[:limit + 1])
 
         has_more = len(messages) > limit
@@ -250,9 +283,25 @@ class SendMessageWithReplyView(LoginRequiredMixin, View):
         recipient = get_object_or_404(get_user_model(), pk=user_id)
         text = request.POST.get('text', '').strip()
         reply_to_id = request.POST.get('reply_to_id')
+        uploads = request.FILES.getlist('files')
 
-        if not text:
+        if not text and not uploads:
             return JsonResponse({'success': False, 'error': 'Текст не может быть пустым'}, status=400)
+
+        if len(uploads) > MAX_ATTACHMENTS_PER_MESSAGE:
+            return JsonResponse(
+                {'success': False,
+                 'error': f'За раз можно отправить не больше {MAX_ATTACHMENTS_PER_MESSAGE} файлов'},
+                status=400,
+            )
+
+        # Файлы принимаются ДО создания сообщения: упрись загрузка в квоту
+        # на третьем файле — и в переписке осталось бы сообщение с частью
+        # вложений, а отправитель увидел бы только текст ошибки.
+        try:
+            uploaded_objects = self._store_files(uploads)
+        except (FileTooLargeError, QuotaExceededError) as error:
+            return JsonResponse({'success': False, 'error': str(error)}, status=400)
 
         reply_to = None
         if reply_to_id:
@@ -264,6 +313,16 @@ class SendMessageWithReplyView(LoginRequiredMixin, View):
             ).first()
 
         message = MessageModel.objects.create(sender=request.user, recipient=recipient, text=text)
+        attachments = [
+            MessageAttachment.objects.create(
+                message=message,
+                file_object=file_object,
+                original_name=file_object.original_name,
+                size=file_object.size,
+                is_image=looks_like_image(file_object.mime_type),
+            )
+            for file_object in uploaded_objects
+        ]
         DialogsModel.create_if_not_exists(request.user, recipient)
         clear_user_cache(recipient.pk)
 
@@ -284,10 +343,30 @@ class SendMessageWithReplyView(LoginRequiredMixin, View):
             'receiver': str(recipient.pk),
             'created': message.created.strftime('%H:%M'),
             'reply_to': reply_payload,
+            'attachments': [serialize_attachment(a) for a in attachments],
         }
         push_chat_event(recipient.pk, 'new_reply_message', **payload)
 
         return JsonResponse({'success': True, **payload})
+
+    def _store_files(self, uploads):
+        """Кладёт файлы в storage, откатывая уже загруженные при отказе.
+
+        Без отката файл, успевший загрузиться до отказа на следующем,
+        остался бы в хранилище ACTIVE без единой ссылки — то есть занимал бы
+        место и место в квоте отправителя навсегда.
+        """
+        stored = []
+        try:
+            for uploaded in uploads:
+                stored.append(StorageService.upload(
+                    uploaded, user=self.request.user, category=FileObject.Category.CHAT,
+                ))
+        except (FileTooLargeError, QuotaExceededError):
+            for file_object in stored:
+                StorageService.detach(file_object, user=self.request.user, consumer=CONSUMER)
+            raise
+        return stored
 
 
 class MarkMessagesReadView(LoginRequiredMixin, View):
@@ -341,6 +420,16 @@ class DeleteMessageView(LoginRequiredMixin, View):
     def post(self, request, message_id):
         message = get_object_or_404(MessageModel, pk=message_id, sender=request.user)
         recipient_id = message.recipient_id
+
+        # Вложения удаляются явно: MessageModel из django_private_chat2 —
+        # SoftDeletableModel, её delete() только ставит признак, каскада не
+        # происходит, и файл остался бы в хранилище до истечения срока —
+        # хотя пользователь его уже отозвал. Пометка нужна, чтобы в журнале
+        # storage было видно, кто удалил.
+        for attachment in message.attachments.all():
+            attribute_deletion(attachment, user=request.user, consumer=CONSUMER)
+            attachment.delete()
+
         message.delete()
 
         push_chat_event(recipient_id, 'message_deleted', message_id=message_id,
@@ -391,3 +480,28 @@ class ToggleMessageReactionView(LoginRequiredMixin, View):
                          sender=str(request.user.pk), receiver=str(other_user_id))
 
         return JsonResponse({'success': True, 'reactions': reactions})
+
+
+class ChatAttachmentView(LoginRequiredMixin, View):
+    """Отдаёт вложение личного сообщения — только его собеседникам.
+
+    storage прав не знает, их проверяет потребитель (ARCHITECTURE.md,
+    раздел 8): переписка личная, и адрес вложения не должен открываться
+    никому, кроме двоих участников диалога.
+    """
+
+    def get(self, request, attachment_id):
+        attachment = get_object_or_404(
+            MessageAttachment.objects.select_related('message', 'file_object__blob'),
+            pk=attachment_id,
+        )
+        message = attachment.message
+        if request.user.pk not in (message.sender_id, message.recipient_id):
+            raise Http404
+
+        if attachment.is_expired:
+            raise Http404
+
+        return StorageService.get_download_response(
+            attachment.file_object, request, inline=request.GET.get('inline') == '1',
+        )

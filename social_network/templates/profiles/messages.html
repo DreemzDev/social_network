@@ -222,9 +222,9 @@
                     <p class="truncate text-sm text-gray-500 dark:text-gray-400">
                         {% if dialog.last_message %}
                             {% if dialog.last_message.sender == request.user %}
-                                Вы: {{ dialog.last_message.text|striptags|truncatechars:30 }}
+                                Вы: {{ dialog.last_message|message_preview|truncatechars:30 }}
                             {% else %}
-                                {{ dialog.last_message.text|striptags|truncatechars:30 }}
+                                {{ dialog.last_message|message_preview|truncatechars:30 }}
                             {% endif %}
                         {% else %}
                             Нет сообщений
@@ -311,6 +311,10 @@
                 </div>
                 {% endif %}
 
+                {% if message.attachments.all %}
+                {% include "includes/chat/attachments.html" with attachments=message.attachments.all %}
+                {% endif %}
+
                 {% if message.reactions.all %}
                 <div class="msg-reactions mt-1.5 flex flex-wrap items-center gap-2">
                     {% regroup message.reactions.all by emoji as reaction_groups %}
@@ -379,6 +383,24 @@
                     class="no-scrollbar msg-editable w-full flex-1 overflow-y-auto bg-transparent text-base outline-none dark:text-white"
                 ></div>
 
+                <!-- Выбранные файлы: над полем ввода, как выпадающий эмодзи-пикер -->
+                <div id="msg-attachments-preview"
+                     class="absolute bottom-full left-0 z-20 mb-2 hidden w-full max-w-md flex-col gap-1.5 rounded-lg border border-gray-200 bg-white p-2 shadow-xl dark:border-zinc-700 dark:bg-zinc-800">
+                </div>
+
+                <input class="hidden" id="msg-attachments-input" name="files" multiple type="file">
+
+                <button
+                    type="button"
+                    id="msg-attach-button"
+                    title="Прикрепить файл или фото (хранятся {{ chat_ttl_days }} дн.)"
+                    class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-200"
+                >
+                    <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+                    </svg>
+                </button>
+
                 <button
                     type="button"
                     id="msg-emoji-button"
@@ -436,6 +458,13 @@
 const recipientPk = "{{ other_user.pk }}";
 const currentUserPk = "{{ request.user.pk }}";
 const otherUserFullName = "{{ other_user.last_name }} {{ other_user.first_name }}";
+const chatTtlDays = "{{ chat_ttl_days|default_if_none:'' }}";
+const maxAttachments = {{ max_attachments }};
+
+// Выбранные, но ещё не отправленные файлы. Свой список, а не input.files:
+// из <input type="file"> нельзя убрать одну позицию, а отменить ошибочно
+// выбранный файл пользователь должен уметь.
+let selectedAttachments = [];
 const currentUserFullName = "{{ request.user.last_name }} {{ request.user.first_name }}";
 
 // Сообщаем base.html, что сейчас открыт диалог именно с этим собеседником
@@ -551,6 +580,8 @@ function createMessageElement(messageData) {
     </span>
   ` : '';
 
+  const attachmentsHtml = renderAttachments(messageData.attachments);
+
   const escapedHtmlAttr = text.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   const messageIdAttr = messageData.id || (messageData.random_id !== undefined ? `pending-${messageData.random_id}` : '');
 
@@ -568,9 +599,37 @@ function createMessageElement(messageData) {
         ${replyHtml}
         <p class="msg-text text-base font-normal py-0.5 whitespace-pre-wrap break-words">${text}<span class="msg-meta float-right ml-2 mt-1.5 inline-flex items-center gap-1" data-read="false"><span class="text-xs font-normal opacity-60">${timeString}</span>${statusHtml}</span></p>
         ${fileHtml}
+        ${attachmentsHtml}
       </div>
     </div>
   `;
+}
+
+function escapeHtml(value) {
+  const holder = document.createElement('div');
+  holder.textContent = value === null || value === undefined ? '' : value;
+  return holder.innerHTML;
+}
+
+// Разметка обязана совпадать с includes/chat/attachments.html: иначе
+// только что отправленное сообщение выглядит одним, а после перезагрузки
+// страницы — другим.
+function renderAttachments(attachments) {
+  if (!attachments || !attachments.length) return '';
+
+  const rows = attachments.map((item) => {
+    const name = escapeHtml(item.name);
+
+    if (item.expired) {
+      return `<div class="rounded-lg border border-dashed px-3 py-2 text-xs opacity-70">Файл «${name}» удалён — вложения хранятся ${chatTtlDays} дн.</div>`;
+    }
+    if (item.is_image) {
+      return `<a href="${item.url}?inline=1" target="_blank" rel="noopener"><img src="${item.url}?inline=1" alt="${name}" class="max-h-72 max-w-full rounded-lg object-contain"></a>`;
+    }
+    return `<a href="${item.url}" class="flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20"><span class="flex-shrink-0">📎</span><span class="min-w-0 flex-1 truncate">${name}</span><span class="flex-shrink-0 text-xs opacity-70">${escapeHtml(item.size)}</span></a>`;
+  }).join('');
+
+  return `<div class="msg-attachments mt-1 flex flex-col gap-1.5">${rows}</div>`;
 }
 
 function addMessageToUI(messageData) {
@@ -782,9 +841,10 @@ function sendMessage() {
   const input = document.getElementById('message-input');
   const rawText = getEditableHtml(input);
 
-  if (!rawText) return;
+  // Сообщение из одних вложений — обычное дело: «вот фото», без подписи.
+  if (!rawText && !selectedAttachments.length) return;
 
-  const text = sanitizeMessageHtml(rawText);
+  const text = rawText ? sanitizeMessageHtml(rawText) : '';
 
   // Режим редактирования - сохраняем изменения вместо отправки нового сообщения
   if (editingMessageEl) {
@@ -797,10 +857,14 @@ function sendMessage() {
   // Ответ на сообщение — отправляем через HTTP-эндпоинт (send_message_reply),
   // т.к. штатный WebSocket-путь библиотеки django_private_chat2 не знает про
   // reply_to и его валидатор отклонит незнакомое поле.
-  if (replyingToMessageEl) {
-    sendMessageWithReply(text, replyingToMessageEl.dataset.messageId);
+  // Вложения тоже идут этим путём: WebSocket библиотеки принимает только
+  // текст, файл через него не передать.
+  if (replyingToMessageEl || selectedAttachments.length) {
+    const replyToId = replyingToMessageEl ? replyingToMessageEl.dataset.messageId : null;
+    sendMessageWithReply(text, replyToId, selectedAttachments);
     input.innerHTML = '';
-    cancelReplyingToMessage();
+    clearSelectedAttachments();
+    if (replyingToMessageEl) cancelReplyingToMessage();
     sendTypingStopped();
     return;
   }
@@ -834,20 +898,27 @@ function sendMessage() {
   sendTypingStopped();
 }
 
-async function sendMessageWithReply(text, replyToId) {
+async function sendMessageWithReply(text, replyToId, files) {
   try {
+    // FormData, а не urlencoded: тем же запросом уходят файлы. Текст
+    // кладётся всегда, даже пустой — тело multipart без единой части
+    // Daphne отбивает 400 ещё до Django (CLAUDE.md, таблица ловушек).
+    const form = new FormData();
+    form.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+    form.append('text', text || '');
+    if (replyToId) form.append('reply_to_id', replyToId);
+    (files || []).forEach((file) => form.append('files', file));
+
     const response = await fetch(`/send-message-reply/${recipientPk}/`, {
       method: 'POST',
-      headers: {
-        'X-CSRFToken': getCookie('csrftoken'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: `text=${encodeURIComponent(text)}&reply_to_id=${encodeURIComponent(replyToId)}`,
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+      body: form,
     });
 
-    if (!response.ok) throw new Error('Request failed');
-    const data = await response.json();
-    if (!data.success) throw new Error(data.error || 'Unknown error');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Не удалось отправить сообщение. Попробуйте ещё раз.');
+    }
 
     addMessageToUI({
       id: data.id,
@@ -855,11 +926,78 @@ async function sendMessageWithReply(text, replyToId) {
       sender: currentUserPk,
       created: data.created,
       reply_to: data.reply_to,
+      attachments: data.attachments,
     });
   } catch (error) {
     console.error('❌ Ошибка при отправке ответа:', error);
-    alert('Не удалось отправить сообщение. Попробуйте ещё раз.');
+    // Причина отказа — от сервера: «файл больше 100 МБ» и «кончилась
+    // квота» пользователь обязан различать (CLAUDE.md, «Интерфейс»).
+    alert(error.message);
   }
+}
+
+// ========================================
+// 📎 ВЛОЖЕНИЯ
+// ========================================
+
+function clearSelectedAttachments() {
+  selectedAttachments = [];
+  renderSelectedAttachments();
+}
+
+function renderSelectedAttachments() {
+  const preview = document.getElementById('msg-attachments-preview');
+  if (!preview) return;
+
+  preview.classList.toggle('hidden', selectedAttachments.length === 0);
+  preview.classList.toggle('flex', selectedAttachments.length > 0);
+  preview.innerHTML = '';
+
+  selectedAttachments.forEach((file, index) => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 rounded-md bg-gray-100 px-2 py-1 text-sm dark:bg-zinc-700';
+    row.innerHTML = `
+      <span class="flex-shrink-0">📎</span>
+      <span class="min-w-0 flex-1 truncate">${escapeHtml(file.name)}</span>
+      <span class="flex-shrink-0 text-xs text-gray-500 dark:text-gray-400">${formatFileSize(file.size)}</span>
+      <button type="button" class="flex-shrink-0 text-gray-400 hover:text-red-500" data-remove-index="${index}">✕</button>
+    `;
+    preview.appendChild(row);
+  });
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+function initAttachments() {
+  const button = document.getElementById('msg-attach-button');
+  const input = document.getElementById('msg-attachments-input');
+  const preview = document.getElementById('msg-attachments-preview');
+  if (!button || !input || !preview) return;
+
+  button.addEventListener('click', () => input.click());
+
+  input.addEventListener('change', (event) => {
+    const picked = Array.from(event.target.files);
+    if (selectedAttachments.length + picked.length > maxAttachments) {
+      alert(`За раз можно отправить не больше ${maxAttachments} файлов`);
+    }
+    selectedAttachments = selectedAttachments.concat(picked).slice(0, maxAttachments);
+    // Сброс значения: без него повторный выбор того же файла не вызывает
+    // change, и кнопка выглядит сломанной.
+    input.value = '';
+    renderSelectedAttachments();
+  });
+
+  preview.addEventListener('click', (event) => {
+    const target = event.target.closest('[data-remove-index]');
+    if (!target) return;
+    selectedAttachments.splice(Number(target.dataset.removeIndex), 1);
+    renderSelectedAttachments();
+  });
 }
 
 // Возвращает HTML-содержимое contenteditable-поля, очищая пустой контент до ''
@@ -996,6 +1134,8 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Отправка сообщения по кнопке
   document.getElementById('send-button').addEventListener('click', sendMessage);
+
+  initAttachments();
   
   // Отправка сообщения по Enter (без Shift)
   const messageInput = document.getElementById('message-input');

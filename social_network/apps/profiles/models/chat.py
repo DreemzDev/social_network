@@ -6,6 +6,9 @@
 from django.contrib.auth import get_user_model
 from django.db import models
 
+from storage.models import FileObject
+from storage.utils import is_inline_safe
+
 
 class MessageReaction(models.Model):
     message = models.ForeignKey('django_private_chat2.MessageModel', on_delete=models.CASCADE, related_name='reactions', verbose_name="Сообщение")
@@ -33,3 +36,61 @@ class MessageReply(models.Model):
 
     def __str__(self):
         return f"Message {self.message_id} replies to {self.reply_to_id}"
+
+
+class MessageAttachment(models.Model):
+    """Файл или фото, приложенные к личному сообщению.
+
+    Своё расширение, а не `MessageModel.file` из django_private_chat2: там
+    обычный FileField в общей медиатеке — файл раздаётся всем, кто знает
+    адрес, не дедуплицируется и лежит вечно. Здесь storage: права проверяет
+    вьюха, срок хранения задаётся в админке (по умолчанию 7 дней).
+
+    Запись переживает истечение срока: file_object обнуляется, а имя и
+    размер остаются, иначе на месте вложения оказывался бы пустой пузырь
+    без объяснения, куда делся файл (profiles/tasks.py).
+    """
+
+    message = models.ForeignKey(
+        'django_private_chat2.MessageModel', on_delete=models.CASCADE,
+        related_name='attachments', verbose_name='Сообщение',
+    )
+    file_object = models.ForeignKey(
+        FileObject, on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+        verbose_name='Файл',
+    )
+    original_name = models.CharField(max_length=255, verbose_name='Имя файла')
+    size = models.PositiveBigIntegerField(default=0, verbose_name='Размер')
+    is_image = models.BooleanField(default=False, verbose_name='Показывать картинкой')
+    created = models.DateTimeField(auto_now_add=True)
+    expired_at = models.DateTimeField(null=True, blank=True, verbose_name='Когда удалён по сроку')
+
+    class Meta:
+        ordering = ('id',)
+        verbose_name = 'Вложение сообщения'
+        verbose_name_plural = 'Вложения сообщений'
+
+    def __str__(self):
+        return self.original_name
+
+    @property
+    def is_expired(self) -> bool:
+        return self.file_object_id is None
+
+    @property
+    def size_display(self) -> str:
+        size = float(self.size)
+        for unit in ('Б', 'КБ', 'МБ', 'ГБ'):
+            if size < 1024:
+                return f'{size:.0f} {unit}' if unit == 'Б' else f'{size:.1f} {unit}'
+            size /= 1024
+        return f'{size:.1f} ТБ'
+
+
+def looks_like_image(mime_type) -> bool:
+    """Показывать ли вложение картинкой прямо в переписке.
+
+    Не любой image/*: SVG — активный документ, и inline он выполняется в
+    домене портала (storage/utils.py, INLINE_UNSAFE_MIME_TYPES).
+    """
+    return (mime_type or '').startswith('image/') and is_inline_safe(mime_type)

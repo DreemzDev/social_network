@@ -44,6 +44,9 @@ urlpatterns = [
     path('edit-message/<int:message_id>/', EditMessageView.as_view(), name='edit_message'),
     path('delete-message/<int:message_id>/', DeleteMessageView.as_view(), name='delete_message'),
 
+    # Вложения переписки
+    path('chat/attachment/<int:attachment_id>/', ChatAttachmentView.as_view(), name='chat_attachment'),
+
     # Реакции на сообщения
     path('toggle-reaction/<int:message_id>/', ToggleMessageReactionView.as_view(), name='toggle_reaction'),
 

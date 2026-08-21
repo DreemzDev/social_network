@@ -1,8 +1,32 @@
 from django import template
 from django.utils import timezone
+from django.utils.html import strip_tags
 from django.template.defaultfilters import date as date_filter
 
 register = template.Library()
+
+
+@register.filter
+def message_preview(message):
+    """Строка для списка диалогов. У сообщения из одних вложений текста нет,
+    и без этой подстановки последняя строка диалога оказывалась пустой —
+    выглядело как потерянное сообщение."""
+    if message is None:
+        return ''
+
+    text = strip_tags(message.text or '').strip()
+    if text:
+        return text
+
+    # attachments приходят через prefetch_related в DialogsWithUnreadMixin,
+    # поэтому лишнего запроса на каждый диалог здесь нет.
+    attachments = list(message.attachments.all())
+    if not attachments:
+        return ''
+    if len(attachments) == 1:
+        return f'📎 {attachments[0].original_name}'
+    return f'📎 Вложений: {len(attachments)}'
+
 
 MONTHS_GENITIVE = [
     'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',

@@ -16,14 +16,14 @@
 """
 from .orgstructure import Category, PhoneType, Position, Rank, UserPhone
 from .user import User, user_logged_in_callback, user_logged_out_callback
-from .chat import MessageReaction, MessageReply
+from .chat import MessageAttachment, MessageReaction, MessageReply, looks_like_image
 from .organizer import Event, Note, Task
 from .notifications import Notification
 
 __all__ = [
     'Category', 'PhoneType', 'Position', 'Rank', 'UserPhone',
     'User', 'user_logged_in_callback', 'user_logged_out_callback',
-    'MessageReaction', 'MessageReply',
+    'MessageAttachment', 'MessageReaction', 'MessageReply', 'looks_like_image',
     'Event', 'Note', 'Task',
     'Notification',
 ]

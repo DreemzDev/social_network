@@ -20,7 +20,8 @@ from .profile import (
 from .chat import (
     DialogsWithUnreadMixin, DialogsListView, DialogMessagesView, LoadMoreMessagesView,
     GetUnreadCountView, SendMessageWithReplyView, MarkMessagesReadView, EditMessageView,
-    DeleteMessageView, ToggleMessageReactionView, ALLOWED_REACTION_EMOJIS,
+    DeleteMessageView, ToggleMessageReactionView, ChatAttachmentView,
+    ALLOWED_REACTION_EMOJIS, MAX_ATTACHMENTS_PER_MESSAGE,
 )
 
 from .tasks import (
@@ -45,7 +46,8 @@ __all__ = [
     'EmployeeStatusUpdateView',
     'DialogsWithUnreadMixin', 'DialogsListView', 'DialogMessagesView', 'LoadMoreMessagesView',
     'GetUnreadCountView', 'SendMessageWithReplyView', 'MarkMessagesReadView', 'EditMessageView',
-    'DeleteMessageView', 'ToggleMessageReactionView', 'ALLOWED_REACTION_EMOJIS',
+    'DeleteMessageView', 'ToggleMessageReactionView', 'ChatAttachmentView',
+    'ALLOWED_REACTION_EMOJIS', 'MAX_ATTACHMENTS_PER_MESSAGE',
     'TaskListFeedView', 'TaskCreateView', 'TaskQuickCreateView', 'TaskStatusUpdateView',
     'TaskToggleView', 'TaskDeleteView', 'TaskEditView',
     'NoteCreateView', 'NoteEditView', 'NoteDeleteView',
