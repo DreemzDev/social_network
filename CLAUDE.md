@@ -127,14 +127,20 @@ cd c:/Users/User/Desktop/social_network/social_network
 - `.venv` — в корне репозитория, `manage.py` — во вложенном
   `social_network/`, отсюда `../.venv/...`.
 
-Тесты — метка `storage`, **не** `apps.storage`:
+Тесты — метки `storage`, `profiles`, `posts` (**не** `apps.storage`):
 
 ```bash
 cd c:/Users/User/Desktop/social_network/social_network
-../.venv/Scripts/python.exe manage.py test storage profiles --top-level-directory=apps
+../.venv/Scripts/python.exe manage.py test storage profiles posts --top-level-directory=apps
 ```
 
-На 19.08.2026 — 423 теста. Число будет расти; верить прогону, а не цифре.
+На 21.08.2026 — 459 тестов. Число будет расти; верить прогону, а не цифре.
+
+- **LibreOffice** нужен только для конвертации справочников в PDF
+  (`storage/convert.py`). На машине разработчика его может не быть — тогда
+  кнопка «Показать в браузере» просто не показывается, остальное работает.
+  Путь задаётся `STORAGE_SOFFICE_PATH`, для проверки живьём его удобно
+  подменить заглушкой в отдельном модуле настроек.
 
 ---
 
@@ -285,7 +291,10 @@ N+1 здесь ловится глазами при чтении вьюхи — 
 | Клик по элементу выпадающего списка не срабатывает | `search.js` темы прячет список по `focusout`, а он наступает раньше `click`. Гасить `mousedown` внутри списка — поле не теряет фокус, `click` доходит |
 | Разбор вывода `ping`/`arp` пуст на бою | Вывод локализован: на русской Windows он не такой, как на Астре. Живость брать из кода возврата, TTL и MAC — регулярным выражением, за слова не цепляться |
 | Долгая задача Celery «зависла» через 20 с | `FM.pollTask` считает задачу непринятой, если она не шлёт `PROGRESS`: без `update_state` обход /24 показывал бы ложную ошибку |
-| `manage.py test` находит 0 тестов | Метка должна быть `storage`/`profiles` + `--top-level-directory=apps` |
+| `manage.py test` находит 0 тестов | Метка должна быть `storage`/`profiles`/`posts` + `--top-level-directory=apps` |
+| Сообщение доехало получателю, а вложение (реакция, поле) — нет | `ExtendedChatConsumer` собирает полезную нагрузку **поле за полем**: новое поле в `push_chat_event` надо добавить и в consumer. Серверный тест этого не видит — он смотрит на HTTP-ответ отправителю |
+| В проверке через CDP клик «не работает», в логе запроса нет | Либо кнопка `disabled` (Alpine `x-bind:disabled` не разбудить присвоением `.value` — нужен `dispatchEvent(new Event('input'))`), либо клик пришёлся на чужой элемент: в маленьком окне вёрстка перестраивается. Ставить `Emulation.setDeviceMetricsOverride` и проверять `document.elementFromPoint` |
+| Два пользователя в проверке оказываются одним | Вкладки `/json/new` живут в одном профиле и делят cookie. Каждому — свой `Target.createBrowserContext` |
 | ~40 тестов падают с `ConnectionError ... 6379` | Не поднят Redis |
 | `duplicate key` в тестах на пустой БД | Миграция засевает справочник в каждую новую БД — чистить в `setUp` |
 | Миграция CharField → FK падает на Postgres | Только цепочкой: Rename → Create/Add → RunPython → Remove |
