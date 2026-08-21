@@ -1,21 +1,17 @@
 from datetime import timedelta
 
 from celery import shared_task
-from django.conf import settings
 from django.utils import timezone
 
-from storage import realtime
+from storage import limits, realtime
 from storage.signals import attribute_deletion
 
 from .models import CatalogDocument, CatalogFolder
 
-TRASH_RETENTION_DAYS = getattr(settings, 'STORAGE_TRASH_RETENTION_DAYS', 30)
-
-
 @shared_task
 def cleanup_catalog_trash():
     """Окончательно удаляет документы каталога, пролежавшие в корзине
-    дольше STORAGE_TRASH_RETENTION_DAYS.
+    дольше срока хранения корзины (задаётся в админке).
 
     До этой задачи корзина каталога чистилась только вручную — документ,
     отправленный в корзину, оставался там навсегда, пока кто-то не заходил
@@ -25,7 +21,7 @@ def cleanup_catalog_trash():
     другой: пользователь уже решил удалить файл, автоочистка лишь
     завершает то, что он начал.
     """
-    deadline = timezone.now() - timedelta(days=TRASH_RETENTION_DAYS)
+    deadline = timezone.now() - timedelta(days=limits.trash_retention_days())
     expired = CatalogDocument.objects.filter(is_deleted=True, deleted_at__lte=deadline)
 
     purged = 0

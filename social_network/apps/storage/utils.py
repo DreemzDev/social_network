@@ -476,10 +476,17 @@ class PartialGridMixin:
     def get_fm_context(self, active_sort, active_filters=None):
         """Общий кусок контекста для панели фильтров/сортировки/пагинации —
         одинаковый у всех трёх модулей."""
+        from . import limits
+
         return {
             'sort_options': SORT_OPTIONS,
             'active_sort': active_sort,
             'active_filters': active_filters or {},
             'per_page_options': PER_PAGE_OPTIONS,
             'active_per_page': self.get_paginate_by(None),
+            # Пределы — числами со страницы, а не текстом в шаблоне: их
+            # правят в админке, и подпись обязана меняться вместе с ними.
+            'fm_max_upload_size': limits.max_upload_size(),
+            'fm_archive_max_files': limits.archive_max_files(),
+            'fm_archive_max_total_size': limits.archive_max_total_size(),
         }

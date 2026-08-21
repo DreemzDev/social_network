@@ -6,7 +6,7 @@ from storage.services import StorageService
 class Command(BaseCommand):
     help = (
         'Физически удаляет blob-файлы, пробывшие в статусе ORPHAN дольше '
-        'STORAGE_ORPHAN_RETENTION_DAYS. Запускать ежедневно через cron/Task Scheduler.'
+        'срока хранения без ссылок. Запускать ежедневно через cron/Task Scheduler.'
     )
 
     def handle(self, *args, **options):

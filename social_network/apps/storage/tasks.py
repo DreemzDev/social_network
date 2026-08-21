@@ -86,7 +86,7 @@ def bulk_move_documents(self, app_label, model_name, doc_ids, folder_field, fold
 @shared_task
 def cleanup_orphan_files():
     """Периодическая задача: физически удаляет blob-файлы, пробывшие в
-    ORPHAN дольше STORAGE_ORPHAN_RETENTION_DAYS."""
+    ORPHAN дольше срока хранения файлов без ссылок."""
     return StorageService.purge_expired_orphans()
 
 

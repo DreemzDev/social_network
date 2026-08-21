@@ -153,8 +153,11 @@ class ArchivePathSanitationTest(SimpleTestCase):
         self.assertTrue(name.endswith('.pdf'))
 
 
-class ArchiveInspectionTest(SimpleTestCase):
-    """Проверки, отбивающие архив ДО того, как что-то попадёт на диск."""
+class ArchiveInspectionTest(TestCase):
+    """Проверки, отбивающие архив ДО того, как что-то попадёт на диск.
+
+    TestCase, а не SimpleTestCase: пределы распаковки читаются записью из
+    админки (storage.limits), то есть из БД."""
 
     def test_not_an_archive(self):
         with self.assertRaises(InvalidArchiveError) as caught:

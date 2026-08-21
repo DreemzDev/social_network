@@ -151,6 +151,9 @@ CELERY_TASK_EAGER_PROPAGATES = 'test' in sys.argv
 CELERY_TASK_STORE_EAGER_RESULT = 'test' in sys.argv
 
 # Storage — единый сервис хранения файлов (apps/storage/ARCHITECTURE.md).
+# Значения ниже — только умолчания: как только администратор откроет
+# «Пределы файлового хранилища» в /admin/, действовать начинает запись в БД
+# (storage/limits.py). Менять здесь имеет смысл лишь стартовые значения.
 STORAGE_TRASH_RETENTION_DAYS = 30                # сколько дней запись лежит в корзине до автоудаления
 STORAGE_MAX_UPLOAD_SIZE = 100 * 1024 * 1024      # 100 МБ на один файл
 STORAGE_USER_QUOTA = 2 * 1024 * 1024 * 1024       # 2 ГБ на пользователя, None = без квоты
@@ -178,7 +181,7 @@ STORAGE_ARCHIVE_MAX_RATIO = 100
 # Пустой словарь означал бы, что cleanup_expired_objects не удаляет ничего
 # никогда — включая вложения чата и обменника, которые должны истекать.
 STORAGE_CATEGORY_TTL = {
-    'chat': 30,
+    'chat': 7,
     'exchange': 7,
     'task': 90,
     'document': None,

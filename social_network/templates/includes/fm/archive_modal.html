@@ -25,6 +25,11 @@
       Файлы из архива появятся здесь по отдельности, папки внутри архива —
       папками раздела. Сам архив на портале не сохраняется.
     </p>
+    <p class="mb-4 text-xs text-gray-600">
+      Сам файл архива — до {{ fm_max_upload_size|filesizeformat }}, внутри не
+      больше {{ fm_archive_max_files }} файлов и
+      {{ fm_archive_max_total_size|filesizeformat }} после распаковки.
+    </p>
 
     <form id="fm-archive-form" method="post" enctype="multipart/form-data">
       <input type="hidden" name="folder_id" value="{{ fm_archive_folder_id|default:'' }}">

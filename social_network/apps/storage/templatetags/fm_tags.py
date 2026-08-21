@@ -1,8 +1,8 @@
 """Шаблонные теги файлового менеджера."""
 from django import template
-from django.conf import settings
 from django.utils import timezone
 
+from .. import limits
 from ..utils import PREVIEWABLE_EXTENSIONS
 
 register = template.Library()
@@ -64,6 +64,6 @@ def trash_days_left(deleted_at) -> int | None:
     if not deleted_at:
         return None
 
-    retention = getattr(settings, 'STORAGE_TRASH_RETENTION_DAYS', 30)
+    retention = limits.trash_retention_days()
     days_passed = (timezone.now() - deleted_at).days
     return max(retention - days_passed, 0)

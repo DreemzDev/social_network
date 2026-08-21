@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import FileBlob, FileObject, StorageAuditLog
+from .models import FileBlob, FileObject, StorageAuditLog, StorageLimits
 
 
 @admin.register(FileBlob)
@@ -31,3 +31,34 @@ class StorageAuditLogAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(StorageLimits)
+class StorageLimitsAdmin(admin.ModelAdmin):
+    """Пределы хранения — одна запись на портал, поэтому список сразу
+    открывает её саму (как SiteSettings)."""
+
+    fieldsets = (
+        ('Загрузка', {'fields': ('max_upload_size_mb', 'user_quota_mb')}),
+        ('Сроки хранения', {
+            'fields': ('trash_retention_days', 'orphan_retention_days',
+                       'chat_ttl_days', 'exchange_ttl_days'),
+        }),
+        ('Скачивание архивом', {'fields': ('zip_max_files', 'zip_max_total_size_mb')}),
+        ('Загрузка архива с распаковкой', {
+            'fields': ('archive_max_files', 'archive_max_total_size_mb', 'archive_max_ratio'),
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return not StorageLimits.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        from django.shortcuts import redirect
+        from django.urls import reverse
+
+        obj = StorageLimits.load()
+        return redirect(reverse('admin:storage_storagelimits_change', args=[obj.pk]))

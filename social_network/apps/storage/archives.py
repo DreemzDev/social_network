@@ -13,10 +13,10 @@ import tempfile
 import zipfile
 from collections import namedtuple
 
-from django.conf import settings
 from django.core.files import File
 from django.db import transaction
 
+from . import limits
 from .exceptions import FileTooLargeError, InvalidArchiveError, QuotaExceededError
 from .services import StorageService
 
@@ -41,18 +41,6 @@ MAX_REPORTED_REASONS = 20
 PROGRESS_STEPS = 50
 
 NAME_MAX_LENGTH = 255  # CharField у original_name и у названий папок
-
-
-def _archive_max_files() -> int:
-    return getattr(settings, 'STORAGE_ARCHIVE_MAX_FILES', 1000)
-
-
-def _archive_max_total_size() -> int:
-    return getattr(settings, 'STORAGE_ARCHIVE_MAX_TOTAL_SIZE', 2 * 1024 * 1024 * 1024)
-
-
-def _archive_max_ratio() -> int:
-    return getattr(settings, 'STORAGE_ARCHIVE_MAX_RATIO', 100)
 
 
 def decode_entry_name(info: zipfile.ZipInfo) -> str:
@@ -158,14 +146,14 @@ def inspect_archive(source) -> list:
     if not entries:
         raise InvalidArchiveError('В архиве нет файлов для распаковки')
 
-    max_files = _archive_max_files()
+    max_files = limits.archive_max_files()
     if len(entries) > max_files:
         raise InvalidArchiveError(
             f'В архиве {len(entries)} файлов при пределе {max_files}. '
             f'Разбейте архив на части.'
         )
 
-    max_total = _archive_max_total_size()
+    max_total = limits.archive_max_total_size()
     if total_size > max_total:
         raise InvalidArchiveError(
             f'В распакованном виде архив занимает {_mb(total_size)} МБ '
@@ -177,7 +165,7 @@ def inspect_archive(source) -> list:
     # бы, но только после того, как мы прочитаем распакованный поток, —
     # а здесь отказ происходит по оглавлению, до чтения содержимого.
     ratio = total_size / max(total_compressed, 1)
-    if ratio > _archive_max_ratio():
+    if ratio > limits.archive_max_ratio():
         raise InvalidArchiveError(
             'Архив выглядит как «zip-бомба»: заявленный объём после '
             'распаковки несоразмерен размеру файла.'
@@ -291,7 +279,8 @@ class _entry_as_upload:
     """Запись архива в виде объекта, который принимает StorageService.upload().
 
     Через SpooledTemporaryFile, а не через archive.read() в память:
-    отдельный файл внутри архива ограничен STORAGE_MAX_UPLOAD_SIZE (100 МБ),
+    отдельный файл внутри архива ограничен тем же пределом, что и обычная
+    загрузка (storage.limits.max_upload_size),
     и держать столько в памяти воркера на каждой итерации незачем. Мелкие
     файлы — а их подавляющее большинство — так и остаются в памяти, крупные
     сами уезжают на диск.
@@ -313,7 +302,7 @@ class _entry_as_upload:
         self.buffer = None
 
     def __enter__(self):
-        limit = getattr(settings, 'STORAGE_MAX_UPLOAD_SIZE', 100 * 1024 * 1024)
+        limit = limits.max_upload_size()
 
         self.buffer = tempfile.SpooledTemporaryFile(max_size=self.SPOOL_LIMIT)
         written = 0

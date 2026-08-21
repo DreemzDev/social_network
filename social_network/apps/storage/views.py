@@ -1,9 +1,9 @@
-from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
 from django.http import JsonResponse
 from django.views.generic import TemplateView, View
 
+from . import limits
 from .models import FileObject
 from .services import StorageService
 from .utils import fm_task_response, owns_task
@@ -13,21 +13,6 @@ from .utils import fm_task_response, owns_task
 # страница отрисовывала бы все удалённые документы разом — у отдельных
 # TrashView каждого модуля paginate_by=24 был, а у сводной не было вовсе.
 TRASH_PREVIEW_LIMIT = 48
-
-
-def _quota():
-    """Настройки читаются при вызове, а не при импорте модуля.
-
-    Модульная константа USER_QUOTA = getattr(settings, ...) вычислялась
-    один раз при загрузке и делала настройку неизменяемой в рантайме:
-    override_settings в тестах на неё не действовал (тесты вынуждены были
-    подменять атрибут модуля руками), а смена квоты требовала перезапуска
-    процесса."""
-    return getattr(settings, 'STORAGE_USER_QUOTA', None)
-
-
-def _trash_retention_days():
-    return getattr(settings, 'STORAGE_TRASH_RETENTION_DAYS', 30)
 
 
 class StorageDashboardView(LoginRequiredMixin, TemplateView):
@@ -44,7 +29,7 @@ class StorageDashboardView(LoginRequiredMixin, TemplateView):
 
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        quota = _quota()
+        quota = limits.user_quota()
 
         usage = StorageService.get_usage(user)
         context['my_usage'] = usage
@@ -57,7 +42,7 @@ class StorageDashboardView(LoginRequiredMixin, TemplateView):
         if user.is_staff:
             context['storage_stats'] = StorageService.get_storage_stats()
 
-        context['trash_retention_days'] = _trash_retention_days()
+        context['trash_retention_days'] = limits.trash_retention_days()
         context['exchange_ttl_days'] = StorageService.get_category_ttl_days(
             FileObject.Category.EXCHANGE
         )
@@ -144,7 +129,7 @@ class UnifiedTrashView(LoginRequiredMixin, TemplateView):
         ]
 
         context['active_tab'] = self.request.GET.get('tab', 'exchange')
-        context['trash_retention_days'] = _trash_retention_days()
+        context['trash_retention_days'] = limits.trash_retention_days()
         context['exchange_ttl_days'] = StorageService.get_category_ttl_days(
             FileObject.Category.EXCHANGE
         )

@@ -3,16 +3,16 @@ class StorageError(Exception):
 
 
 class FileTooLargeError(StorageError):
-    """Файл превышает STORAGE_MAX_UPLOAD_SIZE."""
+    """Файл превышает предел размера загрузки (storage.limits)."""
 
 
 class QuotaExceededError(StorageError):
-    """Загрузка превысила бы квоту пользователя (STORAGE_USER_QUOTA)."""
+    """Загрузка превысила бы квоту пользователя (storage.limits)."""
 
 
 class InvalidArchiveError(StorageError):
     """Загруженный zip нельзя распаковать: не архив, повреждён, защищён
-    паролем, пуст или упирается в пределы STORAGE_ARCHIVE_* (см.
+    паролем, пуст или упирается в пределы распаковки (см.
     storage/archives.py).
 
     Текст причины обязателен и показывается пользователю: «не удалось
@@ -26,7 +26,7 @@ class InvalidArchiveError(StorageError):
 
 
 class ArchiveTooLargeError(StorageError):
-    """Запрошен архив больше STORAGE_ZIP_MAX_FILES / STORAGE_ZIP_MAX_TOTAL_SIZE.
+    """Запрошен архив больше пределов массового скачивания (storage.limits).
 
     В отличие от одиночного скачивания, zip собирается на лету и потому идёт
     через воркер Daphne, а не через nginx (X-Accel-Redirect на несуществующий

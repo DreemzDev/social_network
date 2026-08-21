@@ -4,13 +4,13 @@
 сотрудник: ответственность здесь даёт подпись (created_by/updated_by), а не
 запрет. Удаление мягкое — базовыми вьюхами storage.fmviews.
 """
-from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, UpdateView, View
 
+from storage import limits
 from storage.exceptions import FileTooLargeError, QuotaExceededError
 from storage.fmviews import RestoreObjectView, TrashObjectView
 from storage.models import FileObject
@@ -29,7 +29,7 @@ class PhonebookFormMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['max_upload_size'] = settings.STORAGE_MAX_UPLOAD_SIZE
+        context['max_upload_size'] = limits.max_upload_size()
         return context
 
     def form_valid(self, form):

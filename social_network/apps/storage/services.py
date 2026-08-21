@@ -11,6 +11,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Sum
 from django.utils import timezone
 
+from . import limits
 from .exceptions import ArchiveTooLargeError, FileTooLargeError, QuotaExceededError
 from .models import FileBlob, FileObject, StorageAuditLog
 from .utils import is_inline_safe
@@ -18,37 +19,9 @@ from .utils import is_inline_safe
 CHUNK_SIZE = 1024 * 1024  # 1 МБ
 
 
-# Настройки читаются при каждом вызове, а не один раз при импорте модуля.
-#
-# Раньше это были константы уровня модуля (MAX_UPLOAD_SIZE = getattr(...)),
-# вычислявшиеся при загрузке приложения. Последствия: override_settings в
-# тестах на них не действовал вообще — тест квоты был вынужден подменять
-# атрибут модуля руками (services_module.USER_QUOTA = 100) и возвращать
-# его обратно в finally; а изменение квоты в settings требовало
-# перезапуска процесса, хотя ARCHITECTURE.md (раздел 9) обещает смену
-# «одной строкой без миграций».
-def _max_upload_size() -> int:
-    return getattr(settings, 'STORAGE_MAX_UPLOAD_SIZE', 100 * 1024 * 1024)
-
-
-def _user_quota():
-    return getattr(settings, 'STORAGE_USER_QUOTA', None)
-
-
-def _orphan_retention_days() -> int:
-    return getattr(settings, 'STORAGE_ORPHAN_RETENTION_DAYS', 7)
-
-
-def _category_ttl() -> dict:
-    return getattr(settings, 'STORAGE_CATEGORY_TTL', {})
-
-
-def _zip_max_files() -> int:
-    return getattr(settings, 'STORAGE_ZIP_MAX_FILES', 200)
-
-
-def _zip_max_total_size() -> int:
-    return getattr(settings, 'STORAGE_ZIP_MAX_TOTAL_SIZE', 1024 * 1024 * 1024)
+# Пределы (размер файла, квота, сроки) читаются через storage.limits при
+# каждом вызове: они правятся в админке, а не в settings.py, и константа
+# уровня модуля означала бы «подействует после перезапуска Daphne».
 
 
 def _format_size(size: int) -> str:
@@ -268,13 +241,13 @@ class StorageService:
     @staticmethod
     @transaction.atomic
     def upload(uploaded_file, *, user, category) -> FileObject:
-        max_upload_size = _max_upload_size()
+        max_upload_size = limits.max_upload_size()
         if uploaded_file.size > max_upload_size:
             raise FileTooLargeError(
                 f'Файл превышает максимальный размер {max_upload_size} байт'
             )
 
-        quota = _user_quota()
+        quota = limits.user_quota()
         if quota is not None:
             current_usage = StorageService.get_usage(user)
             if current_usage + uploaded_file.size > quota:
@@ -350,7 +323,7 @@ class StorageService:
         копирование ничего не добавит — но если это чужой файл, который
         пользователь не грузил, копия ляжет в его квоту как новое использование.
         """
-        quota = _user_quota()
+        quota = limits.user_quota()
         if quota is not None:
             current_usage = StorageService.get_usage(user)
             already_counted = FileObject.objects.filter(
@@ -424,11 +397,11 @@ class StorageService:
     @staticmethod
     def purge_expired_orphans() -> int:
         """Физически удаляет blob'ы, пробывшие в ORPHAN дольше
-        STORAGE_ORPHAN_RETENTION_DAYS. Каждый blob обрабатывается в своей
+        срока хранения без ссылок. Каждый blob обрабатывается в своей
         транзакции с повторной проверкой статуса под блокировкой — за время
         обхода списка кандидатов blob мог быть воскрешён через upload()
         (ARCHITECTURE.md, раздел 5.3)."""
-        deadline = timezone.now() - timedelta(days=_orphan_retention_days())
+        deadline = timezone.now() - timedelta(days=limits.orphan_retention_days())
         candidate_ids = list(
             FileBlob.objects.filter(
                 status=FileBlob.Status.ORPHAN, orphaned_at__lte=deadline
@@ -455,7 +428,7 @@ class StorageService:
 
     @staticmethod
     def get_category_ttl_days(category) -> int | None:
-        """Срок хранения категории в днях из STORAGE_CATEGORY_TTL, None =
+        """Срок хранения категории в днях (storage.limits), None =
         бессрочно. storage предоставляет только саму политику — применяют её
         сами модули-потребители, удаляя свои записи и вызывая detach()
         (см. exchange.tasks.cleanup_expired_exchange_files).
@@ -466,7 +439,7 @@ class StorageService:
         защищает), но при этом отчитывалась об успехе. Удалять же чужие
         записи storage не должен — он не знает бизнес-логику потребителей
         (ARCHITECTURE.md, раздел 1)."""
-        return _category_ttl().get(category)
+        return limits.category_ttl_days(category)
 
     @staticmethod
     def get_download_response(file_object: FileObject, request, *, inline: bool = False):
@@ -527,7 +500,7 @@ class StorageService:
     @staticmethod
     def get_archive_limits() -> tuple:
         """(максимум файлов, максимум суммарного размера) для zip-выгрузки."""
-        return _zip_max_files(), _zip_max_total_size()
+        return limits.zip_max_files(), limits.zip_max_total_size()
 
     @staticmethod
     def check_archive_request(items) -> dict:
