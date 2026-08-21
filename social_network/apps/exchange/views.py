@@ -752,8 +752,8 @@ class SendExchangeFileToCatalogView(LoginRequiredMixin, View):
             copied_object = StorageService.copy_reference(
                 exchange_file.file_object, user=request.user, category=FileObject.Category.CATALOG,
             )
-        except QuotaExceededError:
-            return JsonResponse({'success': False, 'error': 'Превышена квота хранилища'}, status=400)
+        except QuotaExceededError as error:
+            return JsonResponse({'success': False, 'error': str(error)}, status=400)
 
         from catalog.models import CatalogDocument
 

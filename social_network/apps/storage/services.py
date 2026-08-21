@@ -244,7 +244,7 @@ class StorageService:
         max_upload_size = limits.max_upload_size()
         if uploaded_file.size > max_upload_size:
             raise FileTooLargeError(
-                f'Файл превышает максимальный размер {max_upload_size} байт'
+                f'Файл больше допустимых {_format_size(max_upload_size)}'
             )
 
         quota = limits.user_quota()
@@ -252,7 +252,8 @@ class StorageService:
             current_usage = StorageService.get_usage(user)
             if current_usage + uploaded_file.size > quota:
                 raise QuotaExceededError(
-                    f'Загрузка превысит квоту пользователя ({quota} байт)'
+                    f'Не хватает места: квота {_format_size(quota)}, '
+                    f'занято {_format_size(current_usage)}'
                 )
 
         checksum = _sha256(uploaded_file)
@@ -331,7 +332,8 @@ class StorageService:
             ).exists()
             if not already_counted and current_usage + file_object.blob.size > quota:
                 raise QuotaExceededError(
-                    f'Копирование превысит квоту пользователя ({quota} байт)'
+                    f'Не хватает места: квота {_format_size(quota)}, '
+                    f'занято {_format_size(current_usage)}'
                 )
 
         with transaction.atomic():

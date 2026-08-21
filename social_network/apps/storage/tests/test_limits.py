@@ -136,3 +136,44 @@ class LimitsShownToUserTest(TestCase):
 
         self.assertContains(response, '17 файлов')
         self.assertEqual(response.context['fm_max_upload_size'], 3 * limits.MB)
+
+
+class RefusalNamesTheLimitTest(TestCase):
+    """Отказ обязан называть действующее число.
+
+    Пока предел лежал в settings.py, «Файл слишком большой» ещё можно было
+    объяснить инструкцией. Теперь его правит администратор, и сообщение без
+    числа не даёт пользователю ни одного способа понять, во что он упёрся и
+    сколько осталось.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='refusal_user', password='pass12345')
+        self.client.force_login(self.user)
+
+    def test_too_large_file_answer_names_the_limit(self):
+        StorageLimits.objects.create(max_upload_size_mb=1)
+        big = SimpleUploadedFile(
+            'большой.pdf', b'x' * (2 * limits.MB), content_type='application/pdf',
+        )
+
+        response = self.client.post(reverse('catalog_upload'), {'title': 'Большой', 'file': big})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('1.0 МБ', response.json()['error'])
+
+    def test_quota_answer_names_quota_and_usage(self):
+        StorageService.upload(
+            SimpleUploadedFile('занято.pdf', b'x' * (900 * 1024), content_type='application/pdf'),
+            user=self.user, category=FileObject.Category.CATALOG,
+        )
+        StorageLimits.objects.create(user_quota_mb=1)
+        another = SimpleUploadedFile(
+            'ещё.pdf', b'y' * (500 * 1024), content_type='application/pdf',
+        )
+
+        response = self.client.post(reverse('catalog_upload'), {'title': 'Ещё', 'file': another})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('квота 1.0 МБ', response.json()['error'])
+        self.assertIn('занято', response.json()['error'])

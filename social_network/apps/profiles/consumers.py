@@ -72,4 +72,8 @@ class ExtendedChatConsumer(ChatConsumer):
             'receiver': event['receiver'],
             'created': event['created'],
             'reply_to': event['reply_to'],
+            # get, а не [ ]: событие приходит и из мест, которые про
+            # вложения ничего не знают, и KeyError здесь стоил бы
+            # получателю всего сообщения, а не одной картинки.
+            'attachments': event.get('attachments', []),
         }))

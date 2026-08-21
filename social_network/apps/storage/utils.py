@@ -243,14 +243,10 @@ def fm_archive_upload_view(request, *, category, launch, field='archive'):
 
     try:
         archive_object = StorageService.upload(uploaded, user=request.user, category=category)
-    except FileTooLargeError:
-        return JsonResponse(
-            {'success': False, 'error': 'Файл архива слишком большой'}, status=400,
-        )
-    except QuotaExceededError:
-        return JsonResponse(
-            {'success': False, 'error': 'Превышена квота хранилища'}, status=400,
-        )
+    except (FileTooLargeError, QuotaExceededError) as error:
+        # Причина приходит из storage вместе с действующим числом: пределы
+        # правятся в админке, и «слишком большой» без него ничего не говорит.
+        return JsonResponse({'success': False, 'error': str(error)}, status=400)
 
     # total — сколько файлов ждать; фронт покажет это в подписи прогресса
     # ещё до того, как задача доложит первый шаг.

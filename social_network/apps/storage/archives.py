@@ -319,7 +319,7 @@ class _entry_as_upload:
                     written += len(chunk)
                     if written > limit:
                         raise FileTooLargeError(
-                            f'«{self.entry.name}» превышает максимальный размер {limit} байт'
+                            f'«{self.entry.name}» больше допустимых {limit} байт'
                         )
                     self.buffer.write(chunk)
         except Exception:

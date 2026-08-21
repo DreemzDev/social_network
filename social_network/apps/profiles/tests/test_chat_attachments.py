@@ -12,17 +12,21 @@
 частью вложений, а отправитель видел бы только текст ошибки.
 """
 
+import asyncio
+import json
 import shutil
 import tempfile
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from django_private_chat2.models import MessageModel
+
+from profiles.consumers import ExtendedChatConsumer
 
 from profiles.models import MessageAttachment
 from profiles.tasks import cleanup_expired_chat_attachments
@@ -300,3 +304,50 @@ class AttachmentQuotaTest(ChatAttachmentTestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn('квот', response.json()['error'])
+
+
+class LiveDeliveryPayloadTest(SimpleTestCase):
+    """Событие WebSocket обязано нести вложения.
+
+    Регрессия, найденная только в браузере: HTTP-ответ отправителю вложения
+    содержал, серверные тесты были зелёные, а consumer собирал полезную
+    нагрузку получателя поле за полем и про attachments не знал — у
+    собеседника сообщение приходило без файла, и увидеть вложение можно
+    было только перезагрузив страницу.
+    """
+
+    def test_new_reply_message_includes_attachments(self):
+        from django_private_chat2.models import MessageModel  # noqa: F401 (регистрация моделей)
+
+        consumer = ExtendedChatConsumer()
+        delivered = {}
+
+        async def fake_send(text_data):
+            delivered['payload'] = json.loads(text_data)
+
+        consumer.send = fake_send
+        asyncio.run(consumer.new_reply_message({
+            'id': 1, 'text': 'вот файл', 'sender': '1', 'receiver': '2',
+            'created': '12:00', 'reply_to': None,
+            'attachments': [{'id': 5, 'name': 'Смета.pdf', 'is_image': False}],
+        }))
+
+        self.assertEqual(delivered['payload']['msg_type'], 104)
+        self.assertEqual(delivered['payload']['attachments'][0]['name'], 'Смета.pdf')
+
+    def test_event_without_attachments_still_delivers(self):
+        """События приходят и из мест, которые про вложения не знают —
+        KeyError здесь стоил бы получателю всего сообщения."""
+        consumer = ExtendedChatConsumer()
+        delivered = {}
+
+        async def fake_send(text_data):
+            delivered['payload'] = json.loads(text_data)
+
+        consumer.send = fake_send
+        asyncio.run(consumer.new_reply_message({
+            'id': 2, 'text': 'просто текст', 'sender': '1', 'receiver': '2',
+            'created': '12:01', 'reply_to': None,
+        }))
+
+        self.assertEqual(delivered['payload']['attachments'], [])

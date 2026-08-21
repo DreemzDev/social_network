@@ -514,8 +514,8 @@ class SendDepartmentDocumentToExchangeView(LoginRequiredMixin, View):
             copied_object = StorageService.copy_reference(
                 document.file_object, user=request.user, category=FileObject.Category.EXCHANGE,
             )
-        except QuotaExceededError:
-            return JsonResponse({'success': False, 'error': 'Превышена квота хранилища'}, status=400)
+        except QuotaExceededError as error:
+            return JsonResponse({'success': False, 'error': str(error)}, status=400)
 
         from exchange.models import ExchangeFile
 
@@ -561,10 +561,10 @@ class UploadDepartmentDocumentView(LoginRequiredMixin, View):
             file_object = StorageService.upload(
                 uploaded, user=request.user, category=FileObject.Category.DOCUMENT,
             )
-        except FileTooLargeError:
-            return JsonResponse({'success': False, 'error': 'Файл слишком большой'}, status=400)
-        except QuotaExceededError:
-            return JsonResponse({'success': False, 'error': 'Превышена квота хранилища'}, status=400)
+        except FileTooLargeError as error:
+            return JsonResponse({'success': False, 'error': str(error)}, status=400)
+        except QuotaExceededError as error:
+            return JsonResponse({'success': False, 'error': str(error)}, status=400)
 
         DepartmentDocument.objects.create(
             folder=folder, file_object=file_object, title=title or uploaded.name, uploaded_by=request.user,
