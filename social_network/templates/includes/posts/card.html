@@ -71,6 +71,10 @@
     </div>
   </div>
 
+  {% if post.poll %}
+  {% include "includes/posts/poll.html" with poll=post.poll %}
+  {% endif %}
+
   <!-- Фото с Lightbox -->
   {% if post.images.all %}
   <div class="px-4 pb-4">

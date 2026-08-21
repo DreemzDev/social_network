@@ -73,6 +73,10 @@
       </div>
     </div>
       
+      {% if post.poll %}
+      {% include "includes/posts/poll.html" with poll=post.poll %}
+      {% endif %}
+
       <!-- Фото с Lightbox: одна картинка — во всю ширину, 2 — в ряд по 2,
            3+ — в ряд не больше 3 (иначе пост получается слишком длинным) -->
       {% if post.images.all %}
@@ -1198,5 +1202,7 @@
     if (deleteModalClose) deleteModalClose.addEventListener('click', closeDeleteCommentModal);
   });
 </script>
+
+<script src="{% static 'js/poll.js' %}"></script>
 
 {% endblock content %}

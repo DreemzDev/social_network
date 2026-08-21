@@ -102,3 +102,87 @@ class PostFile(models.Model):
     def extension(self):
         return self.file_object.extension
 
+
+class Poll(models.Model):
+    """Опрос, прикреплённый к записи.
+
+    Вопрос — сам текст записи, отдельного поля нет намеренно: иначе в ленте
+    оказывались бы две подписи над одним и тем же блоком, и авторы всё
+    равно дублировали бы вопрос в текст.
+    """
+
+    MIN_OPTIONS = 2
+    MAX_OPTIONS = 10
+
+    post = models.OneToOneField(Post, on_delete=models.CASCADE, related_name='poll', verbose_name='Запись')
+    is_multiple = models.BooleanField(default=False, verbose_name='Несколько вариантов ответа')
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Опрос'
+        verbose_name_plural = 'Опросы'
+
+    def __str__(self):
+        return f'Опрос к записи #{self.post_id}'
+
+    def results_for(self, user):
+        """Варианты со счётчиками, долями и отметкой своего голоса.
+
+        Считается в Python по уже загруженным связям (ленты делают
+        prefetch_related('poll__options__votes')): annotate() на каждую
+        карточку означал бы два запроса на пост в ленте из десятков постов.
+        """
+        options = list(self.options.all())
+        votes = {option.pk: list(option.votes.all()) for option in options}
+        total = sum(len(items) for items in votes.values())
+        user_pk = getattr(user, 'pk', None)
+
+        return {
+            'total': total,
+            'is_multiple': self.is_multiple,
+            'voted': any(v.user_id == user_pk for items in votes.values() for v in items),
+            'options': [
+                {
+                    'id': option.pk,
+                    'text': option.text,
+                    'votes': len(votes[option.pk]),
+                    'percent': round(len(votes[option.pk]) * 100 / total) if total else 0,
+                    'chosen': any(v.user_id == user_pk for v in votes[option.pk]),
+                }
+                for option in options
+            ],
+        }
+
+
+class PollOption(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='options', verbose_name='Опрос')
+    text = models.CharField(max_length=200, verbose_name='Вариант ответа')
+    order = models.PositiveIntegerField(default=0, verbose_name='Порядок')
+
+    class Meta:
+        ordering = ['order', 'id']
+        verbose_name = 'Вариант ответа'
+        verbose_name_plural = 'Варианты ответа'
+
+    def __str__(self):
+        return self.text
+
+
+class PollVote(models.Model):
+    """Голос за вариант. Не анонимен на уровне БД (иначе нельзя ни снять
+    свой голос, ни удержать «один голос на человека»), но наружу отдаются
+    только счётчики — кто как проголосовал, портал не показывает."""
+
+    option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='votes', verbose_name='Вариант')
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='+', verbose_name='Сотрудник')
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # Двойной клик по одному варианту не должен превращаться в два
+        # голоса: ограничение на уровне БД, а не только в обработчике.
+        unique_together = ('option', 'user')
+        verbose_name = 'Голос'
+        verbose_name_plural = 'Голоса'
+
+    def __str__(self):
+        return f'{self.user} → {self.option}'

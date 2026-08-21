@@ -38,6 +38,26 @@
     <!-- Edit Form -->
     <form action="{% url 'settingpost' post.id %}" method="post" enctype="multipart/form-data" class="p-4 sm:p-6">
       {% csrf_token %}
+
+      {% if post.poll %}
+      {% comment %}
+        Варианты в правке не меняются: за них уже голосовали, и правка
+        означала бы переписывание чужих ответов. Убрать опрос целиком —
+        можно (posts/views.py, SettingPost.form_valid).
+      {% endcomment %}
+      <div class="mb-4 rounded-xl border border-gray-200 p-3 dark:border-zinc-700">
+        <div class="text-sm font-medium text-gray-800 dark:text-gray-100">К записи прикреплён опрос</div>
+        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-600 dark:text-gray-300">
+          {% for option in post.poll.options.all %}
+          <li>{{ option.text }}</li>
+          {% endfor %}
+        </ul>
+        <label class="mt-3 flex items-center gap-2 text-sm text-red-600">
+          <input type="checkbox" name="remove_poll" value="1" class="rounded border-gray-300">
+          Удалить опрос вместе с голосами
+        </label>
+      </div>
+      {% endif %}
       
       <!-- Content Field -->
       <div class="mb-6">

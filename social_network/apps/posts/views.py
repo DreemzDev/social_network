@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.templatetags.static import static
@@ -27,8 +28,8 @@ from storage.models import FileObject
 from storage.services import StorageService
 from storage.signals import attribute_deletion
 
-from .forms import AddPostForm
-from .models import Post, PostImage, PostFile
+from .forms import AddPostForm, PollForm
+from .models import Poll, PollOption, PollVote, Post, PostImage, PostFile
 from .realtime import broadcast_post_created, broadcast_post_like_toggled, broadcast_post_deleted
 
 
@@ -41,9 +42,9 @@ class PortalHome(LoginRequiredMixin, ListView):
     
 
     def get_queryset(self):
-        posts = Post.objects.select_related('author').annotate(
+        posts = Post.objects.select_related('author', 'poll').annotate(
             num_comments=Count('post_comments')
-        ).prefetch_related('images', 'files', 'likes', 'viewers')
+        ).prefetch_related('images', 'files', 'likes', 'viewers', 'poll__options__votes')
 
         # cat_id приходит с маршрута /category/<id>/ — это та же лента,
         # суженная до одного подразделения. Раньше на него отвечала отдельная
@@ -68,11 +69,11 @@ class NewPostsFeedView(LoginRequiredMixin, View):
     между обычной загрузкой страницы и live-довставкой."""
 
     def get(self, request, last_post_id):
-        posts = Post.objects.select_related('author').annotate(
+        posts = Post.objects.select_related('author', 'poll').annotate(
             num_comments=Count('post_comments')
-        ).prefetch_related('images', 'files', 'likes', 'viewers').filter(
-            pk__gt=last_post_id
-        ).order_by('-time_create')
+        ).prefetch_related(
+            'images', 'files', 'likes', 'viewers', 'poll__options__votes',
+        ).filter(pk__gt=last_post_id).order_by('-time_create')
 
         html = render_to_string('includes/posts/list_fragment.html', {'posts': posts, 'request': request}, request=request)
         return JsonResponse({'html': html, 'count': posts.count()})
@@ -88,7 +89,9 @@ class ShowPost(LoginRequiredMixin, FormMixin, DetailView):
     form_class = CommentForm
 
     def get_queryset(self):
-        return Post.objects.prefetch_related('images', 'files')
+        return Post.objects.select_related('poll').prefetch_related(
+            'images', 'files', 'poll__options__votes',
+        )
 
     def get_success_url(self, **kwargs):
         return reverse_lazy('post', kwargs={'post_id': self.object.id})
@@ -166,9 +169,23 @@ class AddPost(LoginRequiredMixin, FormView, TemplateView):
     success_url = reverse_lazy('home')
     
     def form_valid(self, form):
+        # Опрос проверяется ДО сохранения записи: иначе запись с негодным
+        # опросом уже опубликована, а автору остаётся только удалить её и
+        # написать заново.
+        poll_form = None
+        if self.request.POST.getlist('poll_options'):
+            poll_form = PollForm(self.request.POST)
+            if not poll_form.is_valid():
+                for message in poll_form.non_field_errors():
+                    form.add_error(None, message)
+                return self.form_invalid(form)
+
         post = form.save(commit=False)
         post.author = self.request.user
         post.save()
+
+        if poll_form is not None:
+            poll_form.save(post)
 
         for order, image_file in enumerate(self.request.FILES.getlist('images')):
             PostImage.objects.create(post=post, image=image_file, order=order)
@@ -200,9 +217,11 @@ class AddPost(LoginRequiredMixin, FormView, TemplateView):
 
         context['user_list'] = user_list  # Используем уже созданный user_list
         context["sh_online"] = self.get_online_users()
-        context['posts'] = Post.objects.select_related('author').annotate(
+        context['posts'] = Post.objects.select_related('author', 'poll').annotate(
             num_comments=Count('post_comments')
-        ).prefetch_related('images', 'files', 'likes', 'viewers').filter(author=user).order_by('-time_create')
+        ).prefetch_related(
+            'images', 'files', 'likes', 'viewers', 'poll__options__votes',
+        ).filter(author=user).order_by('-time_create')
         context['user'] = user
         context['profile_user'] = user
         context['online_count'] = online_count  # Добавляем в контекст!
@@ -297,6 +316,11 @@ class SettingPost(LoginRequiredMixin, UpdateView):
         response = super().form_valid(form)
         post = self.object
 
+        # Опрос в правке только удаляется: менять варианты, за которые уже
+        # проголосовали, значит переписывать чужие ответы.
+        if self.request.POST.get('remove_poll') and hasattr(post, 'poll'):
+            post.poll.delete()
+
         remove_image_ids = self.request.POST.getlist('remove_image_ids')
         if remove_image_ids:
             PostImage.objects.filter(post=post, id__in=remove_image_ids).delete()
@@ -321,3 +345,45 @@ class SettingPost(LoginRequiredMixin, UpdateView):
             PostFile.objects.create(post=post, file_object=file_object)
 
         return response
+
+
+class PollVoteView(LoginRequiredMixin, View):
+    """Голос за вариант опроса.
+
+    Ответ — готовая разметка блока опроса, а не голые числа: карточка
+    рендерится include-шаблоном, и вторая реализация той же разметки на JS
+    обязана была бы совпадать с первой — а совпадать она перестанет при
+    первой же правке (то же решение, что в storage/utils.py, FmListView).
+    """
+
+    def post(self, request, post_id):
+        poll = get_object_or_404(Poll.objects.select_related('post'), post__pk=post_id)
+        option = get_object_or_404(PollOption, pk=request.POST.get('option_id'), poll=poll)
+
+        with transaction.atomic():
+            own_votes = PollVote.objects.select_for_update().filter(
+                option__poll=poll, user=request.user,
+            )
+            already_chosen = own_votes.filter(option=option).exists()
+
+            if already_chosen:
+                # Повторный клик снимает голос — иначе передумать нельзя
+                # вовсе, а ошибиться вариантом легко.
+                own_votes.filter(option=option).delete()
+            else:
+                if not poll.is_multiple:
+                    own_votes.delete()
+                PollVote.objects.create(option=option, user=request.user)
+
+        poll = Poll.objects.select_related('post').prefetch_related(
+            'options__votes'
+        ).get(pk=poll.pk)
+
+        return JsonResponse({
+            'success': True,
+            'html': render_to_string(
+                'includes/posts/poll.html',
+                {'post': poll.post, 'poll': poll, 'request': request},
+                request=request,
+            ),
+        })
