@@ -5,12 +5,14 @@
 запрет. Удаление мягкое — базовыми вьюхами storage.fmviews.
 """
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import Http404
+from django.db import transaction
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, UpdateView, View
 
 from storage import limits
+from storage.convert import converter_available
 from storage.exceptions import FileTooLargeError, QuotaExceededError
 from storage.fmviews import RestoreObjectView, TrashObjectView
 from storage.models import FileObject
@@ -18,8 +20,26 @@ from storage.services import StorageService
 
 from .forms import PhonebookCreateForm, PhonebookForm
 from .models import Phonebook
+from .tasks import convert_phonebook_to_pdf
 
 CONSUMER = 'phonebook.Phonebook'
+
+
+def queue_conversion(book, user, save=False):
+    """Ставит справочник в очередь на PDF-копию.
+
+    on_commit, а не сразу: воркер читает запись из БД и до фиксации
+    транзакции не увидел бы ни нового файла, ни статуса «готовится».
+    """
+    if save:
+        Phonebook.objects.filter(pk=book.pk).update(
+            conversion_status=Phonebook.Conversion.PENDING, conversion_error='',
+        )
+
+    file_object_id = book.file_object_id
+    transaction.on_commit(
+        lambda: convert_phonebook_to_pdf.delay(book.pk, file_object_id, user.pk if user else None)
+    )
 
 
 class PhonebookFormMixin:
@@ -30,11 +50,15 @@ class PhonebookFormMixin:
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['max_upload_size'] = limits.max_upload_size()
+        # Без LibreOffice кнопка «Показать в браузере» не сработала бы —
+        # значит, её не должно быть в разметке (ARCHITECTURE.md, 12.4).
+        context['converter_available'] = converter_available()
         return context
 
     def form_valid(self, form):
         uploaded = form.cleaned_data.get('book')
         old_file_object = form.instance.file_object
+        old_pdf_object = form.instance.pdf_file_object
 
         if uploaded:
             try:
@@ -45,6 +69,16 @@ class PhonebookFormMixin:
                 form.add_error('book', str(e))
                 return self.form_invalid(form)
 
+            # PDF-копия относилась к прежнему файлу: оставить её значило бы
+            # показывать в браузере старый справочник под новым названием.
+            form.instance.pdf_file_object = None
+            form.instance.conversion_error = ''
+            form.instance.conversion_status = (
+                Phonebook.Conversion.PENDING
+                if form.instance.needs_conversion and converter_available()
+                else Phonebook.Conversion.NONE
+            )
+
         response = super().form_valid(form)
 
         # Отвязка только после успешного сохранения: detach уводит blob в
@@ -52,6 +86,11 @@ class PhonebookFormMixin:
         # ссылаться на файл, помеченный к удалению.
         if uploaded and old_file_object and old_file_object != form.instance.file_object:
             StorageService.detach(old_file_object, user=self.request.user, consumer=CONSUMER)
+        if uploaded and old_pdf_object:
+            StorageService.detach(old_pdf_object, user=self.request.user, consumer=CONSUMER)
+
+        if uploaded and form.instance.conversion_status == Phonebook.Conversion.PENDING:
+            queue_conversion(form.instance, self.request.user)
         return response
 
 
@@ -106,13 +145,66 @@ class PhoneBook(LoginRequiredMixin, PhonebookFormMixin, UpdateView):
 class PhonebookViewFileView(LoginRequiredMixin, View):
     """Отдаёт файл справочника для просмотра в <iframe> (inline, не
     attachment). Тип, который небезопасно открывать в домене портала,
-    StorageService сам переключит на скачивание."""
+    StorageService сам переключит на скачивание.
+
+    По умолчанию отдаётся то, что покажет браузер (PDF-копия, если она
+    сделана), а ?original=1 — исходный файл: кнопка «Скачать» обязана
+    отдавать именно загруженный документ, а не его пересборку.
+    """
 
     def get(self, request, book_id):
-        book = get_object_or_404(Phonebook, pk=book_id, is_deleted=False)
-        if not book.file_object:
+        book = get_object_or_404(
+            Phonebook.objects.select_related('file_object__blob', 'pdf_file_object__blob'),
+            pk=book_id, is_deleted=False,
+        )
+        if request.GET.get('original') == '1':
+            file_object = book.file_object
+        else:
+            file_object = book.preview_object or book.file_object
+        if not file_object:
             raise Http404
-        return StorageService.get_download_response(book.file_object, request, inline=True)
+        return StorageService.get_download_response(file_object, request, inline=True)
+
+
+class PhonebookConvertView(LoginRequiredMixin, View):
+    """Запускает подготовку PDF-копии по кнопке — для справочников,
+    загруженных до появления конвертации, и для повторной попытки после
+    отказа. Справочник правит любой сотрудник, поэтому и конвертировать
+    может любой (см. докстринг модуля)."""
+
+    def post(self, request, book_id):
+        book = get_object_or_404(
+            Phonebook.objects.select_related('file_object__blob'), pk=book_id, is_deleted=False,
+        )
+
+        if not book.needs_conversion:
+            return JsonResponse(
+                {'success': False, 'error': 'Этот справочник и так открывается в браузере'},
+                status=400,
+            )
+        if not converter_available():
+            return JsonResponse(
+                {'success': False, 'error': 'LibreOffice на сервере не установлен'}, status=503,
+            )
+
+        queue_conversion(book, request.user, save=True)
+        return JsonResponse({'success': True, 'status': Phonebook.Conversion.PENDING})
+
+
+class PhonebookConversionStatusView(LoginRequiredMixin, View):
+    """Готова ли PDF-копия. Страница справочника опрашивает этот адрес, пока
+    идёт конвертация: результата ждёт человек, смотрящий на пустую рамку."""
+
+    def get(self, request, book_id):
+        book = get_object_or_404(
+            Phonebook.objects.select_related('file_object__blob', 'pdf_file_object__blob'),
+            pk=book_id, is_deleted=False,
+        )
+        return JsonResponse({
+            'status': book.conversion_status,
+            'previewable': book.is_previewable,
+            'error': book.conversion_error,
+        })
 
 
 class PhonebookTrashView(TrashObjectView):

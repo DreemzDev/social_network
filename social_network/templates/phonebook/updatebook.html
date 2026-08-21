@@ -46,18 +46,40 @@
     <iframe class="min-h-dvh w-full" src="{% url 'phonebook_view_file' books.id %}"></iframe>
     {% elif books.file_object %}
     {% comment %}
-      Word и таблицы браузер в <iframe> не рисует — вместо пустой рамки
-      честная карточка со скачиванием (CLAUDE.md, «Интерфейс»).
+      Word и таблицы браузер в <iframe> не рисует. Их приводит к PDF
+      LibreOffice на сервере (storage/convert.py); пока копии нет — честная
+      карточка со скачиванием (CLAUDE.md, «Интерфейс»).
     {% endcomment %}
-    <div class="p-8 text-center">
+    <div class="p-8 text-center" id="phonebook-fallback">
       <div class="text-sm font-medium text-gray-900 dark:text-white">{{ books.file_object.original_name }}</div>
-      <p class="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
-        Файл {{ books.file_object.extension }} браузер показать не может — его нужно открыть в офисном редакторе.
-      </p>
-      <a href="{% url 'phonebook_view_file' books.id %}"
-         class="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#0077FF] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF]">
-        Скачать файл
-      </a>
+
+      <div id="phonebook-converting" class="{% if books.conversion_status != 'pending' %}hidden {% endif %}mt-3">
+        <div class="inline-block h-6 w-6 animate-spin rounded-full border-b-2 border-[#0077FF]"></div>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          Готовим версию для просмотра — это занимает несколько секунд.
+        </p>
+      </div>
+
+      <div id="phonebook-offer" class="{% if books.conversion_status == 'pending' %}hidden{% endif %}">
+        <p class="mx-auto mt-2 max-w-md text-sm text-gray-500 dark:text-gray-400">
+          Файл {{ books.file_object.extension }} браузер показать не может — его нужно открыть в офисном редакторе.
+          {% if books.conversion_status == 'failed' %}
+          <br>Прошлая попытка показать его на портале не удалась{% if books.conversion_error %}: {{ books.conversion_error }}{% endif %}.
+          {% endif %}
+        </p>
+        <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {% if books.needs_conversion and converter_available %}
+          <button type="button" id="phonebook-convert" data-url="{% url 'phonebook_convert' books.id %}"
+                  class="inline-flex items-center gap-2 rounded-lg bg-[#0077FF] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3391FF]">
+            {% if books.conversion_status == 'failed' %}Попробовать снова{% else %}Показать в браузере{% endif %}
+          </button>
+          {% endif %}
+          <a href="{% url 'phonebook_view_file' books.id %}?original=1"
+             class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700">
+            Скачать файл
+          </a>
+        </div>
+      </div>
     </div>
     {% else %}
     <div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">Файл справочника ещё не загружен</div>
@@ -94,6 +116,61 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 });
+
+{% if books.file_object and not books.is_previewable %}
+// Подготовка PDF-копии: запуск по кнопке и опрос состояния. Опрашивается
+// состояние справочника, а не задачи Celery: конвертацию мог запустить и
+// другой сотрудник, и тогда id задачи этой странице неизвестен.
+document.addEventListener('DOMContentLoaded', function () {
+  var statusUrl = '{% url 'phonebook_conversion_status' books.id %}';
+  var converting = document.getElementById('phonebook-converting');
+  var offer = document.getElementById('phonebook-offer');
+  var button = document.getElementById('phonebook-convert');
+  var timer = null;
+
+  function showConverting(on) {
+    converting.classList.toggle('hidden', !on);
+    offer.classList.toggle('hidden', on);
+  }
+
+  function poll() {
+    fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.previewable) {
+          window.clearInterval(timer);
+          window.location.reload();
+          return;
+        }
+        if (data.status !== 'pending') {
+          window.clearInterval(timer);
+          showConverting(false);
+          FM.toast(data.error || 'Не удалось подготовить версию для просмотра', 'error');
+          if (data.status === 'failed') window.location.reload();
+        }
+      });
+  }
+
+  function watch() {
+    if (timer) window.clearInterval(timer);
+    timer = window.setInterval(poll, 2000);
+  }
+
+  if (converting && !converting.classList.contains('hidden')) watch();
+
+  if (button) {
+    button.addEventListener('click', function () {
+      showConverting(true);
+      FM.action(button.dataset.url, {}, {
+        successText: 'Готовим версию для просмотра',
+        refresh: false,
+        onSuccess: watch,
+        onError: function () { showConverting(false); },
+      });
+    });
+  }
+});
+{% endif %}
 
 {% if form.errors %}
 // Форма вернулась с ошибкой — модалку надо открыть снова, иначе
