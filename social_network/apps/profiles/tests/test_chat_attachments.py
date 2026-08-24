@@ -288,6 +288,20 @@ class DialogPageRenderingTest(ChatAttachmentTestCase):
         self.assertContains(response, 'PDF')
         self.assertContains(response, 'download')
 
+    def test_badge_carries_the_format_label(self):
+        """Формат подписан прямо на корешке значка: цвет отличает семейство,
+        а буквы — конкретный формат, и без них .docx от .odt не отличить."""
+        self.send(files=[self.document('Смета.pdf'), self.document('Доклад.pptx')])
+
+        response = self.client.get(reverse('dialog_messages', args=[self.recipient.pk]))
+        labels = {a.original_name: (a.badge_label, a.badge_font_size)
+                  for a in MessageAttachment.objects.all()}
+
+        self.assertEqual(labels['Смета.pdf'], ('PDF', '5'))
+        self.assertEqual(labels['Доклад.pptx'], ('PPTX', '4'), 'четыре знака набираются мельче')
+        self.assertContains(response, '>PDF</text>')
+        self.assertContains(response, '>PPTX</text>')
+
     def test_badge_color_marks_the_family_of_the_format(self):
         """Цвет корешка — по семейству формата: в значке размером с ноготь
         важно с одного взгляда отличить таблицу от документа, а не .xls от

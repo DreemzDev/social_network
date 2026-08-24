@@ -91,6 +91,18 @@ class MessageAttachment(models.Model):
         return BADGE_COLORS.get(self.extension, BADGE_COLORS[None])
 
     @property
+    def badge_label(self) -> str:
+        """Надпись на корешке значка. Четыре знака — предел: корешок шириной
+        15 единиц системы координат значка, дальше буквы не влезают."""
+        return self.extension[:4]
+
+    @property
+    def badge_font_size(self) -> str:
+        """Кегль надписи в системе координат значка (viewBox 20×21).
+        Четыре знака набираются мельче, иначе выходят за корешок."""
+        return '4' if len(self.badge_label) > 3 else '5'
+
+    @property
     def size_display(self) -> str:
         size = float(self.size)
         for unit in ('Б', 'КБ', 'МБ', 'ГБ'):
