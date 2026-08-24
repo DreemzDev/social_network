@@ -6,10 +6,10 @@
 на просмотр — и, главное, что копия не подменяет оригинал и не переживает
 замену файла.
 
-Сам LibreOffice не запускается ни в одном тесте: он внешняя программа,
-которой на машине разработчика может не быть, а проверять надо свой код
-вокруг него. Поэтому запуск подменяется, а формирование команды
-проверяется отдельно.
+Ни LibreOffice, ни Office в тестах не запускаются: это внешние программы,
+которых на конкретной машине может не быть, а проверять надо свой код
+вокруг них — выбор движка, сборку команды и разбор результата. Поэтому
+сам запуск подменяется.
 """
 
 import os
@@ -24,7 +24,15 @@ from django.urls import reverse
 
 from phonebook.models import Phonebook
 from phonebook.tasks import convert_phonebook_to_pdf
-from storage.convert import ConversionError, convert_to_pdf, is_convertible, soffice_path
+from storage.convert import (
+    ConversionError,
+    available_converter,
+    convert_to_pdf,
+    converter_available,
+    is_convertible,
+    office_app_for,
+    soffice_path,
+)
 from storage.models import FileBlob, FileObject
 from storage.services import StorageService
 
@@ -112,7 +120,7 @@ class ConvertCommandTest(TestCase):
                     produced.write(PDF_BYTES)
                 return mock.Mock(returncode=0, stdout=b'', stderr=b'')
 
-            with override_settings(STORAGE_SOFFICE_PATH=__file__):
+            with mock.patch('storage.convert.soffice_path', return_value=__file__):
                 with mock.patch('storage.convert.subprocess.run', fake_run):
                     result = convert_to_pdf(source, 'Справочник.DOCX', work_dir)
 
@@ -128,7 +136,7 @@ class ConvertCommandTest(TestCase):
             with open(source, 'wb') as handle:
                 handle.write(b'x')
 
-            with override_settings(STORAGE_SOFFICE_PATH=__file__):
+            with mock.patch('storage.convert.soffice_path', return_value=__file__):
                 with mock.patch(
                     'storage.convert.subprocess.run',
                     return_value=mock.Mock(returncode=0, stdout=b'', stderr=b'Error: source file could not be loaded'),
@@ -138,15 +146,15 @@ class ConvertCommandTest(TestCase):
 
             self.assertIn('could not be loaded', str(caught.exception))
 
-    def test_missing_libreoffice_reports_reason(self):
+    def test_missing_converter_reports_reason(self):
         with tempfile.TemporaryDirectory() as work_dir:
-            with override_settings(STORAGE_SOFFICE_PATH=None):
-                with mock.patch('storage.convert.shutil.which', return_value=None):
-                    with mock.patch('storage.convert.os.path.exists', return_value=False):
-                        with self.assertRaises(ConversionError) as caught:
-                            convert_to_pdf('anything', 'Справочник.docx', work_dir)
+            with mock.patch('storage.convert.soffice_path', return_value=None):
+                with mock.patch('storage.convert.office_app_installed', return_value=False):
+                    with self.assertRaises(ConversionError) as caught:
+                        convert_to_pdf('anything', 'Справочник.docx', work_dir)
 
         self.assertIn('LibreOffice', str(caught.exception))
+        self.assertIn('Office', str(caught.exception))
 
 
 class ConversionTaskTest(ConversionTestCase):
@@ -242,14 +250,16 @@ class ConversionViewsTest(ConversionTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('открывается в браузере', response.json()['error'])
 
-    def test_without_libreoffice_the_answer_says_so(self):
+    def test_without_a_converter_the_answer_says_so(self):
+        """Молчаливый отказ оставил бы страницу в состоянии «готовим версию
+        для просмотра» навсегда."""
         book = self.book()
 
         with mock.patch('phonebook.views.converter_available', return_value=False):
             response = self.client.post(reverse('phonebook_convert', args=[book.pk]))
 
         self.assertEqual(response.status_code, 503)
-        self.assertIn('LibreOffice', response.json()['error'])
+        self.assertIn('нет программы', response.json()['error'])
 
     def test_status_endpoint_reports_readiness(self):
         book = self.book()
@@ -328,3 +338,102 @@ class ConversionViewsTest(ConversionTestCase):
         self.assertEqual(
             FileBlob.objects.get(pk=stale_pdf_blob_id).status, FileBlob.Status.ORPHAN,
         )
+
+
+class ConverterChoiceTest(TestCase):
+    """Чем конвертировать: LibreOffice, Office или ничем.
+
+    Движка два намеренно: на Астре стоит LibreOffice, на машине
+    разработчика под Windows его может не быть, зато есть Office. Порядок
+    важен — LibreOffice первый, потому что именно его результат увидят
+    пользователи на проде.
+    """
+
+    def test_libreoffice_wins_when_both_are_installed(self):
+        with mock.patch('storage.convert.soffice_path', return_value=r'C:\soffice.exe'):
+            with mock.patch('storage.convert.office_app_installed', return_value=True):
+                self.assertEqual(available_converter('Справочник.docx'), 'libreoffice')
+
+    def test_office_is_used_when_libreoffice_is_missing(self):
+        with mock.patch('storage.convert.soffice_path', return_value=None):
+            with mock.patch('storage.convert.office_app_installed', return_value=True):
+                self.assertEqual(available_converter('Справочник.docx'), 'msoffice')
+
+    def test_nothing_installed_means_no_converter(self):
+        with mock.patch('storage.convert.soffice_path', return_value=None):
+            with mock.patch('storage.convert.office_app_installed', return_value=False):
+                self.assertIsNone(available_converter('Справочник.docx'))
+                self.assertFalse(converter_available('Справочник.docx'))
+
+    def test_office_availability_is_checked_per_format(self):
+        """Word на машине может стоять, а Excel — нет: кнопку у таблицы в
+        этом случае показывать нельзя, она бы каждый раз падала в фоне."""
+        def only_word(app):
+            return app == 'Word'
+
+        with mock.patch('storage.convert.soffice_path', return_value=None):
+            with mock.patch('storage.convert.office_app_installed', only_word):
+                self.assertEqual(available_converter('Приказ.docx'), 'msoffice')
+                self.assertIsNone(available_converter('Смета.xlsx'))
+
+    def test_format_maps_to_its_application(self):
+        self.assertEqual(office_app_for('Приказ.docx'), 'Word')
+        self.assertEqual(office_app_for('Смета.XLSX'), 'Excel')
+        self.assertEqual(office_app_for('Доклад.pptx'), 'PowerPoint')
+        self.assertIsNone(office_app_for('архив.zip'))
+
+
+class OfficeConversionTest(ConversionTestCase):
+    """Ветка Office: скрипт для PowerShell и разбор результата."""
+
+    def _convert(self, name, runner):
+        with mock.patch('storage.convert.soffice_path', return_value=None):
+            with mock.patch('storage.convert.office_app_installed', return_value=True):
+                with mock.patch('storage.convert.subprocess.run', runner):
+                    with tempfile.TemporaryDirectory() as work_dir:
+                        source = os.path.join(work_dir, 'blob')
+                        with open(source, 'wb') as handle:
+                            handle.write(b'x')
+                        return convert_to_pdf(source, name, work_dir), self.captured
+
+    def setUp(self):
+        super().setUp()
+        self.captured = {}
+
+    def _runner(self, produce=True):
+        def run(command, **kwargs):
+            script_path = command[command.index('-File') + 1]
+            self.captured['script'] = open(script_path, encoding='utf-8-sig').read()
+            self.captured['command'] = command
+            if produce:
+                produced = os.path.join(os.path.dirname(script_path), 'source.pdf')
+                with open(produced, 'wb') as target:
+                    target.write(PDF_BYTES)
+            return mock.Mock(returncode=0, stdout=b'', stderr=b'')
+
+        return run
+
+    def test_word_document_is_printed_by_word(self):
+        result, captured = self._convert('Приказ.docx', self._runner())
+
+        self.assertTrue(result.endswith('.pdf'))
+        self.assertIn('Word.Application', captured['script'])
+        self.assertIn('ExportAsFixedFormat', captured['script'])
+        self.assertIn('powershell.exe', captured['command'][0])
+
+    def test_spreadsheet_is_printed_by_excel(self):
+        _, captured = self._convert('Смета.xlsx', self._runner())
+
+        self.assertIn('Excel.Application', captured['script'])
+
+    def test_application_is_closed_even_after_failure(self):
+        """Без finally невидимый Word остался бы висеть в памяти сервера
+        после каждого сбойного документа."""
+        _, captured = self._convert('Приказ.docx', self._runner())
+
+        self.assertIn('finally', captured['script'])
+        self.assertIn('Quit', captured['script'])
+
+    def test_missing_pdf_is_reported(self):
+        with self.assertRaises(ConversionError):
+            self._convert('Приказ.docx', self._runner(produce=False))

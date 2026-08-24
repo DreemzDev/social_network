@@ -74,8 +74,8 @@ class Phonebook(models.Model):
 
     @property
     def needs_conversion(self) -> bool:
-        """Файл не показывается в браузере, но его умеет открыть
-        LibreOffice — значит, PDF-копию имеет смысл предложить."""
+        """Файл не показывается в браузере, но его умеет открыть офисный
+        пакет — значит, PDF-копию имеет смысл предложить."""
         return (
             self.file_object is not None
             and not self.is_previewable

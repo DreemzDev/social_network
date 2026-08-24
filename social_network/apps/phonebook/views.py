@@ -50,9 +50,13 @@ class PhonebookFormMixin:
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['max_upload_size'] = limits.max_upload_size()
-        # Без LibreOffice кнопка «Показать в браузере» не сработала бы —
-        # значит, её не должно быть в разметке (ARCHITECTURE.md, 12.4).
-        context['converter_available'] = converter_available()
+        # Кнопка «Показать в браузере» не должна появляться там, где
+        # конвертировать нечем (ARCHITECTURE.md, 12.4). Проверка по
+        # конкретному файлу: Word на машине может стоять, а Excel — нет.
+        book = getattr(self, 'object', None)
+        context['converter_available'] = converter_available(
+            book.file_object.original_name if book and book.file_object else None
+        )
         return context
 
     def form_valid(self, form):
@@ -75,7 +79,8 @@ class PhonebookFormMixin:
             form.instance.conversion_error = ''
             form.instance.conversion_status = (
                 Phonebook.Conversion.PENDING
-                if form.instance.needs_conversion and converter_available()
+                if form.instance.needs_conversion
+                and converter_available(form.instance.file_object.original_name)
                 else Phonebook.Conversion.NONE
             )
 
@@ -182,9 +187,11 @@ class PhonebookConvertView(LoginRequiredMixin, View):
                 {'success': False, 'error': 'Этот справочник и так открывается в браузере'},
                 status=400,
             )
-        if not converter_available():
+        if not converter_available(book.file_object.original_name):
             return JsonResponse(
-                {'success': False, 'error': 'LibreOffice на сервере не установлен'}, status=503,
+                {'success': False,
+                 'error': 'На сервере нет программы, которая открывает такой формат'},
+                status=503,
             )
 
         queue_conversion(book, request.user, save=True)
