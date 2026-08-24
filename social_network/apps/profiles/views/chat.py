@@ -127,6 +127,8 @@ def serialize_attachment(attachment):
         'id': attachment.pk,
         'name': attachment.original_name,
         'size': attachment.size_display,
+        'extension': attachment.extension,
+        'color': attachment.badge_color,
         'is_image': attachment.is_image and not attachment.is_expired,
         'expired': attachment.is_expired,
         'url': None if attachment.is_expired else reverse('chat_attachment', args=[attachment.pk]),

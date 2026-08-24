@@ -78,6 +78,19 @@ class MessageAttachment(models.Model):
         return self.file_object_id is None
 
     @property
+    def extension(self) -> str:
+        _, dot, extension = (self.original_name or '').rpartition('.')
+        return extension.upper()[:8] if dot else 'ФАЙЛ'
+
+    @property
+    def badge_color(self) -> str:
+        """Цвет корешка на значке. По семейству формата, а не по каждому
+        расширению: в переписке значок размером с ноготь, и различать в нём
+        .xls от .xlsx незачем — важно с одного взгляда отличить таблицу от
+        документа."""
+        return BADGE_COLORS.get(self.extension, BADGE_COLORS[None])
+
+    @property
     def size_display(self) -> str:
         size = float(self.size)
         for unit in ('Б', 'КБ', 'МБ', 'ГБ'):
@@ -85,6 +98,18 @@ class MessageAttachment(models.Model):
                 return f'{size:.0f} {unit}' if unit == 'Б' else f'{size:.1f} {unit}'
             size /= 1024
         return f'{size:.1f} ТБ'
+
+
+# Цвета взяты у офисных пакетов, где они привычны: Word синий, Excel
+# зелёный, PowerPoint оранжевый, PDF красный.
+BADGE_COLORS = {
+    'PDF': '#F15642',
+    'DOC': '#2B579A', 'DOCX': '#2B579A', 'ODT': '#2B579A', 'RTF': '#2B579A',
+    'XLS': '#217346', 'XLSX': '#217346', 'ODS': '#217346', 'CSV': '#217346',
+    'PPT': '#D24726', 'PPTX': '#D24726', 'ODP': '#D24726',
+    'ZIP': '#B7791F', 'RAR': '#B7791F', '7Z': '#B7791F',
+    None: '#6B7280',
+}
 
 
 def looks_like_image(mime_type) -> bool:

@@ -4,6 +4,10 @@
   разметка обязана совпадать, иначе своё сообщение выглядит иначе, чем оно
   же после перезагрузки страницы.
 
+  Документ показывается карточкой: значок формата, имя, размер и тип, а
+  скачивание — отдельной кнопкой. Раньше вся строка была ссылкой, и
+  «посмотреть, что прислали» было не отличить от «скачать».
+
   Параметры: attachments — список вложений, chat_ttl_days — срок хранения.
 {% endcomment %}
 <div class="msg-attachments mt-1 flex flex-col gap-1.5">
@@ -18,12 +22,34 @@
          class="max-h-72 max-w-full rounded-lg object-contain">
   </a>
   {% else %}
-  <a href="{% url 'chat_attachment' attachment.pk %}"
-     class="flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20">
-    <span class="flex-shrink-0">📎</span>
-    <span class="min-w-0 flex-1 truncate">{{ attachment.original_name }}</span>
-    <span class="flex-shrink-0 text-xs opacity-70">{{ attachment.size_display }}</span>
-  </a>
+  <div class="msg-attachment-file flex items-start gap-1.5 rounded-lg bg-black/10 p-2 dark:bg-white/10">
+    <div class="min-w-0 flex-1">
+      <span class="flex items-center gap-2 pb-1 text-sm font-medium">
+        <svg class="h-5 w-5 shrink-0" viewBox="0 0 20 21" fill="none" aria-hidden="true">
+          <path fill="#E2E5E7" d="M5.024.5c-.688 0-1.25.563-1.25 1.25v17.5c0 .688.562 1.25 1.25 1.25h12.5c.687 0 1.25-.563 1.25-1.25V5.5l-5-5h-8.75z"/>
+          <path fill="#B0B7BD" d="M15.024 5.5h3.75l-5-5v3.75c0 .688.562 1.25 1.25 1.25z"/>
+          <path fill="#CAD1D8" d="M18.774 9.25l-3.75-3.75h3.75v3.75z"/>
+          <path fill="{{ attachment.badge_color }}" d="M16.274 16.75a.627.627 0 01-.625.625H1.899a.627.627 0 01-.625-.625V10.5c0-.344.281-.625.625-.625h13.75c.344 0 .625.281.625.625v6.25z"/>
+          <path fill="#CAD1D8" d="M15.649 17.375H3.774V18h11.875a.627.627 0 00.625-.625v-.625a.627.627 0 01-.625.625z"/>
+        </svg>
+        <span class="min-w-0 truncate">{{ attachment.original_name }}</span>
+      </span>
+      <span class="flex items-center gap-2 text-xs opacity-70">
+        {{ attachment.size_display }}
+        <svg width="3" height="4" viewBox="0 0 3 4" fill="none" class="self-center" aria-hidden="true">
+          <circle cx="1.5" cy="2" r="1.5" fill="currentColor"/>
+        </svg>
+        {{ attachment.extension }}
+      </span>
+    </div>
+    <a href="{% url 'chat_attachment' attachment.pk %}" download title="Скачать «{{ attachment.original_name }}»"
+       class="inline-flex flex-shrink-0 self-center rounded-lg p-2 hover:bg-black/10 focus:outline-none focus:ring-4 focus:ring-black/10 dark:hover:bg-white/10">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 13V4M7 14H5a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1h-2m-1-5-4 5-4-5m9 8h.01"/>
+      </svg>
+    </a>
+  </div>
   {% endif %}
   {% endfor %}
 </div>

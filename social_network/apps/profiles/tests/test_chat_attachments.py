@@ -275,6 +275,41 @@ class DialogPageRenderingTest(ChatAttachmentTestCase):
         self.assertContains(response, 'Смета.pdf')
         self.assertContains(response, 'msg-attach-button')
 
+    def test_document_card_shows_size_and_type(self):
+        """В пузыре документ — карточка со значком, размером и типом, а
+        скачивание отдельной кнопкой: раньше вся строка была ссылкой, и
+        «посмотреть, что прислали» не отличалось от «скачать»."""
+        self.send(text='смета', files=[self.document('Смета.pdf', b'x' * 2048)])
+
+        response = self.client.get(reverse('dialog_messages', args=[self.recipient.pk]))
+
+        self.assertContains(response, 'msg-attachment-file')
+        self.assertContains(response, '2.0 КБ')
+        self.assertContains(response, 'PDF')
+        self.assertContains(response, 'download')
+
+    def test_badge_color_marks_the_family_of_the_format(self):
+        """Цвет корешка — по семейству формата: в значке размером с ноготь
+        важно с одного взгляда отличить таблицу от документа, а не .xls от
+        .xlsx."""
+        self.send(files=[
+            self.document('Смета.xlsx'), self.document('Приказ.docx'), self.document('Скан.pdf'),
+        ])
+
+        colors = {a.extension: a.badge_color for a in MessageAttachment.objects.all()}
+
+        self.assertEqual(colors['XLSX'], '#217346')
+        self.assertEqual(colors['DOCX'], '#2B579A')
+        self.assertEqual(colors['PDF'], '#F15642')
+
+    def test_unknown_extension_still_gets_a_card(self):
+        self.send(files=[self.document('без_расширения')])
+
+        attachment = MessageAttachment.objects.get()
+
+        self.assertEqual(attachment.extension, 'ФАЙЛ')
+        self.assertEqual(attachment.badge_color, '#6B7280')
+
     def test_expired_attachment_is_explained_in_the_bubble(self):
         self.send(text='файл', files=[self.document('Смета.pdf')])
         attachment = MessageAttachment.objects.get()
