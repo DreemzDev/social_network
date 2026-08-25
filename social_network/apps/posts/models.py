@@ -116,6 +116,13 @@ class Poll(models.Model):
 
     post = models.OneToOneField(Post, on_delete=models.CASCADE, related_name='poll', verbose_name='Запись')
     is_multiple = models.BooleanField(default=False, verbose_name='Несколько вариантов ответа')
+    # По умолчанию опрос анонимный: голосовать «как все» проще, когда никто
+    # не смотрит, и подсчёт мнений ради этого и заводят. Открытый режим —
+    # осознанный выбор автора: у сбора смен и дежурств смысл ровно
+    # обратный, там нужно знать, кто именно записался.
+    show_voters = models.BooleanField(
+        default=False, verbose_name='Показывать, кто какой вариант выбрал',
+    )
     created = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -140,6 +147,7 @@ class Poll(models.Model):
         return {
             'total': total,
             'is_multiple': self.is_multiple,
+            'show_voters': self.show_voters,
             'voted': any(v.user_id == user_pk for items in votes.values() for v in items),
             'options': [
                 {
@@ -148,10 +156,26 @@ class Poll(models.Model):
                     'votes': len(votes[option.pk]),
                     'percent': round(len(votes[option.pk]) * 100 / total) if total else 0,
                     'chosen': any(v.user_id == user_pk for v in votes[option.pk]),
+                    # В строку помещается три лица, остальные — в модалке по
+                    # клику. Пустой список у анонимного опроса, а не отдельная
+                    # ветка в шаблоне: шаблон не должен решать, что показывать.
+                    'voters': self._voters(votes[option.pk]) if self.show_voters else [],
                 }
                 for option in options
             ],
         }
+
+    @staticmethod
+    def _voters(option_votes, limit=3):
+        from django.templatetags.static import static
+
+        return [
+            {
+                'name': vote.user.get_full_name() or vote.user.username,
+                'avatar': vote.user.avatar.url if vote.user.avatar else static('img/avatar7.png'),
+            }
+            for vote in option_votes[:limit]
+        ]
 
 
 class PollOption(models.Model):
@@ -169,9 +193,12 @@ class PollOption(models.Model):
 
 
 class PollVote(models.Model):
-    """Голос за вариант. Не анонимен на уровне БД (иначе нельзя ни снять
-    свой голос, ни удержать «один голос на человека»), но наружу отдаются
-    только счётчики — кто как проголосовал, портал не показывает."""
+    """Голос за вариант.
+
+    На уровне БД голос всегда именной — иначе нельзя ни снять свой голос,
+    ни удержать «один голос на человека». Показывать ли имена, решает автор
+    опроса (`Poll.show_voters`); в анонимном опросе наружу уходят только
+    счётчики, и эндпоинт списка голосовавших для него отвечает 404."""
 
     option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='votes', verbose_name='Вариант')
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='+', verbose_name='Сотрудник')

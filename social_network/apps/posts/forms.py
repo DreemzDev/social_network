@@ -28,6 +28,7 @@ class PollForm(forms.Form):
     """
 
     poll_multiple = forms.BooleanField(required=False)
+    poll_show_voters = forms.BooleanField(required=False)
 
     def clean(self):
         cleaned = super().clean()
@@ -47,7 +48,11 @@ class PollForm(forms.Form):
         return cleaned
 
     def save(self, post):
-        poll = Poll.objects.create(post=post, is_multiple=self.cleaned_data['poll_multiple'])
+        poll = Poll.objects.create(
+            post=post,
+            is_multiple=self.cleaned_data['poll_multiple'],
+            show_voters=self.cleaned_data['poll_show_voters'],
+        )
         PollOption.objects.bulk_create([
             PollOption(poll=poll, text=text, order=order)
             for order, text in enumerate(self.cleaned_data['options'])

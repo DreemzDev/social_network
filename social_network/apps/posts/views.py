@@ -44,7 +44,7 @@ class PortalHome(LoginRequiredMixin, ListView):
     def get_queryset(self):
         posts = Post.objects.select_related('author', 'poll').annotate(
             num_comments=Count('post_comments')
-        ).prefetch_related('images', 'files', 'likes', 'viewers', 'poll__options__votes')
+        ).prefetch_related('images', 'files', 'likes', 'viewers', 'poll__options__votes__user')
 
         # cat_id приходит с маршрута /category/<id>/ — это та же лента,
         # суженная до одного подразделения. Раньше на него отвечала отдельная
@@ -72,7 +72,7 @@ class NewPostsFeedView(LoginRequiredMixin, View):
         posts = Post.objects.select_related('author', 'poll').annotate(
             num_comments=Count('post_comments')
         ).prefetch_related(
-            'images', 'files', 'likes', 'viewers', 'poll__options__votes',
+            'images', 'files', 'likes', 'viewers', 'poll__options__votes__user',
         ).filter(pk__gt=last_post_id).order_by('-time_create')
 
         html = render_to_string('includes/posts/list_fragment.html', {'posts': posts, 'request': request}, request=request)
@@ -90,7 +90,7 @@ class ShowPost(LoginRequiredMixin, FormMixin, DetailView):
 
     def get_queryset(self):
         return Post.objects.select_related('poll').prefetch_related(
-            'images', 'files', 'poll__options__votes',
+            'images', 'files', 'poll__options__votes__user',
         )
 
     def get_success_url(self, **kwargs):
@@ -220,7 +220,7 @@ class AddPost(LoginRequiredMixin, FormView, TemplateView):
         context['posts'] = Post.objects.select_related('author', 'poll').annotate(
             num_comments=Count('post_comments')
         ).prefetch_related(
-            'images', 'files', 'likes', 'viewers', 'poll__options__votes',
+            'images', 'files', 'likes', 'viewers', 'poll__options__votes__user',
         ).filter(author=user).order_by('-time_create')
         context['user'] = user
         context['profile_user'] = user
@@ -376,7 +376,7 @@ class PollVoteView(LoginRequiredMixin, View):
                 PollVote.objects.create(option=option, user=request.user)
 
         poll = Poll.objects.select_related('post').prefetch_related(
-            'options__votes'
+            'options__votes__user'
         ).get(pk=poll.pk)
 
         return JsonResponse({
@@ -387,3 +387,20 @@ class PollVoteView(LoginRequiredMixin, View):
                 request=request,
             ),
         })
+
+
+class PollVotersView(LoginRequiredMixin, View):
+    """Кто выбрал этот вариант.
+
+    404 у анонимного опроса — не для красоты: имена в БД есть всегда, и без
+    этой проверки список голосовавших доставался бы по прямому адресу и в
+    том опросе, где автор обещал анонимность.
+    """
+
+    def get(self, request, option_id):
+        option = get_object_or_404(
+            PollOption.objects.select_related('poll'), pk=option_id, poll__show_voters=True,
+        )
+        voters = [vote.user for vote in option.votes.select_related('user').order_by('created')]
+
+        return JsonResponse({'option': option.text, 'users': serialize_likers(voters)})

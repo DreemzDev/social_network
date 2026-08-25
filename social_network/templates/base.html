@@ -232,13 +232,15 @@
     <!-- END: Content -->
 </div>
 
-<!-- Модальное окно "Кто поставил лайк" — общее для постов и комментариев,
-     открывается через window.openLikersModal(url). Пришло на смену
-     тултипу, в котором не помещался весь список при большом числе лайков. -->
+<!-- Модальное окно со списком людей — общее для лайков постов,
+     комментариев и вариантов опроса; открывается через
+     window.openLikersModal(url, заголовок, текст_пустого_списка). Пришло на
+     смену тултипу, в котором не помещался весь список при большом числе
+     лайков. -->
 <div id="likers-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4" onclick="if (event.target === this) closeLikersModal()">
     <div class="max-h-[70vh] w-full max-w-sm overflow-hidden rounded-xl bg-white dark:bg-zinc-900">
         <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-zinc-800">
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Нравится</h3>
+            <h3 id="likers-modal-title" class="text-sm font-semibold text-gray-900 dark:text-white">Нравится</h3>
             <button type="button" onclick="closeLikersModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -250,9 +252,10 @@
 </div>
 
 <script>
-  function openLikersModal(url) {
+  function openLikersModal(url, title, emptyText) {
     const modal = document.getElementById('likers-modal');
     const body = document.getElementById('likers-modal-body');
+    document.getElementById('likers-modal-title').textContent = title || 'Нравится';
     body.innerHTML = '<p class="p-4 text-center text-sm text-gray-400">Загрузка...</p>';
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -261,7 +264,7 @@
       .then((response) => response.json())
       .then((data) => {
         if (!data.users.length) {
-          body.innerHTML = '<p class="p-4 text-center text-sm text-gray-400">Пока никто не оценил</p>';
+          body.innerHTML = `<p class="p-4 text-center text-sm text-gray-400">${emptyText || 'Пока никто не оценил'}</p>`;
           return;
         }
         body.innerHTML = data.users.map((u) => `

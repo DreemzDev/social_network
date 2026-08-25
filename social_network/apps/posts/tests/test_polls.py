@@ -33,9 +33,9 @@ class PollTestCase(TestCase):
         )
         return response
 
-    def poll(self, options=('Да', 'Нет'), multiple=False):
+    def poll(self, options=('Да', 'Нет'), multiple=False, show_voters=False):
         post = Post.objects.create(content='Идём в отпуск?', author=self.author)
-        poll = Poll.objects.create(post=post, is_multiple=multiple)
+        poll = Poll.objects.create(post=post, is_multiple=multiple, show_voters=show_voters)
         for order, text in enumerate(options):
             PollOption.objects.create(poll=poll, text=text, order=order)
         return poll
@@ -286,3 +286,117 @@ class PollEditingTest(PollTestCase):
         self.assertEqual(Poll.objects.count(), 0)
         self.assertEqual(PollOption.objects.count(), 0)
         self.assertEqual(PollVote.objects.count(), 0)
+
+
+class OpenPollTest(PollTestCase):
+    """Опрос, в котором видно, кто какой вариант выбрал.
+
+    Анонимность остаётся умолчанием: голосовать «как все» проще, когда
+    никто не смотрит, и ради этого опросы и заводят. Открытый режим — выбор
+    автора, и главное здесь то, что этот выбор нельзя обойти по прямому
+    адресу: имена лежат в БД в любом случае.
+    """
+
+    def open_poll(self, options=('Да', 'Нет')):
+        return self.poll(options=options, show_voters=True)
+
+    def test_flag_is_saved_from_the_form(self):
+        self.client.post(
+            reverse('addpost', args=[self.author.username]),
+            {'content': 'Кто идёт?', 'poll_options': ['Да', 'Нет'], 'poll_show_voters': '1'},
+        )
+
+        self.assertTrue(Poll.objects.get().show_voters)
+
+    def test_poll_is_anonymous_unless_asked(self):
+        self.create_post_with_poll()
+
+        self.assertFalse(Poll.objects.get().show_voters)
+
+    def test_results_carry_voters_in_open_poll(self):
+        poll = self.open_poll()
+        option = poll.options.first()
+        PollVote.objects.create(option=option, user=self.voter)
+
+        results = Poll.objects.prefetch_related('options__votes__user').get(
+            pk=poll.pk
+        ).results_for(self.author)
+
+        self.assertTrue(results['show_voters'])
+        self.assertEqual(len(results['options'][0]['voters']), 1)
+        self.assertIn('avatar', results['options'][0]['voters'][0])
+
+    def test_anonymous_poll_hides_voters_from_results(self):
+        poll = self.poll()
+        PollVote.objects.create(option=poll.options.first(), user=self.voter)
+
+        results = Poll.objects.prefetch_related('options__votes__user').get(
+            pk=poll.pk
+        ).results_for(self.author)
+
+        self.assertFalse(results['show_voters'])
+        self.assertEqual(results['options'][0]['voters'], [])
+
+    def test_voters_list_is_served_for_an_open_poll(self):
+        poll = self.open_poll()
+        option = poll.options.first()
+        PollVote.objects.create(option=option, user=self.voter)
+
+        response = self.client.get(reverse('poll_voters', args=[option.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()['users']), 1)
+        self.assertEqual(response.json()['option'], option.text)
+
+    def test_voters_list_is_closed_for_an_anonymous_poll(self):
+        """Имена лежат в БД и у анонимного опроса. Не закрой этот адрес — и
+        обещанная анонимность снимается одним переходом по ссылке."""
+        poll = self.poll()
+        option = poll.options.first()
+        PollVote.objects.create(option=option, user=self.voter)
+
+        response = self.client.get(reverse('poll_voters', args=[option.pk]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_anonymous_visitor_cannot_read_voters(self):
+        poll = self.open_poll()
+        PollVote.objects.create(option=poll.options.first(), user=self.voter)
+        self.client.logout()
+
+        response = self.client.get(reverse('poll_voters', args=[poll.options.first().pk]))
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_feed_shows_faces_only_in_an_open_poll(self):
+        open_poll = self.open_poll()
+        PollVote.objects.create(option=open_poll.options.first(), user=self.voter)
+
+        response = self.client.get(reverse('home'))
+        self.assertContains(response, 'poll-voters')
+        self.assertContains(response, 'видно, кто как ответил')
+
+        Poll.objects.filter(pk=open_poll.pk).update(show_voters=False)
+
+        response = self.client.get(reverse('home'))
+        self.assertNotContains(response, 'poll-voters')
+        self.assertContains(response, 'анонимно')
+
+    def test_open_poll_does_not_query_per_voter(self):
+        """Лица собираются тем же prefetch, что и голоса: запрос на каждого
+        проголосовавшего превратил бы ленту в сотню запросов."""
+        def poll_queries(context):
+            return [q for q in context.captured_queries if 'posts_poll' in q['sql']]
+
+        poll = self.open_poll()
+        PollVote.objects.create(option=poll.options.first(), user=self.voter)
+        with CaptureQueriesContext(connection) as one_voter:
+            self.client.get(reverse('home'))
+
+        for index in range(3):
+            user = User.objects.create_user(username=f'voter{index}', password='x')
+            PollVote.objects.create(option=poll.options.first(), user=user)
+        with CaptureQueriesContext(connection) as four_voters:
+            self.client.get(reverse('home'))
+
+        self.assertEqual(len(poll_queries(four_voters)), len(poll_queries(one_voter)))

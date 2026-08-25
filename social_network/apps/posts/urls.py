@@ -20,6 +20,7 @@ urlpatterns = [
     path('toggle_like/<int:post_id>/', toggle_like, name='toggle_like'),
 
     path('post/<int:post_id>/poll/vote/', PollVoteView.as_view(), name='poll_vote'),
+    path('poll/option/<int:option_id>/voters/', PollVotersView.as_view(), name='poll_voters'),
 
     path('deletepost/<int:pk>/', PostDeleteView.as_view(), name='delete-post'),
 

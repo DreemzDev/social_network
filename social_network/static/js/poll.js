@@ -16,6 +16,17 @@
     return match ? decodeURIComponent(match[2]) : '';
   }
 
+  // Список выбравших вариант — в общей модалке портала (base.html).
+  document.addEventListener('click', function (event) {
+    const voters = event.target.closest('.poll-voters');
+    if (!voters) return;
+    window.openLikersModal(
+      voters.dataset.votersUrl,
+      'Выбрали «' + voters.dataset.option + '»',
+      'Этот вариант пока никто не выбрал',
+    );
+  });
+
   document.addEventListener('click', function (event) {
     const button = event.target.closest('.poll-option');
     if (!button) return;

@@ -18,9 +18,29 @@
         <span class="flex-shrink-0 text-xs text-gray-500">{{ option.percent }}% · {{ option.votes }}</span>
       </span>
     </button>
+
+    {% comment %}
+      Кто выбрал этот вариант — отдельной строкой под кнопкой, а не внутри
+      неё: кнопка голосует, а список открывает модалку, и вложенные друг в
+      друга кликабельные элементы разошлись бы по назначению первого же
+      промаха.
+    {% endcomment %}
+    {% if option.voters %}
+    <button type="button"
+            class="poll-voters flex items-center gap-1.5 pl-1 text-xs text-gray-500 hover:text-[#0077FF]"
+            data-voters-url="{% url 'poll_voters' option.id %}" data-option="{{ option.text }}">
+      <span class="flex items-center">
+        {% for voter in option.voters %}
+        <img src="{{ voter.avatar }}" alt="{{ voter.name }}" title="{{ voter.name }}"
+             class="h-6 w-6 rounded-full border-2 border-white object-cover dark:border-zinc-900 {% if not forloop.first %}-ml-2{% endif %}">
+        {% endfor %}
+      </span>
+      <span class="hover:underline">{{ option.votes }}</span>
+    </button>
+    {% endif %}
     {% endfor %}
   </div>
   <p class="mt-2 text-xs text-gray-500">
-    {% if results.total %}Проголосовали: {{ results.total }}{% else %}Ещё никто не голосовал{% endif %}{% if results.is_multiple %} · можно выбрать несколько вариантов{% endif %}
+    {% if results.total %}Проголосовали: {{ results.total }}{% else %}Ещё никто не голосовал{% endif %}{% if results.is_multiple %} · можно выбрать несколько вариантов{% endif %}{% if results.show_voters %} · видно, кто как ответил{% else %} · анонимно{% endif %}
   </p>
 </div>

@@ -121,13 +121,22 @@
 
           <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
             <button type="button" id="poll-add-option" class="text-sm text-[#0077FF] hover:underline">Добавить вариант</button>
-            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-              <input type="checkbox" name="poll_multiple" value="1" class="rounded border-gray-300">
-              Несколько вариантов ответа
-            </label>
+            <div class="flex flex-wrap items-center gap-4">
+              <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                <input type="checkbox" name="poll_multiple" value="1" class="rounded border-gray-300">
+                Несколько вариантов ответа
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                <input type="checkbox" name="poll_show_voters" value="1" class="rounded border-gray-300">
+                Показывать, кто как ответил
+              </label>
+            </div>
           </div>
 
-          <p class="mt-2 text-xs text-gray-500">Вопрос — текст записи. Вариантов от 2 до 10.</p>
+          <p class="mt-2 text-xs text-gray-500">
+            Вопрос — текст записи. Вариантов от 2 до 10. Без галочки опрос
+            анонимный: видны только доли, но не имена.
+          </p>
         </div>
 
         <div class="flex items-end gap-3">
@@ -581,8 +590,7 @@
         // Поля очищаются, а не просто прячутся: иначе скрытый опрос всё
         // равно уехал бы на сервер вместе с записью.
         list.innerHTML = "";
-        const multiple = editor.querySelector('input[name="poll_multiple"]');
-        if (multiple) multiple.checked = false;
+        editor.querySelectorAll('input[type="checkbox"]').forEach((box) => { box.checked = false; });
       }
 
       openButton.addEventListener("click", openEditor);
