@@ -5,6 +5,7 @@
 """
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils import timezone
 
 from storage.models import FileObject
 from storage.utils import is_inline_safe
@@ -89,6 +90,24 @@ class MessageAttachment(models.Model):
         .xls от .xlsx незачем — важно с одного взгляда отличить таблицу от
         документа."""
         return BADGE_COLORS.get(self.extension, BADGE_COLORS[None])
+
+    def retention_note(self, ttl_days) -> str:
+        """Подпись о сроке — готовой строкой, а не числом дней.
+
+        Строку собирает модель, а не шаблон, потому что рисуют вложение
+        двое: шаблон при загрузке истории и JS при живой доставке. Число
+        дней им пришлось бы превращать в текст каждому по-своему, и
+        «удалится сегодня» разошлось бы с «удалится через 0 дн.».
+        """
+        if self.is_expired:
+            when = timezone.localtime(self.expired_at) if self.expired_at else None
+            return f'файл удалён {when:%d.%m}' if when else 'файл удалён'
+
+        if not ttl_days:
+            return ''
+
+        left = max(ttl_days - (timezone.now() - self.created).days, 0)
+        return 'удалится сегодня' if left == 0 else f'удалится через {left} дн.'
 
     @property
     def badge_label(self) -> str:

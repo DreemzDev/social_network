@@ -7,6 +7,13 @@ register = template.Library()
 
 
 @register.filter
+def attachment_retention(attachment, ttl_days):
+    """Подпись о сроке вложения. Собирает её модель — тот же текст нужен и
+    JS при живой доставке (profiles/models/chat.py)."""
+    return attachment.retention_note(ttl_days)
+
+
+@register.filter
 def message_preview(message):
     """Строка для списка диалогов. У сообщения из одних вложений текста нет,
     и без этой подстановки последняя строка диалога оказывалась пустой —

@@ -324,7 +324,29 @@ class DialogPageRenderingTest(ChatAttachmentTestCase):
         self.assertEqual(attachment.extension, 'ФАЙЛ')
         self.assertEqual(attachment.badge_color, '#6B7280')
 
+    def test_retention_is_written_on_the_card(self):
+        """Срок стоит на самой карточке: получатель не нажимал «скрепку» и
+        подсказки на ней не видел, а файл живёт считанные дни."""
+        self.send(text='файл', files=[self.document('Смета.pdf')])
+
+        response = self.client.get(reverse('dialog_messages', args=[self.recipient.pk]))
+
+        self.assertContains(response, 'удалится через 7 дн.')
+
+    def test_last_day_is_said_plainly(self):
+        self.send(text='файл', files=[self.document('Смета.pdf')])
+        attachment = MessageAttachment.objects.get()
+        MessageAttachment.objects.filter(pk=attachment.pk).update(
+            created=timezone.now() - timedelta(days=7)
+        )
+
+        response = self.client.get(reverse('dialog_messages', args=[self.recipient.pk]))
+
+        self.assertContains(response, 'удалится сегодня')
+
     def test_expired_attachment_is_explained_in_the_bubble(self):
+        """После истечения срока остаётся та же карточка, только погасшая:
+        видно, что за файл здесь был и что его удалили, а не пустой пузырь."""
         self.send(text='файл', files=[self.document('Смета.pdf')])
         attachment = MessageAttachment.objects.get()
         MessageAttachment.objects.filter(pk=attachment.pk).update(
@@ -334,8 +356,24 @@ class DialogPageRenderingTest(ChatAttachmentTestCase):
 
         response = self.client.get(reverse('dialog_messages', args=[self.recipient.pk]))
 
-        self.assertContains(response, 'удалён')
+        self.assertContains(response, 'файл удалён')
         self.assertContains(response, 'Смета.pdf')
+        self.assertContains(response, 'msg-attachment-file')
+        self.assertNotContains(response, 'download title="Скачать «Смета.pdf»"')
+
+    def test_expired_photo_becomes_a_card_too(self):
+        """Картинку показывать нечем — вместо битой рамки та же карточка."""
+        self.send(files=[self.photo('Фото.png')])
+        attachment = MessageAttachment.objects.get()
+        MessageAttachment.objects.filter(pk=attachment.pk).update(
+            created=timezone.now() - timedelta(days=8)
+        )
+        cleanup_expired_chat_attachments()
+
+        response = self.client.get(reverse('dialog_messages', args=[self.recipient.pk]))
+
+        self.assertContains(response, 'msg-attachment-file')
+        self.assertNotContains(response, '<img src="/chat/attachment/')
 
 
 class AttachmentQuotaTest(ChatAttachmentTestCase):

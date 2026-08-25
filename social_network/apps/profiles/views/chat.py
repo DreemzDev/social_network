@@ -120,9 +120,17 @@ class DialogsListView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
         return super().render_to_response(context, **response_kwargs)
 
 
-def serialize_attachment(attachment):
+def chat_ttl_days():
+    return StorageService.get_category_ttl_days(FileObject.Category.CHAT)
+
+
+def serialize_attachment(attachment, ttl_days=None):
     """Одна форма вложения на все пути: первая отрисовка страницы, догрузка
-    истории и живое событие получателю."""
+    истории и живое событие получателю.
+
+    ttl_days передаётся снаружи, а не спрашивается здесь: сериализация идёт
+    в цикле по сообщениям, и запрос за сроком на каждое вложение был бы
+    лишним."""
     return {
         'id': attachment.pk,
         'name': attachment.original_name,
@@ -133,8 +141,17 @@ def serialize_attachment(attachment):
         'label_size': attachment.badge_font_size,
         'is_image': attachment.is_image and not attachment.is_expired,
         'expired': attachment.is_expired,
+        'retention': attachment.retention_note(ttl_days),
         'url': None if attachment.is_expired else reverse('chat_attachment', args=[attachment.pk]),
     }
+
+
+def _serialize_attachments(msg):
+    attachments = list(msg.attachments.all())  # уже в prefetch
+    if not attachments:
+        return []
+    ttl_days = chat_ttl_days()
+    return [serialize_attachment(a, ttl_days) for a in attachments]
 
 
 def _serialize_message(msg):
@@ -169,7 +186,7 @@ def _serialize_message(msg):
         'sender_avatar': msg.sender.avatar.url if msg.sender.avatar else None,
         'created': msg.created.strftime('%H:%M'),
         'file': msg.file.url if hasattr(msg, 'file') and msg.file else None,
-        'attachments': [serialize_attachment(a) for a in msg.attachments.all()],
+        'attachments': _serialize_attachments(msg),
         'reply_to': reply_payload,
         'reactions': reactions_payload,
     }
@@ -202,9 +219,7 @@ class DialogMessagesView(DialogsWithUnreadMixin, LoginRequiredMixin, ListView):
         context['reaction_emojis'] = ALLOWED_REACTION_EMOJIS
         # Срок берётся из политики storage, а не пишется в шаблоне числом:
         # его правят в админке, и подпись обязана меняться вместе с ним.
-        context['chat_ttl_days'] = StorageService.get_category_ttl_days(
-            FileObject.Category.CHAT
-        )
+        context['chat_ttl_days'] = chat_ttl_days()
         context['max_attachments'] = MAX_ATTACHMENTS_PER_MESSAGE
         return context
 
@@ -347,7 +362,9 @@ class SendMessageWithReplyView(LoginRequiredMixin, View):
             'receiver': str(recipient.pk),
             'created': message.created.strftime('%H:%M'),
             'reply_to': reply_payload,
-            'attachments': [serialize_attachment(a) for a in attachments],
+            'attachments': [
+                serialize_attachment(a, chat_ttl_days()) for a in attachments
+            ],
         }
         push_chat_event(recipient.pk, 'new_reply_message', **payload)
 
